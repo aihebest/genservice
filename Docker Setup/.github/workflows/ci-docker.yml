@@ -1,0 +1,69 @@
+# =============================================================================
+#  GitHub Actions — Docker CI Pipeline
+#  Builds and tests the full stack using Docker Compose on every PR.
+#  This is the bridge between your local Docker setup and future Azure deploy.
+# =============================================================================
+
+name: Docker CI
+
+on:
+  push:
+    branches: [ develop, main, 'release/**' ]
+  pull_request:
+    branches: [ develop, main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ── Build backend image ──────────────────────────────────────────────
+      - name: Build API image
+        run: |
+          docker build \
+            -f Docker\ Setup/backend/Dockerfile \
+            -t genservice-api:ci \
+            Docker\ Setup/backend/
+
+      # ── Build frontend image ─────────────────────────────────────────────
+      - name: Build Frontend image
+        run: |
+          docker build \
+            -f Docker\ Setup/frontend/Dockerfile \
+            --build-arg VITE_API_URL="http://localhost:8081" \
+            --build-arg VITE_AUTH_MODE="DevJwt" \
+            -t genservice-web:ci \
+            Docker\ Setup/frontend/
+
+      # ── Start Test environment ───────────────────────────────────────────
+      - name: Start Test stack
+        working-directory: Docker\ Setup
+        run: |
+          docker compose -f docker-compose.test.yml up -d
+          echo "Waiting for services to be healthy..."
+          sleep 60
+
+      # ── Run API health check ─────────────────────────────────────────────
+      - name: API health check
+        run: |
+          curl -f http://localhost:8081/health || exit 1
+
+      # ── Run unit tests inside API container ─────────────────────────────
+      - name: Run unit tests
+        run: |
+          docker run --rm \
+            -e ASPNETCORE_ENVIRONMENT=Testing \
+            genservice-api:ci \
+            dotnet test tests/GenService.UnitTests/ --no-build -c Release --logger trx
+
+      # ── Tear down ────────────────────────────────────────────────────────
+      - name: Tear down Test stack
+        working-directory: Docker\ Setup
+        if: always()
+        run: docker compose -f docker-compose.test.yml down -v

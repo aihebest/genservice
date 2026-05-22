@@ -1,0 +1,140 @@
+# =============================================================================
+#  GenService — TEST / UAT Environment
+#  docker-compose.test.yml
+#
+#  Uses production Dockerfiles (no hot reload). Separate database from Dev.
+#  Migrations run automatically on API startup.
+#
+#  Run:  docker compose -f docker-compose.test.yml up --build
+#  URL:  http://localhost:5174   (React frontend — TEST)
+#        http://localhost:8081   (ASP.NET Core API — TEST)
+#        http://localhost:15673  (RabbitMQ management — TEST)
+#        http://localhost:5342   (Seq log viewer — TEST)
+# =============================================================================
+
+name: genservice-test
+
+services:
+
+  sqlserver-test:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: gs-test-sql
+    environment:
+      SA_PASSWORD: "GenService@Test2026!"
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: "Developer"
+    ports:
+      - "1434:1433"
+    volumes:
+      - gs_test_sql:/var/opt/mssql
+    healthcheck:
+      test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "GenService@Test2026!" -Q "SELECT 1" -No -C
+      interval: 15s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
+    networks:
+      - gs-test-net
+
+  redis-test:
+    image: redis:7-alpine
+    container_name: gs-test-redis
+    ports:
+      - "6380:6379"
+    networks:
+      - gs-test-net
+
+  azurite-test:
+    image: mcr.microsoft.com/azure-storage/azurite
+    container_name: gs-test-storage
+    command: azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --loose
+    ports:
+      - "10010:10000"
+      - "10011:10001"
+      - "10012:10002"
+    volumes:
+      - gs_test_blobs:/data
+    networks:
+      - gs-test-net
+
+  rabbitmq-test:
+    image: rabbitmq:3-management-alpine
+    container_name: gs-test-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: genservice
+      RABBITMQ_DEFAULT_PASS: "GenService@Test2026!"
+    ports:
+      - "5673:5672"
+      - "15673:15672"
+    networks:
+      - gs-test-net
+
+  seq-test:
+    image: datalust/seq:latest
+    container_name: gs-test-seq
+    environment:
+      ACCEPT_EULA: "Y"
+    ports:
+      - "5342:80"
+    volumes:
+      - gs_test_seq:/data
+    networks:
+      - gs-test-net
+
+  api-test:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: gs-test-api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Testing
+      ASPNETCORE_URLS: "http://+:8081"
+      ConnectionStrings__DefaultConnection: "Server=sqlserver-test,1433;Database=GenServiceTest;User Id=sa;Password=GenService@Test2026!;TrustServerCertificate=true;MultipleActiveResultSets=true"
+      ConnectionStrings__Redis: "redis-test:6379"
+      AzureStorage__ConnectionString: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OGLjX+N3kRciCP3dQnz7eQ+kAEYVbT8q;BlobEndpoint=http://azurite-test:10000/devstoreaccount1;"
+      AzureStorage__ContainerName: "documents"
+      RabbitMQ__Host: "rabbitmq-test"
+      RabbitMQ__Port: "5672"
+      RabbitMQ__Username: "genservice"
+      RabbitMQ__Password: "GenService@Test2026!"
+      Seq__ServerUrl: "http://seq-test:80"
+      Auth__Mode: "DevJwt"
+      Auth__DevJwt__Secret: "GenServiceTestJwtSecret2026LocalKey32chars!"
+      Auth__DevJwt__Issuer: "genservice-local"
+      Auth__DevJwt__Audience: "genservice-web"
+      Cors__AllowedOrigins: "http://localhost:5174"
+      RunMigrationsOnStartup: "true"
+    ports:
+      - "8081:8081"
+    depends_on:
+      sqlserver-test:
+        condition: service_healthy
+      redis-test:
+        condition: service_started
+    networks:
+      - gs-test-net
+
+  frontend-test:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: "http://localhost:8081"
+        VITE_AUTH_MODE: "DevJwt"
+        VITE_ENV_LABEL: "TEST"
+    container_name: gs-test-web
+    ports:
+      - "5174:80"
+    depends_on:
+      - api-test
+    networks:
+      - gs-test-net
+
+volumes:
+  gs_test_sql:
+  gs_test_blobs:
+  gs_test_seq:
+
+networks:
+  gs-test-net:
+    driver: bridge

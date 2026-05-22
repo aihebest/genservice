@@ -1,0 +1,167 @@
+# =============================================================================
+#  GenService — DEVELOPMENT Environment
+#  docker-compose.yml
+#
+#  Starts: SQL Server | Redis | Azurite | RabbitMQ | Seq | API | Frontend
+#  Hot-reload is ON for both the API and the React frontend.
+#
+#  Run:  docker compose up --build
+#  URL:  http://localhost:5173   (React frontend)
+#        http://localhost:8080   (ASP.NET Core API)
+#        http://localhost:15672  (RabbitMQ management UI  — user: genservice / GenService@Dev2026)
+#        http://localhost:5341   (Seq log viewer)
+# =============================================================================
+
+name: genservice-dev
+
+services:
+
+  # ── SQL Server (replaces Azure SQL Database) ─────────────────────────────
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: gs-dev-sql
+    environment:
+      SA_PASSWORD: "GenService@Dev2026!"
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: "Developer"
+    ports:
+      - "1433:1433"
+    volumes:
+      - gs_dev_sql:/var/opt/mssql
+      - ./docker/sql/init-dev.sql:/init-dev.sql
+    healthcheck:
+      test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "GenService@Dev2026!" -Q "SELECT 1" -No -C
+      interval: 15s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
+    networks:
+      - gs-dev-net
+    restart: unless-stopped
+
+  # ── Redis (replaces Azure Cache for Redis) ───────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: gs-dev-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - gs-dev-net
+    restart: unless-stopped
+
+  # ── Azurite (replaces Azure Blob Storage) ───────────────────────────────
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite
+    container_name: gs-dev-storage
+    command: azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --loose
+    ports:
+      - "10000:10000"   # Blob
+      - "10001:10001"   # Queue
+      - "10002:10002"   # Table
+    volumes:
+      - gs_dev_blobs:/data
+    networks:
+      - gs-dev-net
+    restart: unless-stopped
+
+  # ── RabbitMQ (replaces Azure Service Bus) ───────────────────────────────
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: gs-dev-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: genservice
+      RABBITMQ_DEFAULT_PASS: "GenService@Dev2026!"
+    ports:
+      - "5672:5672"     # AMQP
+      - "15672:15672"   # Management UI
+    volumes:
+      - gs_dev_rabbit:/var/lib/rabbitmq
+    networks:
+      - gs-dev-net
+    restart: unless-stopped
+
+  # ── Seq (replaces Application Insights — local structured log viewer) ────
+  seq:
+    image: datalust/seq:latest
+    container_name: gs-dev-seq
+    environment:
+      ACCEPT_EULA: "Y"
+    ports:
+      - "5341:80"
+    volumes:
+      - gs_dev_seq:/data
+    networks:
+      - gs-dev-net
+    restart: unless-stopped
+
+  # ── ASP.NET Core 8 API (hot reload via dotnet watch) ────────────────────
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: gs-dev-api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: "http://+:8080"
+      ConnectionStrings__DefaultConnection: "Server=sqlserver,1433;Database=GenServiceDev;User Id=sa;Password=GenService@Dev2026!;TrustServerCertificate=true;MultipleActiveResultSets=true"
+      ConnectionStrings__Redis: "redis:6379"
+      AzureStorage__ConnectionString: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OGLjX+N3kRciCP3dQnz7eQ+kAEYVbT8q;BlobEndpoint=http://azurite:10000/devstoreaccount1;"
+      AzureStorage__ContainerName: "documents"
+      RabbitMQ__Host: "rabbitmq"
+      RabbitMQ__Port: "5672"
+      RabbitMQ__Username: "genservice"
+      RabbitMQ__Password: "GenService@Dev2026!"
+      Seq__ServerUrl: "http://seq:80"
+      Auth__Mode: "DevJwt"
+      Auth__DevJwt__Secret: "GenServiceDevJwtSecret2026LocalKey32chars!"
+      Auth__DevJwt__Issuer: "genservice-local"
+      Auth__DevJwt__Audience: "genservice-web"
+      Cors__AllowedOrigins: "http://localhost:5173"
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend:/app
+      - gs_dev_nuget:/root/.nuget/packages
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+    networks:
+      - gs-dev-net
+    restart: unless-stopped
+
+  # ── React + Vite Frontend (hot reload) ──────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: gs-dev-web
+    environment:
+      VITE_API_URL: "http://localhost:8080"
+      VITE_AUTH_MODE: "DevJwt"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - api
+    networks:
+      - gs-dev-net
+    restart: unless-stopped
+
+# ── Volumes ──────────────────────────────────────────────────────────────────
+volumes:
+  gs_dev_sql:
+  gs_dev_blobs:
+  gs_dev_rabbit:
+  gs_dev_seq:
+  gs_dev_nuget:
+
+# ── Networks ─────────────────────────────────────────────────────────────────
+networks:
+  gs-dev-net:
+    driver: bridge

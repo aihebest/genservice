@@ -1,0 +1,6 @@
+@GenService.API_HostAddress = http://localhost:5171
+
+GET {{GenService.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

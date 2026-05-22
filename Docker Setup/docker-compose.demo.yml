@@ -1,0 +1,136 @@
+# =============================================================================
+#  GenService — MANAGEMENT DEMO (Production-like)
+#  docker-compose.demo.yml
+#
+#  Production builds. Nginx reverse proxy on port 80. Demo data pre-seeded.
+#  ALL THREE environments (Dev/Test/Demo) can run simultaneously on the same
+#  machine — they use different port ranges with no conflicts.
+#
+#  Run:  docker compose -f docker-compose.demo.yml up --build
+#  URL:  http://localhost         (Platform — looks like production)
+#        http://localhost/api     (API health check)
+#
+#  DEMO USERS (pre-seeded — use these to log in during management presentation):
+#    manager@demo.local     / DemoManager2026!
+#    supervisor@demo.local  / DemoSuper2026!
+#    technician@demo.local  / DemoTech2026!
+#    driver@demo.local      / DemoDriver2026!
+# =============================================================================
+
+name: genservice-demo
+
+services:
+
+  # ── Nginx Reverse Proxy (routes / → frontend, /api → backend) ───────────
+  nginx:
+    image: nginx:alpine
+    container_name: gs-demo-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./docker/nginx/nginx-demo.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - api-demo
+      - frontend-demo
+    networks:
+      - gs-demo-net
+    restart: unless-stopped
+
+  sqlserver-demo:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: gs-demo-sql
+    environment:
+      SA_PASSWORD: "GenService@Demo2026!"
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: "Developer"
+    volumes:
+      - gs_demo_sql:/var/opt/mssql
+      - ./docker/sql/seed-demo.sql:/seed-demo.sql
+    healthcheck:
+      test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "GenService@Demo2026!" -Q "SELECT 1" -No -C
+      interval: 15s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
+    networks:
+      - gs-demo-net
+    restart: unless-stopped
+
+  redis-demo:
+    image: redis:7-alpine
+    container_name: gs-demo-redis
+    networks:
+      - gs-demo-net
+    restart: unless-stopped
+
+  azurite-demo:
+    image: mcr.microsoft.com/azure-storage/azurite
+    container_name: gs-demo-storage
+    command: azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --loose
+    volumes:
+      - gs_demo_blobs:/data
+    networks:
+      - gs-demo-net
+    restart: unless-stopped
+
+  rabbitmq-demo:
+    image: rabbitmq:3-management-alpine
+    container_name: gs-demo-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: genservice
+      RABBITMQ_DEFAULT_PASS: "GenService@Demo2026!"
+    networks:
+      - gs-demo-net
+    restart: unless-stopped
+
+  api-demo:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: gs-demo-api
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Production"
+      ASPNETCORE_URLS: "http://+:8080"
+      ConnectionStrings__DefaultConnection: "Server=sqlserver-demo,1433;Database=GenServiceDemo;User Id=sa;Password=GenService@Demo2026!;TrustServerCertificate=true;MultipleActiveResultSets=true"
+      ConnectionStrings__Redis: "redis-demo:6379"
+      AzureStorage__ConnectionString: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OGLjX+N3kRciCP3dQnz7eQ+kAEYVbT8q;BlobEndpoint=http://azurite-demo:10000/devstoreaccount1;"
+      AzureStorage__ContainerName: "documents"
+      RabbitMQ__Host: "rabbitmq-demo"
+      RabbitMQ__Port: "5672"
+      RabbitMQ__Username: "genservice"
+      RabbitMQ__Password: "GenService@Demo2026!"
+      Auth__Mode: "DevJwt"
+      Auth__DevJwt__Secret: "GenServiceDemoJwtSecret2026LocalKey32chars!"
+      Auth__DevJwt__Issuer: "genservice-local"
+      Auth__DevJwt__Audience: "genservice-web"
+      SeedDemoData: "true"
+      RunMigrationsOnStartup: "true"
+    depends_on:
+      sqlserver-demo:
+        condition: service_healthy
+      redis-demo:
+        condition: service_started
+    networks:
+      - gs-demo-net
+    restart: unless-stopped
+
+  frontend-demo:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ""
+        VITE_AUTH_MODE: "DevJwt"
+        VITE_ENV_LABEL: "DEMO"
+    container_name: gs-demo-web
+    networks:
+      - gs-demo-net
+    restart: unless-stopped
+
+volumes:
+  gs_demo_sql:
+  gs_demo_blobs:
+
+networks:
+  gs-demo-net:
+    driver: bridge

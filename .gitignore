@@ -1,0 +1,32 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+*.nupkg
+
+# EF Core migrations snapshot (optional, remove if you want to track)
+# **/Migrations/
+
+# ASP.NET Core
+appsettings.Development.json
+
+# Node / Vite
+node_modules/
+dist/
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Office temp files
+~$*
