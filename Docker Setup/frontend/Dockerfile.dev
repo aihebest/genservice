@@ -1,0 +1,21 @@
+# =============================================================================
+#  Frontend — DEVELOPMENT Dockerfile  (hot reload via Vite dev server)
+#  Place this file at:  frontend/Dockerfile.dev
+# =============================================================================
+
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copy package files first so install is cached unless dependencies change
+COPY package.json package-lock.json ./
+
+RUN npm ci
+
+# Copy source (volume mount in dev will override this at runtime)
+COPY . .
+
+EXPOSE 5173
+
+# Vite dev server — host 0.0.0.0 makes it reachable from Docker network
+ENTRYPOINT ["npm", "run", "dev", "--", "--host", "0.0.0.0"]

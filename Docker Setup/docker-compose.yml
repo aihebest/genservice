@@ -82,7 +82,7 @@ services:
 
   # ── Seq (replaces Application Insights — local structured log viewer) ────
   seq:
-    image: datalust/seq:latest
+    image: datalust/seq:2024.3
     container_name: gs-dev-seq
     environment:
       ACCEPT_EULA: "Y"
@@ -90,6 +90,12 @@ services:
       - "5341:80"
     volumes:
       - gs_dev_seq:/data
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo >/dev/tcp/localhost/80' 2>/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     networks:
       - gs-dev-net
     restart: unless-stopped
@@ -127,8 +133,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
-      rabbitmq:
-        condition: service_started
     networks:
       - gs-dev-net
     restart: unless-stopped
@@ -140,8 +144,14 @@ services:
       dockerfile: Dockerfile.dev
     container_name: gs-dev-web
     environment:
-      VITE_API_URL: "http://localhost:8080"
+      # API_TARGET is read by vite.config.ts (server-side) for the dev proxy.
+      # The Vite dev server forwards /api/* to this Docker-internal address.
+      # The browser never hits port 8080 directly → no CORS issues.
+      API_TARGET: "http://api:8080"
+      # VITE_API_URL="" → axios uses /api/v1 (relative) → goes through the proxy.
+      VITE_API_URL: ""
       VITE_AUTH_MODE: "DevJwt"
+      VITE_ENV_LABEL: "dev"
     ports:
       - "5173:5173"
     volumes:

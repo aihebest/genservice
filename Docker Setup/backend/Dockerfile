@@ -10,14 +10,14 @@ FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
 # Copy project files and restore (layer cached until .csproj changes)
-COPY *.sln ./
+# Note: using project-level restore (works with both .sln and .slnx formats)
 COPY src/GenService.Domain/GenService.Domain.csproj           src/GenService.Domain/
 COPY src/GenService.Application/GenService.Application.csproj src/GenService.Application/
 COPY src/GenService.Infrastructure/GenService.Infrastructure.csproj src/GenService.Infrastructure/
 COPY src/GenService.API/GenService.API.csproj                 src/GenService.API/
 COPY tests/GenService.UnitTests/GenService.UnitTests.csproj   tests/GenService.UnitTests/
 
-RUN dotnet restore
+RUN dotnet restore src/GenService.API/GenService.API.csproj
 
 # Copy all source and publish
 COPY . .

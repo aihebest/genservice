@@ -16,7 +16,7 @@ IF NOT EXISTS (SELECT 1 FROM Users WHERE Email = 'manager@demo.local')
 BEGIN
     INSERT INTO Users (Id, FullName, Email, Department, Role, IsActive, CreatedAt)
     VALUES
-      (NEWID(), 'Adaeze Williams',     'manager@demo.local',    'General Service', 'DepartmentManager', 1, GETUTCDATE()),
+      (NEWID(), 'Bobby Tholath',       'manager@demo.local',    'General Service', 'DepartmentManager', 1, GETUTCDATE()),
       (NEWID(), 'Emeka Okonkwo',       'supervisor@demo.local', 'General Service', 'Supervisor',        1, GETUTCDATE()),
       (NEWID(), 'Chukwudi Nwosu',      'technician@demo.local', 'General Service', 'Technician',        1, GETUTCDATE()),
       (NEWID(), 'Bola Adeyemi',        'driver@demo.local',     'General Service', 'Driver',            1, GETUTCDATE()),
