@@ -1,0 +1,36 @@
+# Normalize all text files to LF in the repo; convert to CRLF on Windows checkout
+* text=auto eol=lf
+
+# Explicitly text
+*.cs        text eol=lf
+*.csproj    text eol=lf
+*.sln       text eol=lf
+*.slnx      text eol=lf
+*.ts        text eol=lf
+*.tsx       text eol=lf
+*.js        text eol=lf
+*.jsx       text eol=lf
+*.json      text eol=lf
+*.md        text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.sql       text eol=lf
+*.css       text eol=lf
+*.html      text eol=lf
+*.sh        text eol=lf
+*.env       text eol=lf
+Dockerfile* text eol=lf
+*.conf      text eol=lf
+*.bat       text eol=crlf
+
+# Binary — no conversion
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.svg  binary
+*.pdf  binary
+*.docx binary
+*.xlsx binary
+*.zip  binary
