@@ -6,8 +6,11 @@ import {
 import {
   BarChartOutlined, ToolOutlined, ThunderboltOutlined,
   ReloadOutlined, CheckCircleOutlined, WarningOutlined,
-  ClockCircleOutlined, FireOutlined,
+  ClockCircleOutlined, FireOutlined, CarOutlined,
+  HomeOutlined, TeamOutlined, BankOutlined,
 } from '@ant-design/icons';
+import { taskProgressLogApi } from '../../api/taskProgressLog.api';
+import type { TechnicianSummary } from '../../types';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartTooltip,
   ResponsiveContainer, PieChart, Pie, Cell, Legend, LineChart, Line, Area, AreaChart,
@@ -561,9 +564,341 @@ export default function ReportsPage() {
             label:    <Space><ThunderboltOutlined />Fuel &amp; Power</Space>,
             children: <FuelReportTab period={period} />,
           },
+          {
+            key:      'vehicle',
+            label:    <Space><CarOutlined />Vehicle Maintenance</Space>,
+            children: <VehicleReportTab period={period} />,
+          },
+          {
+            key:      'facility',
+            label:    <Space><HomeOutlined />Facility Maintenance</Space>,
+            children: <FacilityReportTab period={period} />,
+          },
+          {
+            key:      'generator',
+            label:    <Space><FireOutlined />Generator Report</Space>,
+            children: <GeneratorReportTab period={period} />,
+          },
+          {
+            key:      'technicians',
+            label:    <Space><TeamOutlined />Technician Activity</Space>,
+            children: <TechnicianReportTab />,
+          },
+          {
+            key:      'accommodation',
+            label:    <Space><BankOutlined />Accommodation</Space>,
+            children: <AccommodationReportTab period={period} />,
+          },
         ]}
         style={{ background: 'white', padding: '0 16px 16px', borderRadius: 8 }}
       />
+    </div>
+  );
+}
+
+// ── Vehicle Maintenance Report ────────────────────────────────────────────────
+function VehicleReportTab({ period }: { period: ReportPeriod }) {
+  const { data: d, isFetching } = useQuery({
+    queryKey: ['reports', 'vehicle', period],
+    queryFn: () => reportsApi.vehicle(period),
+  });
+
+  if (isFetching || !d) return <div style={{ padding: 32, textAlign: 'center' }}>Loading…</div>;
+  const r = d as Record<string, unknown>;
+
+  return (
+    <div>
+      <Row gutter={12} style={{ marginBottom: 20 }}>
+        {[
+          { label: 'Total Requests',  value: r.total      as number, color: '#1677ff' },
+          { label: 'Pending',         value: r.pending    as number, color: '#fa8c16' },
+          { label: 'In Workshop',     value: r.inWorkshop as number, color: '#722ed1' },
+          { label: 'Long-Standing',   value: r.longStanding as number, color: '#f5222d' },
+          { label: 'Completed',       value: r.completed  as number, color: '#52c41a' },
+        ].map(k => (
+          <Col key={k.label} style={{ flex: '1 1 130px', minWidth: 120, marginBottom: 8 }}>
+            <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
+              <Statistic title={<Text style={{ fontSize: 12 }}>{k.label}</Text>}
+                value={k.value ?? 0} valueStyle={{ color: k.color, fontSize: 22, fontWeight: 700 }} />
+            </Card>
+          </Col>
+        ))}
+      </Row>
+      <Row gutter={16}>
+        <Col xs={24} md={12}>
+          <ChartCard title="Requests by Maintenance Type">
+            <ResponsiveContainer>
+              <BarChart data={(r.byType as PeriodBreakdownItem[] ?? [])}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} />
+                <RechartTooltip />
+                <Bar dataKey="count" fill="#722ed1" />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        </Col>
+        <Col xs={24} md={12}>
+          <ChartCard title="Requests by Location">
+            <ResponsiveContainer>
+              <BarChart data={(r.byLocation as PeriodBreakdownItem[] ?? [])}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} />
+                <RechartTooltip />
+                <Bar dataKey="count" fill="#1677ff" />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        </Col>
+      </Row>
+    </div>
+  );
+}
+
+// ── Facility Maintenance Report ───────────────────────────────────────────────
+function FacilityReportTab({ period }: { period: ReportPeriod }) {
+  const { data: d, isFetching } = useQuery({
+    queryKey: ['reports', 'facility', period],
+    queryFn: () => reportsApi.facility(period),
+  });
+
+  if (isFetching || !d) return <div style={{ padding: 32, textAlign: 'center' }}>Loading…</div>;
+  const r = d as Record<string, unknown>;
+
+  return (
+    <div>
+      <Row gutter={12} style={{ marginBottom: 20 }}>
+        {[
+          { label: 'Total',           value: r.total          as number, color: '#1677ff' },
+          { label: 'Pending',         value: r.pending        as number, color: '#fa8c16' },
+          { label: 'Ongoing',         value: r.ongoing        as number, color: '#722ed1' },
+          { label: 'Awaiting Spares', value: r.awaitingSpares as number, color: '#d4a015' },
+          { label: 'Awaiting Funds',  value: r.awaitingFunds  as number, color: '#fa541c' },
+          { label: 'Completed',       value: r.completed      as number, color: '#52c41a' },
+        ].map(k => (
+          <Col key={k.label} style={{ flex: '1 1 110px', minWidth: 100, marginBottom: 8 }}>
+            <Card size="small" styles={{ body: { padding: '10px 14px' } }}>
+              <Statistic title={<Text style={{ fontSize: 11 }}>{k.label}</Text>}
+                value={k.value ?? 0} valueStyle={{ color: k.color, fontSize: 20, fontWeight: 700 }} />
+            </Card>
+          </Col>
+        ))}
+      </Row>
+      <Row gutter={16}>
+        <Col xs={24} md={12}>
+          <ChartCard title="By Work Type">
+            <ResponsiveContainer>
+              <BarChart data={(r.byType as PeriodBreakdownItem[] ?? [])}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} />
+                <RechartTooltip />
+                <Bar dataKey="count" fill="#52c41a" />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        </Col>
+        <Col xs={24} md={12}>
+          <ChartCard title="By End User / Department">
+            <ResponsiveContainer>
+              <PieChart>
+                <Pie data={(r.byEndUser as PeriodBreakdownItem[] ?? [])} dataKey="count" nameKey="label"
+                  cx="50%" cy="50%" outerRadius={80} label={({ label, percent }) => `${label} ${((percent ?? 0)*100).toFixed(0)}%`}>
+                  {(r.byEndUser as PeriodBreakdownItem[] ?? []).map((_: PeriodBreakdownItem, i: number) =>
+                    <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+                </Pie>
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        </Col>
+      </Row>
+    </div>
+  );
+}
+
+// ── Generator Report ──────────────────────────────────────────────────────────
+function GeneratorReportTab({ period }: { period: ReportPeriod }) {
+  const { data: d, isFetching } = useQuery({
+    queryKey: ['reports', 'generator', period],
+    queryFn: () => reportsApi.generator(period),
+  });
+
+  if (isFetching || !d) return <div style={{ padding: 32, textAlign: 'center' }}>Loading…</div>;
+  const r = d as Record<string, unknown>;
+
+  type GenStatus = { assetDescription: string; location: string; cumulativeRunHours: number; fuelLevelLitres: number; latestStatus: string; serviceAlertActive: boolean; hoursUntilNextService: number };
+
+  return (
+    <div>
+      <Row gutter={12} style={{ marginBottom: 20 }}>
+        {[
+          { label: 'Generators Tracked',    value: r.generatorsTracked      as number, color: '#1677ff' },
+          { label: `Run Hours (${r.periodLabel})`, value: r.totalRunHoursPeriod as number, color: '#722ed1', suffix: ' h' },
+          { label: 'Fuel Consumed (L)',      value: r.totalFuelConsumed      as number, color: '#fa8c16', suffix: ' L' },
+          { label: 'Service Alerts',         value: r.serviceAlerts          as number, color: (r.serviceAlerts as number) > 0 ? '#f5222d' : '#52c41a' },
+        ].map(k => (
+          <Col key={k.label} style={{ flex: '1 1 140px', minWidth: 130, marginBottom: 8 }}>
+            <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
+              <Statistic title={<Text style={{ fontSize: 11 }}>{k.label}</Text>}
+                value={k.value ?? 0} suffix={k.suffix ?? ''}
+                valueStyle={{ color: k.color, fontSize: 22, fontWeight: 700 }} />
+            </Card>
+          </Col>
+        ))}
+      </Row>
+      <Row gutter={16} style={{ marginBottom: 16 }}>
+        <Col xs={24}>
+          <ChartCard title="Daily Run Hours Trend" height={200}>
+            <ResponsiveContainer>
+              <AreaChart data={(r.runHoursTrend as { date: string; value: number }[] ?? [])}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 11 }} />
+                <RechartTooltip />
+                <Area type="monotone" dataKey="value" stroke="#722ed1" fill="#f0e6ff" name="Run Hours" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        </Col>
+      </Row>
+      <Card size="small" title={<Text strong style={{ fontSize: 13 }}>Fleet Status</Text>}>
+        {(r.fleetStatus as GenStatus[] ?? []).map((g: GenStatus, i: number) => (
+          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            padding: '8px 0', borderBottom: '1px solid #f5f5f5', flexWrap: 'wrap', gap: 8 }}>
+            <div>
+              <Text strong style={{ fontSize: 13 }}>{g.assetDescription}</Text>
+              <Text type="secondary" style={{ fontSize: 12, marginLeft: 8 }}>{g.location}</Text>
+            </div>
+            <Space wrap>
+              <Text style={{ fontSize: 12 }}>{(g.cumulativeRunHours ?? 0).toLocaleString()} h cumulative</Text>
+              <Text style={{ fontSize: 12 }}>{(g.fuelLevelLitres ?? 0).toLocaleString()} L fuel</Text>
+              {g.serviceAlertActive
+                ? <Tag color="red" icon={<WarningOutlined />}>Service Alert — {(g.hoursUntilNextService ?? 0).toFixed(0)}h left</Tag>
+                : <Tag color="green"><CheckCircleOutlined /> {(g.hoursUntilNextService ?? 0).toFixed(0)}h to service</Tag>}
+            </Space>
+          </div>
+        ))}
+      </Card>
+    </div>
+  );
+}
+
+// ── Technician Activity Report ────────────────────────────────────────────────
+function TechnicianReportTab() {
+  const { data: techs = [], isFetching } = useQuery({
+    queryKey: ['reports', 'technicians'],
+    queryFn: taskProgressLogApi.performance,
+  });
+
+  return (
+    <div>
+      <Row gutter={12} style={{ marginBottom: 20 }}>
+        {[
+          { label: 'Technicians',      value: techs.length, color: '#1677ff' },
+          { label: 'Total Assigned',   value: techs.reduce((s: number, t: TechnicianSummary) => s + t.totalAssigned, 0), color: '#722ed1' },
+          { label: 'Total Completed',  value: techs.reduce((s: number, t: TechnicianSummary) => s + t.completed, 0), color: '#52c41a' },
+          { label: "Today's Logs",     value: techs.reduce((s: number, t: TechnicianSummary) => s + t.todayLogs, 0), color: '#1677ff' },
+          { label: 'Active Blockers',  value: techs.reduce((s: number, t: TechnicianSummary) => s + t.awaitingMaterials + t.awaitingVendor, 0), color: '#fa541c' },
+        ].map(k => (
+          <Col key={k.label} style={{ flex: '1 1 130px', minWidth: 120, marginBottom: 8 }}>
+            <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
+              <Statistic title={<Text style={{ fontSize: 11 }}>{k.label}</Text>}
+                value={k.value} valueStyle={{ color: k.color, fontSize: 22, fontWeight: 700 }} />
+            </Card>
+          </Col>
+        ))}
+      </Row>
+      <Card size="small" title={<Text strong>Technician Performance Summary</Text>} loading={isFetching}>
+        {techs.map((t: TechnicianSummary) => {
+          const rate = t.totalAssigned > 0 ? Math.round((t.completed / t.totalAssigned) * 100) : 0;
+          return (
+            <div key={t.email} style={{ padding: '12px 0', borderBottom: '1px solid #f5f5f5' }}>
+              <Row gutter={8} align="middle">
+                <Col flex="160px"><Text strong>{t.name}</Text></Col>
+                <Col flex="80px"><Tag color="blue">{t.totalAssigned} assigned</Tag></Col>
+                <Col flex="80px"><Tag color="green">{t.completed} done</Tag></Col>
+                <Col flex="80px"><Tag color="processing">{t.inProgress} active</Tag></Col>
+                <Col flex="130px">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ flex: 1 }}>
+                      <Progress percent={rate} size="small" showInfo={false}
+                        strokeColor={rate >= 70 ? '#52c41a' : rate >= 40 ? '#fa8c16' : '#ff4d4f'} />
+                    </div>
+                    <Text style={{ fontSize: 12, width: 32 }}>{rate}%</Text>
+                  </div>
+                </Col>
+                <Col flex="auto">
+                  <Space wrap size={4}>
+                    {t.awaitingMaterials > 0 && <Tag color="gold">{t.awaitingMaterials} Spares</Tag>}
+                    {t.awaitingVendor > 0 && <Tag color="orange">{t.awaitingVendor} Vendor</Tag>}
+                    <Text type="secondary" style={{ fontSize: 11 }}>Today: {t.todayLogs} logs | Week: {t.weekLogs}</Text>
+                  </Space>
+                </Col>
+              </Row>
+            </div>
+          );
+        })}
+        {techs.length === 0 && !isFetching && (
+          <Text type="secondary">No assignment data yet.</Text>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+// ── Accommodation Report ──────────────────────────────────────────────────────
+function AccommodationReportTab({ period }: { period: ReportPeriod }) {
+  const { data: d, isFetching } = useQuery({
+    queryKey: ['reports', 'accommodation', period],
+    queryFn: () => reportsApi.accommodation(period),
+  });
+
+  if (isFetching || !d) return <div style={{ padding: 32, textAlign: 'center' }}>Loading…</div>;
+  const r = d as Record<string, unknown>;
+
+  type AccomReq = { ticketNumber: string; title: string; status: string; priority: string; location: string; requestedByName: string; approvedByName?: string; createdAt: string; approvedAt?: string };
+
+  return (
+    <div>
+      <Row gutter={12} style={{ marginBottom: 20 }}>
+        {[
+          { label: 'Total Requests', value: r.total    as number, color: '#1677ff' },
+          { label: 'Pending',        value: r.pending  as number, color: '#fa8c16' },
+          { label: 'Approved',       value: r.approved as number, color: '#52c41a' },
+          { label: 'Completed',      value: r.completed as number, color: '#52c41a' },
+          { label: 'Rejected',       value: r.rejected  as number, color: '#f5222d' },
+        ].map(k => (
+          <Col key={k.label} style={{ flex: '1 1 130px', minWidth: 120, marginBottom: 8 }}>
+            <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
+              <Statistic title={<Text style={{ fontSize: 12 }}>{k.label}</Text>}
+                value={k.value ?? 0} valueStyle={{ color: k.color, fontSize: 22, fontWeight: 700 }} />
+            </Card>
+          </Col>
+        ))}
+      </Row>
+      <Card size="small" title={<Text strong>Accommodation Requests ({r.periodLabel as string})</Text>}>
+        {(r.requests as AccomReq[] ?? []).map((req: AccomReq, i: number) => (
+          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            padding: '8px 0', borderBottom: '1px solid #f5f5f5', flexWrap: 'wrap', gap: 8 }}>
+            <Space>
+              <Text code style={{ fontSize: 11 }}>{req.ticketNumber}</Text>
+              <Text style={{ fontSize: 13 }}>{req.title}</Text>
+            </Space>
+            <Space wrap>
+              <Text type="secondary" style={{ fontSize: 12 }}>{req.location}</Text>
+              <Text type="secondary" style={{ fontSize: 12 }}>{req.requestedByName}</Text>
+              <Tag color={STATUS_META[req.status as import('../../types').RequestStatus]?.color ?? 'default'}>
+                {STATUS_META[req.status as import('../../types').RequestStatus]?.label ?? req.status}
+              </Tag>
+            </Space>
+          </div>
+        ))}
+        {(r.requests as AccomReq[] ?? []).length === 0 && (
+          <Text type="secondary">No accommodation requests in this period.</Text>
+        )}
+      </Card>
     </div>
   );
 }

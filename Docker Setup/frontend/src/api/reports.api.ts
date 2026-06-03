@@ -70,12 +70,24 @@ export interface FuelPowerReport {
 }
 
 export const reportsApi = {
-  requests:    (period: ReportPeriod = '30d') =>
+  requests:      (period: ReportPeriod = '30d') =>
     apiClient.get<RequestReport>('/reports/requests', { params: { period } }).then(r => r.data),
 
-  maintenance: (period: ReportPeriod = '30d') =>
+  maintenance:   (period: ReportPeriod = '30d') =>
     apiClient.get<MaintenanceReport>('/reports/maintenance', { params: { period } }).then(r => r.data),
 
-  fuel:        (period: ReportPeriod = '30d') =>
+  fuel:          (period: ReportPeriod = '30d') =>
     apiClient.get<FuelPowerReport>('/reports/fuel', { params: { period } }).then(r => r.data),
+
+  vehicle:       (period: ReportPeriod = '30d') =>
+    apiClient.get<Record<string, unknown>>('/reports/vehicle', { params: { period } }).then(r => r.data),
+
+  facility:      (period: ReportPeriod = '30d') =>
+    apiClient.get<Record<string, unknown>>('/reports/facility', { params: { period } }).then(r => r.data),
+
+  generator:     (period: ReportPeriod = '30d') =>
+    apiClient.get<Record<string, unknown>>('/reports/generator', { params: { period } }).then(r => r.data),
+
+  accommodation: (period: ReportPeriod = '30d') =>
+    apiClient.get<Record<string, unknown>>('/reports/accommodation', { params: { period } }).then(r => r.data),
 };

@@ -253,4 +253,155 @@ public class ReportsController(GenServiceDbContext db) : ControllerBase
             label
         ));
     }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GET /api/v1/reports/vehicle?period=30d
+    // ══════════════════════════════════════════════════════════════════════════
+    [HttpGet("vehicle")]
+    public async Task<IActionResult> VehicleReport([FromQuery] string period = "30d")
+    {
+        var (from, label) = ResolvePeriod(period);
+        var all    = await db.VehicleMaintenanceRequests.AsNoTracking().Where(r => r.CreatedAt >= from).ToListAsync();
+        var now    = DateTime.UtcNow;
+        var monthS = new DateTime(now.Year, now.Month, 1);
+
+        return Ok(new
+        {
+            total          = all.Count,
+            pending        = all.Count(r => r.Status == VehicleMaintenanceStatus.Pending),
+            approved       = all.Count(r => r.Status == VehicleMaintenanceStatus.Approved),
+            inWorkshop     = all.Count(r => r.Status == VehicleMaintenanceStatus.InWorkshop),
+            completed      = all.Count(r => r.Status == VehicleMaintenanceStatus.Completed),
+            rejected       = all.Count(r => r.Status == VehicleMaintenanceStatus.Rejected),
+            longStanding   = all.Count(r => r.Status == VehicleMaintenanceStatus.InWorkshop
+                                         && r.SentToWorkshopAt.HasValue
+                                         && (now - r.SentToWorkshopAt.Value).TotalDays > 7),
+            byType         = all.GroupBy(r => r.MaintenanceType)
+                                .Select(g => new PeriodBreakdownItem(g.Key, g.Count())).ToList(),
+            byLocation     = all.GroupBy(r => r.CurrentLocation)
+                                .Select(g => new PeriodBreakdownItem(g.Key, g.Count())).ToList(),
+            recentRequests = all.OrderByDescending(r => r.CreatedAt).Take(10)
+                                .Select(r => new {
+                                    r.RequestNumber, r.VehicleRegNo, r.VehicleType,
+                                    r.MaintenanceType, r.Status, r.Priority,
+                                    r.CurrentLocation, r.WorkshopName,
+                                    DaysOpen = (int)(now - r.CreatedAt).TotalDays,
+                                    r.CreatedAt
+                                }).ToList(),
+            periodLabel    = label,
+        });
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GET /api/v1/reports/facility?period=30d
+    // ══════════════════════════════════════════════════════════════════════════
+    [HttpGet("facility")]
+    public async Task<IActionResult> FacilityReport([FromQuery] string period = "30d")
+    {
+        var (from, label) = ResolvePeriod(period);
+        var all = await db.FacilityMaintenanceRequests.AsNoTracking().Where(r => r.CreatedAt >= from).ToListAsync();
+
+        return Ok(new
+        {
+            total            = all.Count,
+            pending          = all.Count(r => r.Status == MaintenanceRequestStatus.Pending),
+            approved         = all.Count(r => r.Status == MaintenanceRequestStatus.Approved),
+            ongoing          = all.Count(r => r.Status == MaintenanceRequestStatus.Ongoing),
+            awaitingSpares   = all.Count(r => r.Status == MaintenanceRequestStatus.AwaitingSpares),
+            awaitingFunds    = all.Count(r => r.Status == MaintenanceRequestStatus.AwaitingFunds),
+            completed        = all.Count(r => r.Status == MaintenanceRequestStatus.Completed),
+            byType           = all.GroupBy(r => r.MaintenanceType)
+                                  .Select(g => new PeriodBreakdownItem(g.Key, g.Count())).ToList(),
+            byLocation       = all.GroupBy(r => r.Location)
+                                  .Select(g => new PeriodBreakdownItem(g.Key, g.Count())).ToList(),
+            byEndUser        = all.GroupBy(r => r.EndUser)
+                                  .Select(g => new PeriodBreakdownItem(g.Key, g.Count())).ToList(),
+            recentRequests   = all.OrderByDescending(r => r.CreatedAt).Take(10)
+                                  .Select(r => new {
+                                      r.RequestNumber, r.MaintenanceType, r.Description,
+                                      r.Location, r.EndUser, r.RoomFlat, r.Status, r.Priority,
+                                      r.ActionedBy, r.CreatedAt
+                                  }).ToList(),
+            periodLabel      = label,
+        });
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GET /api/v1/reports/generator?period=30d
+    // ══════════════════════════════════════════════════════════════════════════
+    [HttpGet("generator")]
+    public async Task<IActionResult> GeneratorReport([FromQuery] string period = "30d")
+    {
+        var (from, label) = ResolvePeriod(period);
+        var readings = await db.GeneratorDailyReadings.AsNoTracking()
+            .Where(r => r.ReadingDate >= from).OrderByDescending(r => r.ReadingDate).ToListAsync();
+
+        var allReadings = await db.GeneratorDailyReadings.AsNoTracking()
+            .OrderByDescending(r => r.ReadingDate).ToListAsync();
+
+        // Latest reading per generator
+        var latestPerGen = allReadings.GroupBy(r => r.AssetNo).Select(g => g.First()).ToList();
+        var alertCount   = latestPerGen.Count(r => r.ServiceAlertActive);
+
+        // Total run hours and fuel consumed in period
+        var totalHours    = readings.Sum(r => r.RunHoursToday);
+        var totalFuel     = readings.Where(r => r.FuelConsumedLitres.HasValue).Sum(r => r.FuelConsumedLitres!.Value);
+
+        var runTrend = readings
+            .GroupBy(r => r.ReadingDate.Date)
+            .OrderBy(g => g.Key)
+            .Select(g => new TrendPoint(g.Key.ToString("MMM dd"), Math.Round(g.Sum(r => r.RunHoursToday), 1)))
+            .ToList();
+
+        return Ok(new
+        {
+            generatorsTracked  = latestPerGen.Count,
+            totalRunHoursPeriod= Math.Round(totalHours, 1),
+            totalFuelConsumed  = Math.Round(totalFuel, 0),
+            serviceAlerts      = alertCount,
+            fleetStatus        = latestPerGen.Select(r => new {
+                r.AssetNo, r.AssetDescription, r.Location,
+                r.CumulativeRunHours, r.FuelLevelLitres,
+                r.GeneratorStatus, r.ServiceAlertActive,
+                HoursUntilService = r.HoursUntilNextService,
+                r.ReadingDate
+            }).ToList(),
+            runHoursTrend      = runTrend,
+            fuelByLocation     = readings.GroupBy(r => r.Location)
+                .Select(g => new PeriodBreakdownItem(g.Key, (int)g.Where(r => r.FuelConsumedLitres.HasValue).Sum(r => r.FuelConsumedLitres!.Value)))
+                .ToList(),
+            periodLabel        = label,
+        });
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GET /api/v1/reports/accommodation?period=30d
+    // ══════════════════════════════════════════════════════════════════════════
+    [HttpGet("accommodation")]
+    public async Task<IActionResult> AccommodationReport([FromQuery] string period = "30d")
+    {
+        var (from, label) = ResolvePeriod(period);
+        var all = await db.ServiceRequests.AsNoTracking()
+            .Where(r => r.Category == RequestCategory.Accommodation && r.CreatedAt >= from)
+            .OrderByDescending(r => r.CreatedAt)
+            .ToListAsync();
+
+        return Ok(new
+        {
+            total       = all.Count,
+            pending     = all.Count(r => r.Status == RequestStatus.PendingLineManager
+                                      || r.Status == RequestStatus.PendingApproval),
+            approved    = all.Count(r => r.Status == RequestStatus.Approved),
+            completed   = all.Count(r => r.Status == RequestStatus.Completed),
+            rejected    = all.Count(r => r.Status == RequestStatus.Rejected),
+            byLocation  = all.GroupBy(r => r.Location)
+                             .Select(g => new PeriodBreakdownItem(g.Key, g.Count())).ToList(),
+            requests    = all.Select(r => new {
+                r.TicketNumber, r.Title, r.Status, r.Priority,
+                r.Location, r.RequestedByName, r.ApprovedByName,
+                r.CreatedAt, r.ApprovedAt, r.CompletedAt
+            }).ToList(),
+            periodLabel = label,
+        });
+    }
 }

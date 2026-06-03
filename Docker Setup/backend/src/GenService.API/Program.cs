@@ -1,5 +1,6 @@
 using GenService.API.Data;
 using GenService.API.Domain;
+using GenService.API.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -49,6 +50,11 @@ builder.Services.AddCors(options =>
               .AllowAnyMethod()
               .AllowAnyHeader());
 });
+
+// ── Application services ──────────────────────────────────────────────────────
+builder.Services.AddScoped<IEmailService, SmtpEmailService>();
+builder.Services.AddScoped<NotificationService>();
+builder.Services.AddScoped<AuditService>();
 
 // ── Controllers & API Explorer ────────────────────────────────────────────────
 builder.Services.AddControllers();
@@ -221,6 +227,177 @@ if (!app.Environment.IsProduction())
         }
     }
     catch (Exception ex) { log.LogError(ex, "❌ Seed failed: DieselRecords"); }
+
+    // ── Seed vehicle maintenance requests ────────────────────────────────────
+    try
+    {
+        if (!await db.VehicleMaintenanceRequests.AnyAsync())
+        {
+            var now = DateTime.UtcNow;
+            db.VehicleMaintenanceRequests.AddRange(
+                new GenService.API.Domain.VehicleMaintenanceRequest { RequestNumber = "V/26/001", VehicleRegNo = "LAG-342-TE", VehicleType = "Toyota Hilux", MaintenanceType = "Repair",      Description = "Engine oil leak detected during routine check. Oil dripping from the undercarriage.",      Priority = "High",   Status = "InWorkshop", CurrentLocation = "Lagos Office",         ApprovedByEmail = "supervisor@demo.local", ApprovedByName = "Emeka Okonkwo", ApprovedAt = now.AddDays(-10), WorkshopName = "AutoFix Garage", WorkshopLocation = "Ilupeju, Lagos", SentToWorkshopAt = now.AddDays(-9),  RequestedByEmail = "driver@demo.local", RequestedByName = "Bola Adeyemi", CreatedAt = now.AddDays(-10), UpdatedAt = now.AddDays(-9) },
+                new GenService.API.Domain.VehicleMaintenanceRequest { RequestNumber = "V/26/002", VehicleRegNo = "RVS-098-BT", VehicleType = "Toyota Coaster Bus", MaintenanceType = "Servicing",  Description = "Routine 10,000km service — oil change, filter replacement, brake inspection.",            Priority = "Normal", Status = "InWorkshop", CurrentLocation = "Port Harcourt Office", ApprovedByEmail = "supervisor@demo.local", ApprovedByName = "Emeka Okonkwo", ApprovedAt = now.AddDays(-3),  WorkshopName = "PH Motors Workshop", WorkshopLocation = "GRA, Port Harcourt", SentToWorkshopAt = now.AddDays(-2),  RequestedByEmail = "driver2@demo.local", RequestedByName = "Kwame Asante",  CreatedAt = now.AddDays(-3),  UpdatedAt = now.AddDays(-2) },
+                new GenService.API.Domain.VehicleMaintenanceRequest { RequestNumber = "V/26/003", VehicleRegNo = "ABJ-211-FC", VehicleType = "Ford Ranger", MaintenanceType = "TyreChange",    Description = "Two front tyres have worn treads and need immediate replacement before next field trip.",   Priority = "Urgent", Status = "Approved",   CurrentLocation = "Abuja Office",         ApprovedByEmail = "manager@demo.local",    ApprovedByName = "Bobby Tholath", ApprovedAt = now.AddHours(-6),                                                                                                                          RequestedByEmail = "driver@demo.local", RequestedByName = "Bola Adeyemi", CreatedAt = now.AddDays(-1),  UpdatedAt = now.AddHours(-6) },
+                new GenService.API.Domain.VehicleMaintenanceRequest { RequestNumber = "V/26/004", VehicleRegNo = "LAG-502-KE", VehicleType = "Honda CR-V",    MaintenanceType = "Inspection",    Description = "Pre-travel vehicle inspection required before Lagos to Bonny trip scheduled next week.",   Priority = "Normal", Status = "Pending",    CurrentLocation = "Lagos Office",                                                                                                                                                                                                                       RequestedByEmail = "driver2@demo.local", RequestedByName = "Kwame Asante",  CreatedAt = now.AddHours(-4),  UpdatedAt = now.AddHours(-4) },
+                new GenService.API.Domain.VehicleMaintenanceRequest { RequestNumber = "V/26/005", VehicleRegNo = "LAG-342-TE", VehicleType = "Toyota Hilux", MaintenanceType = "Bodywork",      Description = "Minor dent and paint damage on the front bumper after a parking lot incident.",            Priority = "Low",    Status = "Completed",  CurrentLocation = "Lagos Office",         ApprovedByEmail = "supervisor@demo.local", ApprovedByName = "Emeka Okonkwo", ApprovedAt = now.AddDays(-22), WorkshopName = "Classic Body Works",  WorkshopLocation = "Ikeja, Lagos",       SentToWorkshopAt = now.AddDays(-21), RequestedByEmail = "driver@demo.local", RequestedByName = "Bola Adeyemi", CompletedAt = now.AddDays(-15), CreatedAt = now.AddDays(-25), UpdatedAt = now.AddDays(-15) }
+            );
+            await db.SaveChangesAsync();
+            log.LogInformation("✅ Seeded 5 demo vehicle maintenance requests.");
+        }
+    }
+    catch (Exception ex) { log.LogError(ex, "❌ Seed failed: VehicleMaintenanceRequests"); }
+
+    // ── Seed equipment maintenance requests ──────────────────────────────────
+    try
+    {
+        if (!await db.EquipmentMaintenanceRequests.AnyAsync())
+        {
+            var now = DateTime.UtcNow;
+            db.EquipmentMaintenanceRequests.AddRange(
+                new GenService.API.Domain.EquipmentMaintenanceRequest { RequestNumber = "E/26/001", AssetNo = "6660003188", AssetDescription = "DR CUMMINS 275KVA GENERATOR",         MaintenanceType = "GeneratorService", EndUser = "DR",         Location = "DR",                  Description = "This generator is due for servicing",                           Priority = "Normal", Status = "Completed", RunningHours = 13602, NextServiceHour = 13852, WorkDone = "Water separator filter, fuel filter, oil filter and 35L Total engine oil 15W-40 replaced", ActionedBy = "Third Party", RequestedByEmail = "supervisor@demo.local", RequestedByName = "Emeka Okonkwo",  ApprovedByEmail = "manager@demo.local", ApprovedByName = "Bobby Tholath", ApprovedAt = now.AddDays(-25), CompletedAt = now.AddDays(-24), CreatedAt = now.AddDays(-26), UpdatedAt = now.AddDays(-24) },
+                new GenService.API.Domain.EquipmentMaintenanceRequest { RequestNumber = "E/26/002", AssetNo = "6660002135", AssetDescription = "PHC OFFICE CAT 350KVA GENERATOR",    MaintenanceType = "GeneratorService", EndUser = "PHC Office", Location = "Port Harcourt Office", Description = "The generator shut down unexpectedly",                           Priority = "High",   Status = "Completed", RunningHours = 16064, NextServiceHour = 16201, WorkDone = "Fuel filter CAT IR-0749 and water separator filter DAHL151 replaced. Radiator flushed.", ActionedBy = "Third Party", RequestedByEmail = "supervisor@demo.local", RequestedByName = "Emeka Okonkwo",  ApprovedByEmail = "manager@demo.local", ApprovedByName = "Bobby Tholath", ApprovedAt = now.AddDays(-18), CompletedAt = now.AddDays(-17), CreatedAt = now.AddDays(-19), UpdatedAt = now.AddDays(-17) },
+                new GenService.API.Domain.EquipmentMaintenanceRequest { RequestNumber = "E/26/003", AssetNo = "MDYO100",    AssetDescription = "AK UYO PERKINS 100KVA GENERATOR",    MaintenanceType = "GeneratorService", EndUser = "AK Uyo",    Location = "Uyo",                 Description = "Servicing of 100kva generator – filters, oil and radiator",      Priority = "Normal", Status = "Ongoing",   RunningHours = 3206,  NextServiceHour = null,  RequestedByEmail = "technician@demo.local", RequestedByName = "Chukwudi Nwosu", ApprovedByEmail = "manager@demo.local", ApprovedByName = "Bobby Tholath", ApprovedAt = now.AddDays(-5), CreatedAt = now.AddDays(-6), UpdatedAt = now.AddDays(-5) },
+                new GenService.API.Domain.EquipmentMaintenanceRequest { RequestNumber = "E/26/004", AssetNo = "OFFICE-AC1", AssetDescription = "CONFERENCE ROOM B – DAIKIN 3HP AC",   MaintenanceType = "ACService",        EndUser = "Lagos Office", Location = "Lagos Office",       Description = "Air conditioning unit not cooling properly. Gas may need recharging.", Priority = "High", Status = "Pending", RequestedByEmail = "requester1@demo.local", RequestedByName = "Fatima Al-Hassan", CreatedAt = now.AddHours(-6), UpdatedAt = now.AddHours(-6) },
+                new GenService.API.Domain.EquipmentMaintenanceRequest { RequestNumber = "E/26/005", AssetNo = "UPS-SVR-01", AssetDescription = "SERVER ROOM APC 20KVA UPS",          MaintenanceType = "UPSMaintenance",   EndUser = "Lagos Office", Location = "Lagos Office",       Description = "UPS battery backup time has dropped significantly. Battery replacement required.", Priority = "Urgent", Status = "AwaitingSpares", RequestedByEmail = "technician@demo.local", RequestedByName = "Chukwudi Nwosu", ApprovedByEmail = "manager@demo.local", ApprovedByName = "Bobby Tholath", ApprovedAt = now.AddDays(-3), CreatedAt = now.AddDays(-4), UpdatedAt = now.AddDays(-3) }
+            );
+            await db.SaveChangesAsync();
+            log.LogInformation("✅ Seeded 5 demo equipment maintenance requests.");
+        }
+    }
+    catch (Exception ex) { log.LogError(ex, "❌ Seed failed: EquipmentMaintenanceRequests"); }
+
+    // ── Seed facility maintenance requests ───────────────────────────────────
+    try
+    {
+        if (!await db.FacilityMaintenanceRequests.AnyAsync())
+        {
+            var now = DateTime.UtcNow;
+            db.FacilityMaintenanceRequests.AddRange(
+                new GenService.API.Domain.FacilityMaintenanceRequest { RequestNumber = "F/26/001", MaintenanceType = "Electrical",  Description = "Faulty hand dryers in all three floors of PHC Office need replacement – 8 units", Location = "Port Harcourt Office", EndUser = "PHC Office", RoomFlat = "All Floors – Conveniences",   Priority = "Normal", Status = "Completed", WorkDone = "8 hand dryer units replaced across ground, first and second floors", ActionedBy = "John Ojie", RequestedByEmail = "supervisor@demo.local", RequestedByName = "Emeka Okonkwo", ApprovedByEmail = "manager@demo.local", ApprovedByName = "Bobby Tholath", ApprovedAt = now.AddDays(-20), CompletedAt = now.AddDays(-19), CreatedAt = now.AddDays(-21), UpdatedAt = now.AddDays(-19) },
+                new GenService.API.Domain.FacilityMaintenanceRequest { RequestNumber = "F/26/002", MaintenanceType = "Plumbing",    Description = "Washing of all water storage tanks at Port Harcourt main office",                  Location = "Port Harcourt Office", EndUser = "PHC Office", RoomFlat = "Main Office Water Tanks",     Priority = "Normal", Status = "Completed", WorkDone = "All water tanks washed and disinfected",                             ActionedBy = "Woji Store",  RequestedByEmail = "technician@demo.local", RequestedByName = "Chukwudi Nwosu", ApprovedByEmail = "manager@demo.local", ApprovedByName = "Bobby Tholath", ApprovedAt = now.AddDays(-14), CompletedAt = now.AddDays(-13), CreatedAt = now.AddDays(-15), UpdatedAt = now.AddDays(-13) },
+                new GenService.API.Domain.FacilityMaintenanceRequest { RequestNumber = "F/26/003", MaintenanceType = "TankWashing", Description = "Washing of DR GeePee overhead tank",                                               Location = "DR",                   EndUser = "DR",         RoomFlat = "Overhead Tank",               Priority = "Normal", Status = "Pending",   RequestedByEmail = "technician@demo.local", RequestedByName = "Chukwudi Nwosu", CreatedAt = now.AddDays(-8), UpdatedAt = now.AddDays(-8) },
+                new GenService.API.Domain.FacilityMaintenanceRequest { RequestNumber = "F/26/004", MaintenanceType = "CivilWorks",  Description = "Window pane in the HR office cracked after storm. Security risk – urgent replacement", Location = "Lagos Office",         EndUser = "Lagos Office", RoomFlat = "HR Office – 3rd Floor",     Priority = "High",   Status = "Ongoing",   WorkDone = null, ActionedBy = null, RequestedByEmail = "requester2@demo.local", RequestedByName = "Tunde Babatunde", ApprovedByEmail = "manager@demo.local", ApprovedByName = "Bobby Tholath", ApprovedAt = now.AddDays(-2), CreatedAt = now.AddDays(-3), UpdatedAt = now.AddDays(-2) },
+                new GenService.API.Domain.FacilityMaintenanceRequest { RequestNumber = "F/26/005", MaintenanceType = "Painting",    Description = "Repainting of the external walls of Block A & B at DR site",                        Location = "DR",                   EndUser = "DR",         RoomFlat = "Block A & B External Walls", Priority = "Low",    Status = "AwaitingFunds", RequestedByEmail = "supervisor@demo.local", RequestedByName = "Emeka Okonkwo", ApprovedByEmail = "manager@demo.local", ApprovedByName = "Bobby Tholath", ApprovedAt = now.AddDays(-10), CreatedAt = now.AddDays(-12), UpdatedAt = now.AddDays(-10) }
+            );
+            await db.SaveChangesAsync();
+            log.LogInformation("✅ Seeded 5 demo facility maintenance requests.");
+        }
+    }
+    catch (Exception ex) { log.LogError(ex, "❌ Seed failed: FacilityMaintenanceRequests"); }
+
+    // ── Seed task progress logs ──────────────────────────────────────────────
+    try
+    {
+        if (!await db.TaskProgressLogs.AnyAsync())
+        {
+            // Get actual request IDs from the seeded service requests
+            var req1 = await db.ServiceRequests.Where(r => r.TicketNumber == "REQ-2026-0001").FirstOrDefaultAsync();
+            var req7 = await db.ServiceRequests.Where(r => r.TicketNumber == "REQ-2026-0007").FirstOrDefaultAsync();
+            var eq1  = await db.EquipmentMaintenanceRequests.Where(r => r.RequestNumber == "E/26/003").FirstOrDefaultAsync();
+            var vm1  = await db.VehicleMaintenanceRequests.Where(r => r.RequestNumber == "V/26/001").FirstOrDefaultAsync();
+            var now  = DateTime.UtcNow;
+
+            var logs = new List<GenService.API.Domain.TaskProgressLog>();
+
+            if (req1 != null)
+            {
+                logs.Add(new GenService.API.Domain.TaskProgressLog { Module = "Requests", EntityId = req1.Id.ToString(), RefNumber = req1.TicketNumber, TaskTitle = req1.Title, LogDate = now.AddDays(-2).Date, ActivityPerformed = "Inspected the AC unit in Conference Room B. Found that the compressor is making an unusual noise. Cleaned the air filters.", ProgressStatus = "WorkInProgress", MaterialsRequired = null, NextAction = "Check refrigerant levels and test compressor performance tomorrow.", LoggedByEmail = "technician@demo.local", LoggedByName = "Chukwudi Nwosu", IsProxy = false, CreatedAt = now.AddDays(-2) });
+                logs.Add(new GenService.API.Domain.TaskProgressLog { Module = "Requests", EntityId = req1.Id.ToString(), RefNumber = req1.TicketNumber, TaskTitle = req1.Title, LogDate = now.AddDays(-1).Date, ActivityPerformed = "Tested refrigerant levels — found gas is low. Identified that the compressor gasket is damaged and needs replacement.", ProgressStatus = "AwaitingMaterials", MaterialsRequired = "1 x Compressor gasket (Model: DAI-COMP-B), 500g R22 refrigerant gas", NextAction = "Raise material request to store. Will complete repair once parts arrive.", LoggedByEmail = "technician@demo.local", LoggedByName = "Chukwudi Nwosu", IsProxy = false, CreatedAt = now.AddDays(-1) });
+            }
+
+            if (req7 != null)
+            {
+                logs.Add(new GenService.API.Domain.TaskProgressLog { Module = "Requests", EntityId = req7.Id.ToString(), RefNumber = req7.TicketNumber, TaskTitle = req7.Title, LogDate = now.AddDays(-1).Date, ActivityPerformed = "Visited HR Office. Assessed window damage — two panes completely shattered, frame is intact. Temporary board-up done for security.", ProgressStatus = "AwaitingVendor", MaterialsRequired = "2 x Tempered glass panes (60cm x 80cm)", NextAction = "Contacted glass vendor for supply and installation. Awaiting quotation.", LoggedByEmail = "supervisor@demo.local", LoggedByName = "Emeka Okonkwo", IsProxy = true, ProxyForName = "Chukwudi Nwosu", CreatedAt = now.AddDays(-1) });
+            }
+
+            if (eq1 != null)
+            {
+                logs.Add(new GenService.API.Domain.TaskProgressLog { Module = "Equipment", EntityId = eq1.Id.ToString(), RefNumber = eq1.RequestNumber, TaskTitle = eq1.AssetDescription, LogDate = now.AddDays(-3).Date, ActivityPerformed = "Sourced filters from third-party supplier. Replaced fuel filter and oil filter. Refilled engine oil (35L Total 15W-40).", ProgressStatus = "WorkInProgress", MaterialsRequired = null, NextAction = "Run generator for 30 minutes and check for leaks. Update running hours.", LoggedByEmail = "technician@demo.local", LoggedByName = "Chukwudi Nwosu", IsProxy = false, CreatedAt = now.AddDays(-3) });
+            }
+
+            if (vm1 != null)
+            {
+                logs.Add(new GenService.API.Domain.TaskProgressLog { Module = "Vehicle", EntityId = vm1.Id.ToString(), RefNumber = vm1.RequestNumber, TaskTitle = $"{vm1.VehicleRegNo} – {vm1.VehicleType}", LogDate = now.AddDays(-5).Date, ActivityPerformed = "Vehicle delivered to AutoFix Garage. Engineer diagnosed oil leak from crankshaft seal. Parts have been ordered.", ProgressStatus = "AwaitingMaterials", MaterialsRequired = "1 x Crankshaft rear oil seal (Toyota Hilux 2.5D4D)", NextAction = "Parts expected in 3 days. Workshop will proceed immediately on arrival.", LoggedByEmail = "supervisor@demo.local", LoggedByName = "Emeka Okonkwo", IsProxy = false, CreatedAt = now.AddDays(-5) });
+                logs.Add(new GenService.API.Domain.TaskProgressLog { Module = "Vehicle", EntityId = vm1.Id.ToString(), RefNumber = vm1.RequestNumber, TaskTitle = $"{vm1.VehicleRegNo} – {vm1.VehicleType}", LogDate = now.AddDays(-9).Date, ActivityPerformed = "Initial assessment done. Vehicle inspected at Lagos Office compound before dispatch to workshop.", ProgressStatus = "WorkInProgress", MaterialsRequired = null, NextAction = "Arrange transportation of vehicle to AutoFix Garage tomorrow.", LoggedByEmail = "driver@demo.local", LoggedByName = "Bola Adeyemi", IsProxy = false, CreatedAt = now.AddDays(-9) });
+            }
+
+            if (logs.Any())
+            {
+                db.TaskProgressLogs.AddRange(logs);
+                await db.SaveChangesAsync();
+                log.LogInformation("✅ Seeded {Count} demo task progress logs.", logs.Count);
+            }
+        }
+    }
+    catch (Exception ex) { log.LogError(ex, "❌ Seed failed: TaskProgressLogs"); }
+
+    // ── Seed generator daily readings ────────────────────────────────────────
+    try
+    {
+        if (!await db.GeneratorDailyReadings.AnyAsync())
+        {
+            var now = DateTime.UtcNow.Date;
+            db.GeneratorDailyReadings.AddRange(
+                // PHC Main Office CAT 350KVA — approaching service (alert active)
+                new GenService.API.Domain.GeneratorDailyReading { AssetNo="6660002135", AssetDescription="PHC OFFICE CAT 350KVA GENERATOR",  Location="Port Harcourt Office", ReadingDate=now,             CumulativeRunHours=16245, RunHoursToday=6.5,  GeneratorStatus="Running",  FuelLevelLitres=380, FuelConsumedLitres=65,  UtilityAvailableHours=8,  ServiceIntervalHours=250, LastServicedAtHours=16010, ServiceAlertActive=true,  LoggedByEmail="supervisor@demo.local", LoggedByName="Emeka Okonkwo", CreatedAt=now },
+                new GenService.API.Domain.GeneratorDailyReading { AssetNo="6660002135", AssetDescription="PHC OFFICE CAT 350KVA GENERATOR",  Location="Port Harcourt Office", ReadingDate=now.AddDays(-1), CumulativeRunHours=16238, RunHoursToday=5.0,  GeneratorStatus="Running",  FuelLevelLitres=445, FuelConsumedLitres=55,  UtilityAvailableHours=10, ServiceIntervalHours=250, LastServicedAtHours=16010, ServiceAlertActive=false, LoggedByEmail="supervisor@demo.local", LoggedByName="Emeka Okonkwo", CreatedAt=now.AddDays(-1) },
+                new GenService.API.Domain.GeneratorDailyReading { AssetNo="6660002135", AssetDescription="PHC OFFICE CAT 350KVA GENERATOR",  Location="Port Harcourt Office", ReadingDate=now.AddDays(-2), CumulativeRunHours=16233, RunHoursToday=4.5,  GeneratorStatus="Standby",  FuelLevelLitres=500, FuelConsumedLitres=null, UtilityAvailableHours=18, ServiceIntervalHours=250, LastServicedAtHours=16010, ServiceAlertActive=false, LoggedByEmail="technician@demo.local", LoggedByName="Chukwudi Nwosu", CreatedAt=now.AddDays(-2) },
+                // DR Cummins 275KVA — normal
+                new GenService.API.Domain.GeneratorDailyReading { AssetNo="6660003188", AssetDescription="DR CUMMINS 275KVA GENERATOR",      Location="DR",                   ReadingDate=now,             CumulativeRunHours=13750, RunHoursToday=8.0,  GeneratorStatus="Running",  FuelLevelLitres=220, FuelConsumedLitres=80,  UtilityAvailableHours=4,  ServiceIntervalHours=250, LastServicedAtHours=13602, ServiceAlertActive=false, LoggedByEmail="technician@demo.local", LoggedByName="Chukwudi Nwosu", CreatedAt=now },
+                new GenService.API.Domain.GeneratorDailyReading { AssetNo="6660003188", AssetDescription="DR CUMMINS 275KVA GENERATOR",      Location="DR",                   ReadingDate=now.AddDays(-1), CumulativeRunHours=13742, RunHoursToday=7.5,  GeneratorStatus="Running",  FuelLevelLitres=300, FuelConsumedLitres=75,  UtilityAvailableHours=6,  ServiceIntervalHours=250, LastServicedAtHours=13602, ServiceAlertActive=false, LoggedByEmail="technician@demo.local", LoggedByName="Chukwudi Nwosu", CreatedAt=now.AddDays(-1) },
+                // Woji FG Wilson 40KVA — low fuel warning
+                new GenService.API.Domain.GeneratorDailyReading { AssetNo="6660000017", AssetDescription="WOJI YARD FG WILSON 40KVA GENERATOR",Location="Woji",              ReadingDate=now,             CumulativeRunHours=10835, RunHoursToday=3.5,  GeneratorStatus="Standby",  FuelLevelLitres=45,  FuelConsumedLitres=35,  UtilityAvailableHours=16, ServiceIntervalHours=250, LastServicedAtHours=10780, ServiceAlertActive=false, LoggedByEmail="driver@demo.local", LoggedByName="Bola Adeyemi", CreatedAt=now },
+                // Lagos Office Cummins 135KVA
+                new GenService.API.Domain.GeneratorDailyReading { AssetNo="6660002108", AssetDescription="LAGOS OFFICE CUMMINS 135KVA GENERATOR",Location="Lagos Office",    ReadingDate=now,             CumulativeRunHours=8920,  RunHoursToday=4.0,  GeneratorStatus="Standby",  FuelLevelLitres=180, FuelConsumedLitres=40,  UtilityAvailableHours=14, ServiceIntervalHours=250, LastServicedAtHours=8750,  ServiceAlertActive=false, LoggedByEmail="supervisor@demo.local", LoggedByName="Emeka Okonkwo", CreatedAt=now }
+            );
+            await db.SaveChangesAsync();
+            log.LogInformation("✅ Seeded 7 demo generator daily readings.");
+        }
+    }
+    catch (Exception ex) { log.LogError(ex, "❌ Seed failed: GeneratorDailyReadings"); }
+
+    // ── Seed power meter readings ─────────────────────────────────────────────
+    try
+    {
+        if (!await db.PowerMeterReadings.AnyAsync())
+        {
+            var now = DateTime.UtcNow.Date;
+            db.PowerMeterReadings.AddRange(
+                new GenService.API.Domain.PowerMeterReading { Location="Port Harcourt Office", MeterNumber="NPA-PHC-001", ReadingDate=now,             MeterReadingKwh=124580, UnitsConsumedToday=320, UtilityAvailableHours=8,  LoggedByEmail="supervisor@demo.local", LoggedByName="Emeka Okonkwo", CreatedAt=now },
+                new GenService.API.Domain.PowerMeterReading { Location="Port Harcourt Office", MeterNumber="NPA-PHC-001", ReadingDate=now.AddDays(-1), MeterReadingKwh=124260, UnitsConsumedToday=290, UtilityAvailableHours=10, LoggedByEmail="supervisor@demo.local", LoggedByName="Emeka Okonkwo", CreatedAt=now.AddDays(-1) },
+                new GenService.API.Domain.PowerMeterReading { Location="Port Harcourt Office", MeterNumber="NPA-PHC-001", ReadingDate=now.AddDays(-2), MeterReadingKwh=123970, UnitsConsumedToday=350, UtilityAvailableHours=6,  LoggedByEmail="technician@demo.local", LoggedByName="Chukwudi Nwosu", CreatedAt=now.AddDays(-2) },
+                new GenService.API.Domain.PowerMeterReading { Location="Lagos Office",         MeterNumber="NPA-LAG-001", ReadingDate=now,             MeterReadingKwh=87420,  UnitsConsumedToday=210, UtilityAvailableHours=14, LoggedByEmail="supervisor@demo.local", LoggedByName="Emeka Okonkwo", CreatedAt=now },
+                new GenService.API.Domain.PowerMeterReading { Location="Lagos Office",         MeterNumber="NPA-LAG-001", ReadingDate=now.AddDays(-1), MeterReadingKwh=87210,  UnitsConsumedToday=195, UtilityAvailableHours=16, LoggedByEmail="supervisor@demo.local", LoggedByName="Emeka Okonkwo", CreatedAt=now.AddDays(-1) }
+            );
+            await db.SaveChangesAsync();
+            log.LogInformation("✅ Seeded 5 demo power meter readings.");
+        }
+    }
+    catch (Exception ex) { log.LogError(ex, "❌ Seed failed: PowerMeterReadings"); }
+
+    // ── Seed diesel tank readings ────────────────────────────────────────────
+    try
+    {
+        if (!await db.DieselTankReadings.AnyAsync())
+        {
+            var now = DateTime.UtcNow.Date;
+            db.DieselTankReadings.AddRange(
+                // PHC Main Office — Main Generator Tank (3-day history)
+                new GenService.API.Domain.DieselTankReading { Location="Port Harcourt Office", TankIdentifier="Main Generator Tank", ReadingDate=now.AddDays(-2), TankLevelLitres=5000, PreviousLevelLitres=null,  ConsumptionLitres=null, CostPerLitreNaira=1250, TotalConsumptionCostNaira=null, LoggedByEmail="supervisor@demo.local", LoggedByName="Emeka Okonkwo", CreatedAt=now.AddDays(-2) },
+                new GenService.API.Domain.DieselTankReading { Location="Port Harcourt Office", TankIdentifier="Main Generator Tank", ReadingDate=now.AddDays(-1), TankLevelLitres=4650, PreviousLevelLitres=5000, ConsumptionLitres=350, CostPerLitreNaira=1250, TotalConsumptionCostNaira=437500, LoggedByEmail="supervisor@demo.local", LoggedByName="Emeka Okonkwo", CreatedAt=now.AddDays(-1) },
+                new GenService.API.Domain.DieselTankReading { Location="Port Harcourt Office", TankIdentifier="Main Generator Tank", ReadingDate=now,             TankLevelLitres=4280, PreviousLevelLitres=4650, ConsumptionLitres=370, CostPerLitreNaira=1250, TotalConsumptionCostNaira=462500, LoggedByEmail="supervisor@demo.local", LoggedByName="Emeka Okonkwo", CreatedAt=now },
+                // DR Overhead Tank
+                new GenService.API.Domain.DieselTankReading { Location="DR", TankIdentifier="DR Overhead Tank", ReadingDate=now.AddDays(-1), TankLevelLitres=2800, PreviousLevelLitres=3200, ConsumptionLitres=400, CostPerLitreNaira=1250, TotalConsumptionCostNaira=500000, LoggedByEmail="technician@demo.local", LoggedByName="Chukwudi Nwosu", CreatedAt=now.AddDays(-1) },
+                new GenService.API.Domain.DieselTankReading { Location="DR", TankIdentifier="DR Overhead Tank", ReadingDate=now,             TankLevelLitres=2450, PreviousLevelLitres=2800, ConsumptionLitres=350, CostPerLitreNaira=1250, TotalConsumptionCostNaira=437500, LoggedByEmail="technician@demo.local", LoggedByName="Chukwudi Nwosu", CreatedAt=now },
+                // Woji Store Tank
+                new GenService.API.Domain.DieselTankReading { Location="Woji", TankIdentifier="Woji Store Tank", ReadingDate=now.AddDays(-1), TankLevelLitres=1200, PreviousLevelLitres=1500, ConsumptionLitres=300, CostPerLitreNaira=1250, TotalConsumptionCostNaira=375000, LoggedByEmail="driver@demo.local", LoggedByName="Bola Adeyemi", CreatedAt=now.AddDays(-1) },
+                new GenService.API.Domain.DieselTankReading { Location="Woji", TankIdentifier="Woji Store Tank", ReadingDate=now,             TankLevelLitres=980,  PreviousLevelLitres=1200, ConsumptionLitres=220, CostPerLitreNaira=1250, TotalConsumptionCostNaira=275000, LoggedByEmail="driver@demo.local", LoggedByName="Bola Adeyemi", CreatedAt=now }
+            );
+            await db.SaveChangesAsync();
+            log.LogInformation("✅ Seeded 7 demo diesel tank readings.");
+        }
+    }
+    catch (Exception ex) { log.LogError(ex, "❌ Seed failed: DieselTankReadings"); }
 
     log.LogInformation("🚀 Database bootstrap complete.");
 }

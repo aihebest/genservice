@@ -18,6 +18,9 @@ import {
   GENERATOR_RUN_REASON_META, DIESEL_RECORD_TYPE_META,
 } from '../../types';
 import type { GeneratorLog, DieselRecord, GeneratorRunReason, DieselRecordType } from '../../types';
+import DailyReadingsTab from './components/DailyReadingsTab';
+import PowerMeterTab    from './components/PowerMeterTab';
+import DieselTankTab    from './components/DieselTankTab';
 import { useAuthStore } from '../../store/authStore';
 import LogGeneratorModal from './components/LogGeneratorModal';
 import AddDieselModal    from './components/AddDieselModal';
@@ -382,8 +385,11 @@ export default function FuelPage() {
             activeKey={activeTab}
             onChange={k => setActiveTab(k)}
             items={[
-              { key: 'generator', label: <Space><ThunderboltOutlined />Generator Log</Space> },
-              { key: 'diesel',    label: <Space><DropboxOutlined />Diesel Records</Space>    },
+              { key: 'generator', label: <Space><ThunderboltOutlined />Generator Log</Space>           },
+              { key: 'daily',     label: <Space><FireOutlined />Daily Readings</Space>                 },
+              { key: 'power',     label: <Space><PlayCircleOutlined />Power Meter (NPA)</Space>        },
+              { key: 'diesel',    label: <Space><DropboxOutlined />Diesel Records</Space>              },
+              { key: 'tanklog',   label: <Space><DropboxOutlined />Tank Level Log</Space>              },
             ]}
             size="small"
           />
@@ -409,6 +415,20 @@ export default function FuelPage() {
             style={{ padding: '0 8px' }}
             scroll={{ x: 900 }}
           />
+        )}
+
+        {/* ── Daily Generator Readings tab ───────────────────────── */}
+        {activeTab === 'daily' && (
+          <div style={{ padding: 20 }}>
+            <DailyReadingsTab />
+          </div>
+        )}
+
+        {/* ── Power Meter (NPA) tab ──────────────────────────────── */}
+        {activeTab === 'power' && (
+          <div style={{ padding: 20 }}>
+            <PowerMeterTab />
+          </div>
         )}
 
         {/* ── Diesel Records tab ─────────────────────────────────── */}
@@ -444,6 +464,13 @@ export default function FuelPage() {
               scroll={{ x: 850 }}
             />
           </>
+        )}
+
+        {/* ── Tank Level Log tab ─────────────────────────────────── */}
+        {activeTab === 'tanklog' && (
+          <div style={{ padding: 20 }}>
+            <DieselTankTab />
+          </div>
         )}
       </Card>
 

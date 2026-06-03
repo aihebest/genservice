@@ -100,7 +100,18 @@ services:
       - gs-dev-net
     restart: unless-stopped
 
-  # ── ASP.NET Core 8 API (hot reload via dotnet watch) ────────────────────
+  # ── MailHog (local email capture — replaces real SMTP in dev) ───────────
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: gs-dev-mail
+    ports:
+      - "1025:1025"   # SMTP (API sends here)
+      - "8025:8025"   # Web inbox UI
+    networks:
+      - gs-dev-net
+    restart: unless-stopped
+
+  # ── ASP.NET Core 8 API (pre-compiled binary — fast startup) ─────────────
   api:
     build:
       context: ./backend
@@ -110,24 +121,17 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: "http://+:8080"
       ConnectionStrings__DefaultConnection: "Server=sqlserver,1433;Database=GenServiceDev;User Id=sa;Password=GenService@Dev2026!;TrustServerCertificate=true;MultipleActiveResultSets=true"
-      ConnectionStrings__Redis: "redis:6379"
-      AzureStorage__ConnectionString: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OGLjX+N3kRciCP3dQnz7eQ+kAEYVbT8q;BlobEndpoint=http://azurite:10000/devstoreaccount1;"
-      AzureStorage__ContainerName: "documents"
-      RabbitMQ__Host: "rabbitmq"
-      RabbitMQ__Port: "5672"
-      RabbitMQ__Username: "genservice"
-      RabbitMQ__Password: "GenService@Dev2026!"
-      Seq__ServerUrl: "http://seq:80"
       Auth__Mode: "DevJwt"
       Auth__DevJwt__Secret: "GenServiceDevJwtSecret2026LocalKey32chars!"
       Auth__DevJwt__Issuer: "genservice-local"
       Auth__DevJwt__Audience: "genservice-web"
       Cors__AllowedOrigins: "http://localhost:5173"
+      Email__Host: "mailhog"
+      Email__Port: "1025"
+      Email__From: "noreply@genservice.local"
+      Email__FromName: "GenService Platform"
     ports:
       - "8080:8080"
-    volumes:
-      - ./backend:/app
-      - gs_dev_nuget:/root/.nuget/packages
     depends_on:
       sqlserver:
         condition: service_healthy
@@ -169,7 +173,6 @@ volumes:
   gs_dev_blobs:
   gs_dev_rabbit:
   gs_dev_seq:
-  gs_dev_nuget:
 
 # ── Networks ─────────────────────────────────────────────────────────────────
 networks:

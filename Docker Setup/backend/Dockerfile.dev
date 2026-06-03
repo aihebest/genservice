@@ -1,31 +1,36 @@
 # =============================================================================
-#  Backend — DEVELOPMENT Dockerfile  (hot reload via dotnet watch)
-#  Place this file at:  backend/Dockerfile.dev
+#  Backend — DEVELOPMENT Dockerfile  (pre-compiled for fast reliable startup)
+#  Multi-stage: SDK image builds & publishes, ASP.NET runtime image runs it.
+#  API starts in seconds — no compilation delay at container startup.
 # =============================================================================
 
-FROM mcr.microsoft.com/dotnet/sdk:8.0
+# ── Stage 1: Build & publish ──────────────────────────────────────────────────
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /build
 
-WORKDIR /app
-
-# Enable polling file watcher (required for hot reload inside Docker on Windows)
-ENV DOTNET_USE_POLLING_FILE_WATCHER=1
-ENV DOTNET_WATCH_SUPPRESS_MSBUILD_INCREMENTALISM=1
-ENV ASPNETCORE_URLS=http://+:8080
-
-EXPOSE 8080
-
-# Copy project files first so restore is cached unless .csproj changes
-# Note: using project-level restore (works with both .sln and .slnx formats)
-COPY src/GenService.Domain/GenService.Domain.csproj           src/GenService.Domain/
-COPY src/GenService.Application/GenService.Application.csproj src/GenService.Application/
-COPY src/GenService.Infrastructure/GenService.Infrastructure.csproj src/GenService.Infrastructure/
-COPY src/GenService.API/GenService.API.csproj                 src/GenService.API/
-COPY tests/GenService.UnitTests/GenService.UnitTests.csproj   tests/GenService.UnitTests/
+# Restore packages (cached layer — only re-runs if .csproj changes)
+COPY src/GenService.API/GenService.API.csproj                         src/GenService.API/
+COPY src/GenService.Application/GenService.Application.csproj         src/GenService.Application/
+COPY src/GenService.Domain/GenService.Domain.csproj                   src/GenService.Domain/
+COPY src/GenService.Infrastructure/GenService.Infrastructure.csproj   src/GenService.Infrastructure/
+COPY tests/GenService.UnitTests/GenService.UnitTests.csproj           tests/GenService.UnitTests/
 
 RUN dotnet restore src/GenService.API/GenService.API.csproj
 
-# Copy all source
+# Copy all source and publish
 COPY . .
+RUN dotnet publish src/GenService.API/GenService.API.csproj \
+    -c Release \
+    -o /app/publish \
+    --no-restore
 
-# Compile and run (stable for demo — no hot-reload restarts that interrupt seeding)
-ENTRYPOINT ["dotnet", "run", "--project", "src/GenService.API/GenService.API.csproj", "--urls", "http://0.0.0.0:8080"]
+# ── Stage 2: Runtime image ────────────────────────────────────────────────────
+FROM mcr.microsoft.com/dotnet/aspnet:8.0
+WORKDIR /app
+
+COPY --from=build /app/publish .
+
+ENV ASPNETCORE_URLS=http://+:8080
+EXPOSE 8080
+
+ENTRYPOINT ["dotnet", "GenService.API.dll"]

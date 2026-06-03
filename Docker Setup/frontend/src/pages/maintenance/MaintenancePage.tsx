@@ -1,12 +1,64 @@
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
+import { Tabs, Typography, Row, Col } from 'antd';
+import { ToolOutlined, HomeOutlined, CalendarOutlined } from '@ant-design/icons';
+import EquipmentTab from './components/EquipmentTab';
+import FacilityTab  from './components/FacilityTab';
+
+const { Title, Text } = Typography;
+
+export default function MaintenancePage() {
+  const [activeTab, setActiveTab] = useState('equipment');
+
+  return (
+    <div>
+      <Row justify="space-between" align="middle" style={{ marginBottom: 20 }}>
+        <Col>
+          <Title level={4} style={{ margin: 0 }}>Maintenance Register</Title>
+          <Text type="secondary" style={{ fontSize: 13 }}>
+            Equipment, Facility, and Scheduled maintenance tracking — E/26/001 · F/26/001
+          </Text>
+        </Col>
+      </Row>
+
+      <Tabs
+        activeKey={activeTab}
+        onChange={setActiveTab}
+        type="card"
+        size="middle"
+        style={{ marginBottom: 0 }}
+        items={[
+          {
+            key:      'equipment',
+            label:    <span><ToolOutlined style={{ marginRight: 6 }} />Equipment Maintenance</span>,
+            children: <EquipmentTab />,
+          },
+          {
+            key:      'facility',
+            label:    <span><HomeOutlined style={{ marginRight: 6 }} />Facility Maintenance</span>,
+            children: <FacilityTab />,
+          },
+          {
+            key:      'scheduler',
+            label:    <span><CalendarOutlined style={{ marginRight: 6 }} />Maintenance Scheduler</span>,
+            children: <SchedulerContent />,
+          },
+        ]}
+      />
+    </div>
+  );
+}
+
+// ── Original scheduler content below ─────────────────────────────────────────
+
+import { useCallback } from 'react';
 import {
-  Alert, Badge, Button, Card, Col, Modal, Row, Select, Space,
-  Table, Tag, Tooltip, Typography,
+  Alert, Badge, Button, Card, Modal, Select, Space,
+  Table, Tag, Tooltip,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
   PlusOutlined, ReloadOutlined, WarningOutlined,
-  ClockCircleOutlined, CheckCircleOutlined, ToolOutlined,
+  ClockCircleOutlined, CheckCircleOutlined,
 } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
@@ -18,8 +70,6 @@ import { useAuthStore } from '../../store/authStore';
 import NewScheduleModal from './components/NewScheduleModal';
 
 dayjs.extend(relativeTime);
-
-const { Title, Text } = Typography;
 
 function buildColumns(
   canManage: boolean,
@@ -125,7 +175,7 @@ function buildColumns(
   ];
 }
 
-export default function MaintenancePage() {
+function SchedulerContent() {
   const user      = useAuthStore(s => s.user);
   const role      = user?.role;
   const qc        = useQueryClient();

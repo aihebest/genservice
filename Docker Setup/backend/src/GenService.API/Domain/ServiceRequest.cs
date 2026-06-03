@@ -23,7 +23,12 @@ public class ServiceRequest
     public string? AssignedToEmail { get; set; }
     public string? AssignedToName  { get; set; }
 
-    // ── Approval ─────────────────────────────────────────────────────
+    // ── Line Manager approval (Stage 1) ──────────────────────────────
+    public string?   LineManagerEmail      { get; set; }
+    public string?   LineManagerName       { get; set; }
+    public DateTime? LineManagerApprovedAt { get; set; }
+
+    // ── General Service approval (Stage 2) ───────────────────────────
     public string?   ApprovedByEmail  { get; set; }
     public string?   ApprovedByName   { get; set; }
     public DateTime? ApprovedAt       { get; set; }
@@ -33,6 +38,12 @@ public class ServiceRequest
     public DateTime  CreatedAt   { get; set; } = DateTime.UtcNow;
     public DateTime  UpdatedAt   { get; set; } = DateTime.UtcNow;
     public DateTime? CompletedAt { get; set; }
+
+    // ── Reassignment ─────────────────────────────────────────────────────
+    public string?   ReassignedToType { get; set; }  // Logistics | Vendor | Procurement | Internal
+    public string?   ReassignedToName { get; set; }  // team/vendor name
+    public string?   ReassignedNotes  { get; set; }
+    public DateTime? ReassignedAt     { get; set; }
 
     public string? Notes { get; set; }
 }
@@ -68,13 +79,17 @@ public static class RequestCategory
 // ── Status constants ───────────────────────────────────────────────────────
 public static class RequestStatus
 {
-    public const string Open            = "Open";
-    public const string PendingApproval = "PendingApproval";
+    public const string Open                = "Open";
+    public const string PendingLineManager  = "PendingLineManager";  // Stage 1: awaiting Line Manager
+    public const string PendingApproval     = "PendingApproval";     // Stage 2: awaiting GS review
     public const string Approved        = "Approved";
     public const string Rejected        = "Rejected";
     public const string InProgress      = "InProgress";
+    public const string MaterialAwaited = "MaterialAwaited";   // Awaiting Spares
+    public const string AwaitingFunds   = "AwaitingFunds";     // Awaiting budget approval
     public const string Completed       = "Completed";
     public const string Cancelled       = "Cancelled";
+    public const string Reassigned      = "Reassigned";
 }
 
 // ── Priority constants ─────────────────────────────────────────────────────

@@ -24,13 +24,17 @@ const { Title, Text } = Typography;
 
 // ── Status tab definitions ─────────────────────────────────────────────────
 const STATUS_TABS = [
-  { key: '',               label: 'All'             },
-  { key: 'Open',           label: 'Open'            },
-  { key: 'PendingApproval',label: 'Pending Approval'},
-  { key: 'Approved',       label: 'Approved'        },
-  { key: 'InProgress',     label: 'In Progress'     },
-  { key: 'Completed',      label: 'Completed'       },
-  { key: 'Rejected',       label: 'Rejected'        },
+  { key: '',                   label: 'All'                    },
+  { key: 'Open',               label: 'Open'                   },
+  { key: 'PendingLineManager', label: 'Pending Line Manager'   },
+  { key: 'PendingApproval',    label: 'Pending GS Approval'    },
+  { key: 'Approved',        label: 'Approved'        },
+  { key: 'InProgress',      label: 'In Progress'     },
+  { key: 'MaterialAwaited', label: 'Awaiting Spares' },
+  { key: 'AwaitingFunds',   label: 'Awaiting Funds'  },
+  { key: 'Reassigned',      label: 'Reassigned'      },
+  { key: 'Completed',       label: 'Completed'       },
+  { key: 'Rejected',        label: 'Rejected'        },
 ];
 
 // ── Table columns ──────────────────────────────────────────────────────────

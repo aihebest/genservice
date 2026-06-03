@@ -1,7 +1,9 @@
 using GenService.API.Data;
 using GenService.API.Domain;
 using GenService.API.Models;
+using GenService.API.Services;
 using Microsoft.AspNetCore.Authorization;
+using static GenService.API.Domain.AuditAction;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
@@ -13,6 +15,8 @@ namespace GenService.API.Controllers;
 [Authorize]
 public class RequestsController(
     GenServiceDbContext db,
+    NotificationService notifications,
+    AuditService audit,
     ILogger<RequestsController> logger) : ControllerBase
 {
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -25,9 +29,11 @@ public class RequestsController(
         r.Category, r.RequiresApproval, r.Status, r.Priority, r.Location,
         r.RequestedByEmail, r.RequestedByName,
         r.AssignedToEmail, r.AssignedToName,
+        r.LineManagerEmail, r.LineManagerName, r.LineManagerApprovedAt,
         r.ApprovedByEmail, r.ApprovedByName,
         r.CreatedAt, r.UpdatedAt, r.ApprovedAt, r.CompletedAt,
-        r.RejectionReason, r.Notes
+        r.RejectionReason, r.Notes,
+        r.ReassignedToType, r.ReassignedToName, r.ReassignedNotes, r.ReassignedAt
     );
 
     private async Task<string> NextTicketNumberAsync()
@@ -87,8 +93,11 @@ public class RequestsController(
             pendingApproval = all.Count(r => r.Status == RequestStatus.PendingApproval),
             approved        = all.Count(r => r.Status == RequestStatus.Approved),
             inProgress      = all.Count(r => r.Status == RequestStatus.InProgress),
+            materialAwaited = all.Count(r => r.Status == RequestStatus.MaterialAwaited),
+            awaitingFunds   = all.Count(r => r.Status == RequestStatus.AwaitingFunds),
             completed       = all.Count(r => r.Status == RequestStatus.Completed),
             rejected        = all.Count(r => r.Status == RequestStatus.Rejected),
+            reassigned      = all.Count(r => r.Status == RequestStatus.Reassigned),
         });
     }
 
@@ -109,8 +118,9 @@ public class RequestsController(
             return BadRequest(new { message = "Title is required." });
 
         var requiresApproval = RequestCategory.NeedsApproval(req.Category);
+        // Two-stage approval: approval-required → Line Manager first, then GS
         var initialStatus    = requiresApproval
-            ? RequestStatus.PendingApproval
+            ? RequestStatus.PendingLineManager
             : RequestStatus.Open;
 
         var ticket = new ServiceRequest
@@ -136,6 +146,15 @@ public class RequestsController(
         logger.LogInformation("Request {Ticket} created by {User} (category: {Cat}, approval: {Approx})",
             ticket.TicketNumber, CallerEmail, ticket.Category, requiresApproval);
 
+        // Audit trail
+        await audit.LogCreatedAsync("Request", ticket.Id.ToString(), ticket.TicketNumber,
+            CallerEmail, CallerName, $"Category: {ticket.Category}, Priority: {ticket.Priority}");
+
+        // Fire notification to management
+        await notifications.RequestSubmittedAsync(
+            ticket.TicketNumber, ticket.Id.ToString(),
+            ticket.Category, CallerName, ticket.Location);
+
         return CreatedAtAction(nameof(GetById), new { id = ticket.Id }, ToDto(ticket));
     }
 
@@ -147,6 +166,7 @@ public class RequestsController(
         var r = await db.ServiceRequests.FindAsync(id);
         if (r is null) return NotFound(new { message = $"Request {id} not found." });
 
+        var oldStatus = r.Status;
         r.Status    = req.Status;
         r.UpdatedAt = DateTime.UtcNow;
 
@@ -160,6 +180,72 @@ public class RequestsController(
             r.Notes = req.Notes;
 
         await db.SaveChangesAsync();
+
+        await audit.LogStatusChangedAsync("Request", r.Id.ToString(), r.TicketNumber,
+            oldStatus, req.Status, CallerEmail, CallerName, req.Notes);
+
+        return Ok(ToDto(r));
+    }
+
+    // ── POST /api/v1/requests/{id}/line-approve ─────────────────────────────
+    [HttpPost("{id:guid}/line-approve")]
+    public async Task<ActionResult<RequestDto>> LineApprove(
+        Guid id, [FromBody] ApproveRequestRequest req)
+    {
+        if (CallerRole is not ("DepartmentManager" or "Supervisor" or "SystemAdmin"))
+            return Forbid();
+
+        var r = await db.ServiceRequests.FindAsync(id);
+        if (r is null) return NotFound(new { message = $"Request {id} not found." });
+        if (r.Status != RequestStatus.PendingLineManager)
+            return BadRequest(new { message = "Only PendingLineManager requests can be line-manager approved." });
+
+        r.LineManagerEmail      = CallerEmail;
+        r.LineManagerName       = CallerName;
+        r.LineManagerApprovedAt = DateTime.UtcNow;
+        r.Status                = RequestStatus.PendingApproval;  // moves to GS review
+        r.UpdatedAt             = DateTime.UtcNow;
+        if (!string.IsNullOrWhiteSpace(req.Notes)) r.Notes = req.Notes;
+
+        await db.SaveChangesAsync();
+
+        await audit.LogAsync("Request", r.Id.ToString(), r.TicketNumber,
+            AuditAction.LineManagerApproved, CallerEmail, CallerName,
+            oldValue: "PendingLineManager", newValue: "PendingApproval");
+        await notifications.RequestLineManagerApprovedAsync(
+            r.TicketNumber, r.Id.ToString(), CallerName,
+            r.RequestedByEmail, r.RequestedByName);
+
+        logger.LogInformation("Request {Ticket} line-manager approved by {User}", r.TicketNumber, CallerEmail);
+        return Ok(ToDto(r));
+    }
+
+    // ── POST /api/v1/requests/{id}/line-reject ───────────────────────────────
+    [HttpPost("{id:guid}/line-reject")]
+    public async Task<ActionResult<RequestDto>> LineReject(
+        Guid id, [FromBody] RejectRequestRequest req)
+    {
+        if (CallerRole is not ("DepartmentManager" or "Supervisor" or "SystemAdmin"))
+            return Forbid();
+
+        var r = await db.ServiceRequests.FindAsync(id);
+        if (r is null) return NotFound(new { message = $"Request {id} not found." });
+        if (r.Status != RequestStatus.PendingLineManager)
+            return BadRequest(new { message = "Only PendingLineManager requests can be line-manager rejected." });
+
+        r.Status              = RequestStatus.Rejected;
+        r.LineManagerEmail    = CallerEmail;
+        r.LineManagerName     = CallerName;
+        r.RejectionReason     = req.Reason?.Trim();
+        r.UpdatedAt           = DateTime.UtcNow;
+
+        await db.SaveChangesAsync();
+
+        await notifications.RequestLineManagerRejectedAsync(
+            r.TicketNumber, r.Id.ToString(), CallerName,
+            req.Reason ?? "", r.RequestedByEmail, r.RequestedByName);
+
+        logger.LogInformation("Request {Ticket} line-manager rejected by {User}", r.TicketNumber, CallerEmail);
         return Ok(ToDto(r));
     }
 
@@ -175,7 +261,7 @@ public class RequestsController(
         if (r is null) return NotFound(new { message = $"Request {id} not found." });
 
         if (r.Status != RequestStatus.PendingApproval)
-            return BadRequest(new { message = "Only requests in PendingApproval status can be approved." });
+            return BadRequest(new { message = "Only requests in PendingApproval status can be approved by General Service." });
 
         r.Status         = RequestStatus.Approved;
         r.ApprovedByEmail= CallerEmail;
@@ -188,7 +274,14 @@ public class RequestsController(
 
         await db.SaveChangesAsync();
 
-        logger.LogInformation("Request {Ticket} approved by {User}", r.TicketNumber, CallerEmail);
+        await audit.LogAsync("Request", r.Id.ToString(), r.TicketNumber,
+            AuditAction.Approved, CallerEmail, CallerName,
+            oldValue: "PendingApproval", newValue: "Approved");
+        await notifications.RequestGsApprovedAsync(
+            r.TicketNumber, r.Id.ToString(), CallerName,
+            r.RequestedByEmail, r.RequestedByName);
+
+        logger.LogInformation("Request {Ticket} GS-approved by {User}", r.TicketNumber, CallerEmail);
         return Ok(ToDto(r));
     }
 
@@ -204,7 +297,7 @@ public class RequestsController(
         if (r is null) return NotFound(new { message = $"Request {id} not found." });
 
         if (r.Status != RequestStatus.PendingApproval)
-            return BadRequest(new { message = "Only requests in PendingApproval status can be rejected." });
+            return BadRequest(new { message = "Only requests in PendingApproval (GS review) status can be rejected here. Use /line-reject for Line Manager rejection." });
 
         r.Status          = RequestStatus.Rejected;
         r.ApprovedByEmail = CallerEmail;
@@ -215,7 +308,11 @@ public class RequestsController(
 
         await db.SaveChangesAsync();
 
-        logger.LogInformation("Request {Ticket} rejected by {User}: {Reason}",
+        await notifications.RequestGsRejectedAsync(
+            r.TicketNumber, r.Id.ToString(), CallerName,
+            req.Reason ?? "", r.RequestedByEmail, r.RequestedByName);
+
+        logger.LogInformation("Request {Ticket} GS-rejected by {User}: {Reason}",
             r.TicketNumber, CallerEmail, req.Reason);
 
         return Ok(ToDto(r));
@@ -239,8 +336,40 @@ public class RequestsController(
 
         await db.SaveChangesAsync();
 
+        await audit.LogAsync("Request", r.Id.ToString(), r.TicketNumber,
+            AuditAction.Assigned, CallerEmail, CallerName,
+            details: $"Assigned to {req.AssigneeName} ({req.AssigneeEmail})");
         logger.LogInformation("Request {Ticket} assigned to {Assignee} by {By}",
             r.TicketNumber, req.AssigneeEmail, CallerEmail);
+
+        return Ok(ToDto(r));
+    }
+
+    // ── POST /api/v1/requests/{id}/reassign ─────────────────────────────────
+    [HttpPost("{id:guid}/reassign")]
+    public async Task<ActionResult<RequestDto>> Reassign(
+        Guid id, [FromBody] ReassignRequestRequest req)
+    {
+        if (CallerRole is not ("DepartmentManager" or "Supervisor" or "SystemAdmin"))
+            return Forbid();
+
+        var r = await db.ServiceRequests.FindAsync(id);
+        if (r is null) return NotFound(new { message = $"Request {id} not found." });
+
+        r.ReassignedToType = req.ReassignToType;
+        r.ReassignedToName = req.ReassignToName.Trim();
+        r.ReassignedNotes  = req.Notes?.Trim();
+        r.ReassignedAt     = DateTime.UtcNow;
+        r.Status           = RequestStatus.Reassigned;
+        r.UpdatedAt        = DateTime.UtcNow;
+
+        await db.SaveChangesAsync();
+
+        await audit.LogAsync("Request", r.Id.ToString(), r.TicketNumber,
+            AuditAction.Reassigned, CallerEmail, CallerName,
+            details: $"Reassigned to {req.ReassignToType}: {req.ReassignToName}. {req.Notes}");
+        logger.LogInformation("Request {Ticket} reassigned to {Type}:{Name} by {By}",
+            r.TicketNumber, req.ReassignToType, req.ReassignToName, CallerEmail);
 
         return Ok(ToDto(r));
     }

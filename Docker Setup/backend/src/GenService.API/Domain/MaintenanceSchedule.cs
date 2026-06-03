@@ -38,13 +38,44 @@ public class MaintenanceSchedule
 
 public static class MaintenanceCategory
 {
-    public const string Fumigation      = "Fumigation";
-    public const string WasteDisposal   = "WasteDisposal";
-    public const string TankWashing     = "TankWashing";
+    // ── Equipment Maintenance ─────────────────────────────────────────────────
     public const string GeneratorService = "GeneratorService";
-    public const string FireSafety      = "FireSafety";
-    public const string HVAC            = "HVAC";
-    public const string Plumbing        = "Plumbing";
-    public const string Electrical      = "Electrical";
-    public const string General         = "General";
+    public const string HVAC             = "HVAC";              // Air conditioners
+    public const string UPS              = "UPS";
+    public const string Pumps            = "Pumps";
+
+    // ── Vehicle Maintenance ───────────────────────────────────────────────────
+    public const string VehicleServicing  = "VehicleServicing";
+    public const string VehicleInspection = "VehicleInspection";
+
+    // ── Facility Maintenance ──────────────────────────────────────────────────
+    public const string Electrical   = "Electrical";
+    public const string Plumbing     = "Plumbing";
+    public const string CivilWorks   = "CivilWorks";
+    public const string FireSafety   = "FireSafety";
+    public const string Fumigation   = "Fumigation";
+    public const string WasteDisposal= "WasteDisposal";
+    public const string TankWashing  = "TankWashing";
+    public const string General      = "General";
+}
+
+// ── Maintenance group (top-level classification) ───────────────────────────────
+public static class MaintenanceGroup
+{
+    public const string Equipment = "Equipment";
+    public const string Vehicle   = "Vehicle";
+    public const string Facility  = "Facility";
+
+    public static string ForCategory(string category) => category switch
+    {
+        MaintenanceCategory.GeneratorService or
+        MaintenanceCategory.HVAC             or
+        MaintenanceCategory.UPS              or
+        MaintenanceCategory.Pumps            => Equipment,
+
+        MaintenanceCategory.VehicleServicing  or
+        MaintenanceCategory.VehicleInspection => Vehicle,
+
+        _ => Facility,
+    };
 }

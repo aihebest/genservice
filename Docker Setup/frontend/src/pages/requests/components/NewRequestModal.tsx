@@ -1,31 +1,43 @@
 import { useState } from 'react';
-import { Modal, Form, Input, Select, Alert, Tag, Typography } from 'antd';
+import { Modal, Form, Input, Select, Alert, Tag } from 'antd';
 import { requestsApi } from '../../../api/requests.api';
-import { CATEGORY_META, PRIORITY_META } from '../../../types';
-import type { CreateRequestDto, RequestCategory, RequestPriority } from '../../../types';
+import { CATEGORY_META, PRIORITY_META, OFFICE_LOCATIONS } from '../../../types';
+import type { CreateRequestDto, RequestCategory } from '../../../types';
 
 const { TextArea } = Input;
-const { Text }     = Typography;
 
 interface Props {
-  open:    boolean;
-  onClose: () => void;
+  open:      boolean;
+  onClose:   () => void;
   onCreated: () => void;
 }
 
 export default function NewRequestModal({ open, onClose, onCreated }: Props) {
-  const [form]    = Form.useForm<CreateRequestDto>();
-  const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState<string | null>(null);
-  const [selectedCat, setSelectedCat] = useState<RequestCategory | null>(null);
+  const [form]           = Form.useForm<CreateRequestDto & { locationSelect: string; locationOther: string }>();
+  const [loading,        setLoading]        = useState(false);
+  const [error,          setError]          = useState<string | null>(null);
+  const [selectedCat,    setSelectedCat]    = useState<RequestCategory | null>(null);
+  const [locationSelect, setLocationSelect] = useState<string | null>(null);
 
-  const handleSubmit = async (values: CreateRequestDto) => {
+  const handleSubmit = async (values: CreateRequestDto & { locationSelect: string; locationOther?: string }) => {
     setLoading(true);
     setError(null);
     try {
-      await requestsApi.create(values);
+      // Resolve location: if "Other" was chosen, use the free-text field
+      const location = values.locationSelect === 'Other'
+        ? (values.locationOther?.trim() ?? 'Other')
+        : values.locationSelect;
+
+      await requestsApi.create({
+        title:       values.title,
+        description: values.description,
+        category:    values.category,
+        priority:    values.priority,
+        location,
+      });
       form.resetFields();
       setSelectedCat(null);
+      setLocationSelect(null);
       onCreated();
       onClose();
     } catch (err: unknown) {
@@ -40,6 +52,7 @@ export default function NewRequestModal({ open, onClose, onCreated }: Props) {
   const handleCancel = () => {
     form.resetFields();
     setSelectedCat(null);
+    setLocationSelect(null);
     setError(null);
     onClose();
   };
@@ -77,7 +90,8 @@ export default function NewRequestModal({ open, onClose, onCreated }: Props) {
 
       <Form form={form} layout="vertical" onFinish={handleSubmit} requiredMark>
 
-        <Form.Item name="category" label="Request Type" rules={[{ required: true, message: 'Select a request type' }]}>
+        <Form.Item name="category" label="Request Type"
+          rules={[{ required: true, message: 'Select a request type' }]}>
           <Select
             placeholder="Select category…"
             onChange={(v: RequestCategory) => setSelectedCat(v)}
@@ -95,24 +109,40 @@ export default function NewRequestModal({ open, onClose, onCreated }: Props) {
           />
         </Form.Item>
 
-        <Form.Item name="title" label="Request Title" rules={[{ required: true, message: 'Enter a title' }, { max: 250 }]}>
+        <Form.Item name="title" label="Request Title"
+          rules={[{ required: true, message: 'Enter a title' }, { max: 250 }]}>
           <Input placeholder="Brief description of what you need…" />
         </Form.Item>
 
-        <Form.Item name="description" label="Details" rules={[{ required: true, message: 'Provide more details' }]}>
+        <Form.Item name="description" label="Details"
+          rules={[{ required: true, message: 'Provide more details' }]}>
           <TextArea
             rows={4}
-            placeholder="Provide full details — include any relevant equipment, location info, urgency reason, or supporting context…"
+            placeholder="Provide full details — equipment, location info, urgency reason, supporting context…"
             maxLength={4000}
             showCount
           />
         </Form.Item>
 
-        <Form.Item name="location" label="Location / Area" rules={[{ required: true, message: 'Enter a location' }]}>
-          <Input placeholder="e.g. Conference Room B, Block C Rooftop, Server Room…" />
+        {/* ── Location dropdown ─────────────────────────────────── */}
+        <Form.Item name="locationSelect" label="Office / Location"
+          rules={[{ required: true, message: 'Select a location' }]}>
+          <Select
+            placeholder="Select office or site…"
+            onChange={(v: string) => setLocationSelect(v)}
+            options={OFFICE_LOCATIONS.map(loc => ({ value: loc, label: loc }))}
+          />
         </Form.Item>
 
-        <Form.Item name="priority" label="Priority" initialValue="Normal" rules={[{ required: true }]}>
+        {locationSelect === 'Other' && (
+          <Form.Item name="locationOther" label="Specify Location"
+            rules={[{ required: true, message: 'Please specify the location' }]}>
+            <Input placeholder="Enter the specific location or area…" />
+          </Form.Item>
+        )}
+
+        <Form.Item name="priority" label="Priority" initialValue="Normal"
+          rules={[{ required: true }]}>
           <Select options={
             Object.entries(PRIORITY_META).map(([key, meta]) => ({
               value: key,

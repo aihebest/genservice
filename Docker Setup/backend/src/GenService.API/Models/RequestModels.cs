@@ -18,6 +18,12 @@ public record RejectRequestRequest(string Reason);
 
 public record AssignRequestRequest(string AssigneeEmail, string AssigneeName);
 
+public record ReassignRequestRequest(
+    string  ReassignToType,  // Logistics | Vendor | Procurement | Internal
+    string  ReassignToName,  // team / vendor / person name
+    string? Notes
+);
+
 // ── Query parameters ───────────────────────────────────────────────────────
 
 public record RequestsQuery(
@@ -45,6 +51,11 @@ public record RequestDto(
     string  RequestedByName,
     string? AssignedToEmail,
     string? AssignedToName,
+    // Line Manager (Stage 1)
+    string?   LineManagerEmail,
+    string?   LineManagerName,
+    DateTime? LineManagerApprovedAt,
+    // GS Approval (Stage 2)
     string? ApprovedByEmail,
     string? ApprovedByName,
     DateTime  CreatedAt,
@@ -52,7 +63,12 @@ public record RequestDto(
     DateTime? ApprovedAt,
     DateTime? CompletedAt,
     string?   RejectionReason,
-    string?   Notes
+    string?   Notes,
+    // Reassignment
+    string?   ReassignedToType,
+    string?   ReassignedToName,
+    string?   ReassignedNotes,
+    DateTime? ReassignedAt
 );
 
 public record RequestListResponse(

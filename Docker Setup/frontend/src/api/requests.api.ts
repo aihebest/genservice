@@ -31,6 +31,12 @@ export const requestsApi = {
   updateStatus: (id: string, status: string, notes?: string) =>
     apiClient.patch<ServiceRequest>(`/requests/${id}/status`, { status, notes }).then(r => r.data),
 
+  lineApprove: (id: string, notes?: string) =>
+    apiClient.post<ServiceRequest>(`/requests/${id}/line-approve`, { notes }).then(r => r.data),
+
+  lineReject: (id: string, reason: string) =>
+    apiClient.post<ServiceRequest>(`/requests/${id}/line-reject`, { reason }).then(r => r.data),
+
   approve: (id: string, notes?: string) =>
     apiClient.post<ServiceRequest>(`/requests/${id}/approve`, { notes }).then(r => r.data),
 
@@ -39,6 +45,9 @@ export const requestsApi = {
 
   assign: (id: string, assigneeEmail: string, assigneeName: string) =>
     apiClient.post<ServiceRequest>(`/requests/${id}/assign`, { assigneeEmail, assigneeName }).then(r => r.data),
+
+  reassign: (id: string, reassignToType: string, reassignToName: string, notes?: string) =>
+    apiClient.post<ServiceRequest>(`/requests/${id}/reassign`, { reassignToType, reassignToName, notes }).then(r => r.data),
 
   cancel: (id: string) =>
     apiClient.delete<ServiceRequest>(`/requests/${id}`).then(r => r.data),

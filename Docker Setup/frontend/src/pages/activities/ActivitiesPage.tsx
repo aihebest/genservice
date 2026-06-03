@@ -1,20 +1,23 @@
 import { useState, useCallback } from 'react';
 import {
-  Button, Card, Col, Row, Select, Space, Table, Tag, Badge,
-  Tabs, Tooltip, Typography,
+  Button, Card, Col, Progress, Row, Select, Space, Statistic,
+  Table, Tag, Badge, Tabs, Tooltip, Typography,
 } from 'antd';
+import type { ColumnsType as AntColumnsType } from 'antd/es/table';
 import type { ColumnsType } from 'antd/es/table';
 import {
   PlusOutlined, ReloadOutlined, TeamOutlined, ThunderboltOutlined,
+  TrophyOutlined,
 } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { activitiesApi } from '../../api/activities.api';
+import { taskProgressLogApi } from '../../api/taskProgressLog.api';
 import {
   ACTIVITY_STATUS_META, ACTIVITY_CATEGORY_META,
 } from '../../types';
-import type { StaffActivity, ActivityStatus } from '../../types';
+import type { StaffActivity, ActivityStatus, TechnicianSummary } from '../../types';
 import { useAuthStore } from '../../store/authStore';
 import LogActivityModal from './components/LogActivityModal';
 import ActivityFeed     from './components/ActivityFeed';
@@ -116,7 +119,7 @@ export default function ActivitiesPage() {
   const [category,     setCategory]     = useState<string | undefined>();
   const [page,         setPage]         = useState(1);
   const [modalOpen,    setModalOpen]    = useState(false);
-  const [activeTab,    setActiveTab]    = useState<'feed' | 'table'>('feed');
+  const [activeTab,    setActiveTab]    = useState<'feed' | 'table' | 'performance'>('feed');
 
   const refresh = useCallback(() => {
     qc.invalidateQueries({ queryKey: ['activities'] });
@@ -139,6 +142,13 @@ export default function ActivitiesPage() {
       pageSize: 15,
     }),
     enabled: activeTab === 'table',
+  });
+
+  const { data: perfData, isFetching: perfFetching } = useQuery({
+    queryKey: ['technician-performance'],
+    queryFn:  taskProgressLogApi.performance,
+    enabled:  activeTab === 'performance',
+    refetchInterval: 60_000,
   });
 
   const handleStatusUpdate = async (id: string, status: string) => {
@@ -236,10 +246,11 @@ export default function ActivitiesPage() {
         <div style={{ padding: '0 24px', borderBottom: '1px solid #f0f0f0' }}>
           <Tabs
             activeKey={activeTab}
-            onChange={k => setActiveTab(k as 'feed' | 'table')}
+            onChange={k => setActiveTab(k as 'feed' | 'table' | 'performance')}
             items={[
-              { key: 'feed',  label: 'Live Feed'    },
-              { key: 'table', label: 'Activity Log' },
+              { key: 'feed',        label: <span><ThunderboltOutlined /> Live Feed</span>    },
+              { key: 'table',       label: <span><TeamOutlined /> Activity Log</span>        },
+              { key: 'performance', label: <span><TrophyOutlined /> Performance</span>       },
             ]}
             size="small"
           />
@@ -295,12 +306,122 @@ export default function ActivitiesPage() {
             />
           </>
         )}
+
+        {activeTab === 'performance' && (
+          <div style={{ padding: 24 }}>
+            <PerformanceDashboard data={perfData ?? []} loading={perfFetching} />
+          </div>
+        )}
       </Card>
 
       <LogActivityModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         onCreated={refresh}
+      />
+    </div>
+  );
+}
+
+// ── Performance Dashboard ─────────────────────────────────────────────────────
+function PerformanceDashboard({ data, loading }: { data: TechnicianSummary[]; loading: boolean }) {
+  const perfColumns: AntColumnsType<TechnicianSummary> = [
+    {
+      title: 'Technician', dataIndex: 'name', key: 'name', width: 160,
+      render: (v: string) => <Text strong>{v}</Text>,
+    },
+    {
+      title: 'Total Assigned', dataIndex: 'totalAssigned', key: 'total', width: 120,
+      render: (v: number) => <Statistic value={v} valueStyle={{ fontSize: 18 }} />,
+    },
+    {
+      title: 'In Progress', dataIndex: 'inProgress', key: 'inProgress', width: 110,
+      render: (v: number) => <Tag color="processing">{v}</Tag>,
+    },
+    {
+      title: 'Completed', dataIndex: 'completed', key: 'completed', width: 100,
+      render: (v: number) => <Tag color="success">{v}</Tag>,
+    },
+    {
+      title: 'Pending', dataIndex: 'pending', key: 'pending', width: 90,
+      render: (v: number) => <Tag color="default">{v}</Tag>,
+    },
+    {
+      title: 'Completion Rate', key: 'rate', width: 150,
+      render: (_: unknown, r: TechnicianSummary) => {
+        const rate = r.totalAssigned > 0
+          ? Math.round((r.completed / r.totalAssigned) * 100)
+          : 0;
+        return (
+          <div style={{ width: 120 }}>
+            <Progress percent={rate} size="small" strokeColor={rate >= 70 ? '#52c41a' : rate >= 40 ? '#fa8c16' : '#ff4d4f'} />
+          </div>
+        );
+      },
+    },
+    {
+      title: 'Today Updates', dataIndex: 'todayLogs', key: 'today', width: 115,
+      render: (v: number) => (
+        <Tag color={v > 0 ? 'blue' : 'default'}>{v} log{v !== 1 ? 's' : ''}</Tag>
+      ),
+    },
+    {
+      title: 'This Week', dataIndex: 'weekLogs', key: 'week', width: 100,
+      render: (v: number) => <Text style={{ fontSize: 13 }}>{v}</Text>,
+    },
+    {
+      title: 'This Month', dataIndex: 'monthLogs', key: 'month', width: 105,
+      render: (v: number) => <Text style={{ fontSize: 13 }}>{v}</Text>,
+    },
+    {
+      title: 'Blockers', key: 'blockers', width: 160,
+      render: (_: unknown, r: TechnicianSummary) => (
+        <Space size={4} wrap>
+          {r.awaitingMaterials > 0 && <Tag color="gold">{r.awaitingMaterials} Spares</Tag>}
+          {r.awaitingVendor > 0    && <Tag color="orange">{r.awaitingVendor} Vendor</Tag>}
+          {r.awaitingMaterials === 0 && r.awaitingVendor === 0 && <Text type="secondary">—</Text>}
+        </Space>
+      ),
+    },
+  ];
+
+  const totalAssigned  = data.reduce((s, t) => s + t.totalAssigned, 0);
+  const totalCompleted = data.reduce((s, t) => s + t.completed, 0);
+  const totalToday     = data.reduce((s, t) => s + t.todayLogs, 0);
+  const totalBlockers  = data.reduce((s, t) => s + t.awaitingMaterials + t.awaitingVendor, 0);
+
+  return (
+    <div>
+      {/* Summary KPIs */}
+      <Row gutter={16} style={{ marginBottom: 24 }}>
+        {[
+          { label: 'Total Technicians',   value: data.length,      color: '#1677ff' },
+          { label: 'Total Assigned Jobs', value: totalAssigned,    color: '#722ed1' },
+          { label: 'Total Completed',     value: totalCompleted,   color: '#52c41a' },
+          { label: "Today's Updates",     value: totalToday,       color: '#1677ff' },
+          { label: 'Active Blockers',     value: totalBlockers,    color: '#fa541c' },
+        ].map(k => (
+          <Col key={k.label} style={{ flex: '1 1 140px', minWidth: 130 }}>
+            <Card size="small" styles={{ body: { padding: '14px 18px' } }}>
+              <Statistic
+                title={<Text style={{ fontSize: 12 }}>{k.label}</Text>}
+                value={k.value}
+                valueStyle={{ color: k.color, fontSize: 24, fontWeight: 700 }}
+              />
+            </Card>
+          </Col>
+        ))}
+      </Row>
+
+      <Table<TechnicianSummary>
+        columns={perfColumns}
+        dataSource={data}
+        rowKey="email"
+        loading={loading}
+        pagination={false}
+        size="middle"
+        scroll={{ x: 1100 }}
+        locale={{ emptyText: 'No assignment data yet — assign requests to technicians to see their performance.' }}
       />
     </div>
   );
