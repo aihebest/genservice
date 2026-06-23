@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Button,
@@ -11,6 +11,7 @@ import {
   Tag,
   Divider,
   Collapse,
+  Spin,
 } from 'antd';
 import { LockOutlined, MailOutlined, WindowsOutlined } from '@ant-design/icons';
 import { authApi } from '../../api/auth.api';
@@ -20,7 +21,6 @@ import type { LoginRequest } from '../../types';
 
 const { Title, Text, Paragraph } = Typography;
 
-// ── Quick-login demo credentials (dev mode only) ──────────────────────────
 const DEMO_USERS = [
   { label: 'Manager',    email: 'manager@demo.local',    password: 'DemoManager2026!' },
   { label: 'Supervisor', email: 'supervisor@demo.local', password: 'DemoSuper2026!'   },
@@ -28,48 +28,71 @@ const DEMO_USERS = [
   { label: 'Driver',     email: 'driver@demo.local',     password: 'DemoDriver2026!'  },
 ];
 
-// Production = VITE_ENTRA_CLIENT_ID is injected at build time
 const isSsoEnabled = !!import.meta.env.VITE_ENTRA_CLIENT_ID;
 const ENV_LABEL    = import.meta.env.VITE_ENV_LABEL as string | undefined;
 
-// ── Component ──────────────────────────────────────────────────────────────
 export default function LoginPage() {
   const navigate  = useNavigate();
   const setAuth   = useAuthStore((s) => s.setAuth);
   const [form]    = Form.useForm<LoginRequest>();
-  const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState<string | null>(null);
+  const [loading,     setLoading]     = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
+  const [error,       setError]       = useState<string | null>(null);
 
-  // ── Microsoft SSO ────────────────────────────────────────────────────────
+  // ── Handle return from Microsoft redirect ──────────────────────────────
+  useEffect(() => {
+    if (!isSsoEnabled) return;
+
+    const handleRedirect = async () => {
+      try {
+        await msalInstance.initialize();
+        const result = await msalInstance.handleRedirectPromise();
+        if (result?.idToken) {
+          setLoading(true);
+          try {
+            const resp = await authApi.entraLogin(result.idToken);
+            setAuth(resp.token, resp.user);
+            navigate('/dashboard', { replace: true });
+          } catch (apiErr: unknown) {
+            const e = apiErr as { response?: { data?: { message?: string } } };
+            setError(e.response?.data?.message ?? 'Sign-in succeeded but the platform rejected this account. Contact your administrator.');
+          } finally {
+            setLoading(false);
+          }
+        }
+      } catch (msalErr: unknown) {
+        const e = msalErr as { message?: string };
+        console.error('MSAL redirect error:', e.message);
+        // Only show an error if it's not a user-cancel
+        if (!e.message?.includes('user_cancelled')) {
+          setError(`Microsoft sign-in error: ${e.message ?? 'Unknown error'}`);
+        }
+      }
+    };
+
+    handleRedirect();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Initiate Microsoft login (full-page redirect — no popup) ──────────
   const handleMicrosoftLogin = async () => {
-    setLoading(true);
     setError(null);
+    setRedirecting(true);
     try {
       await msalInstance.initialize();
-      const result = await msalInstance.loginPopup(loginRequest);
-
-      const resp = await authApi.entraLogin(result.idToken);
-      setAuth(resp.token, resp.user);
-      navigate('/dashboard', { replace: true });
+      await msalInstance.loginRedirect({
+        ...loginRequest,
+        redirectUri: window.location.origin,
+      });
+      // Page navigates away — nothing after this runs
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string } }; message?: string };
-      // Ignore user-cancelled popup (BrowserAuthError: user_cancelled)
-      if (axiosErr.message?.includes('user_cancelled') || axiosErr.message?.includes('popup_window_error')) {
-        return;
-      }
-      if (axiosErr.response?.data?.message) {
-        setError(axiosErr.response.data.message);
-      } else if (!axiosErr.response) {
-        setError('Cannot reach the API. The server may be starting up — please wait 30 seconds and try again.');
-      } else {
-        setError('Microsoft sign-in failed. Please try again.');
-      }
-    } finally {
-      setLoading(false);
+      const e = err as { message?: string };
+      setError(`Could not start Microsoft sign-in: ${e.message ?? 'Unknown error'}`);
+      setRedirecting(false);
     }
   };
 
-  // ── Email / password (local dev) ─────────────────────────────────────────
+  // ── Email / password (dev mode only) ──────────────────────────────────
   const handleSubmit = async (values: LoginRequest) => {
     setLoading(true);
     setError(null);
@@ -98,17 +121,27 @@ export default function LoginPage() {
     form.submit();
   };
 
-  return (
-    <div
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
+  // Show redirect spinner while Microsoft redirect is in progress
+  if (redirecting) {
+    return (
+      <div style={{
+        minHeight: '100vh', display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
         background: 'linear-gradient(135deg, #0a1628 0%, #0f2444 50%, #1a3a5c 100%)',
-        padding: '24px',
-      }}
-    >
+        gap: 16,
+      }}>
+        <Spin size="large" />
+        <Text style={{ color: 'rgba(255,255,255,0.7)' }}>Redirecting to Microsoft…</Text>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{
+      minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'linear-gradient(135deg, #0a1628 0%, #0f2444 50%, #1a3a5c 100%)',
+      padding: '24px',
+    }}>
       <div style={{ width: '100%', maxWidth: 440 }}>
 
         {/* ── Brand header ─────────────────────────────────────────────── */}
@@ -121,20 +154,15 @@ export default function LoginPage() {
               onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
             />
           </div>
-
           <Title level={3} style={{ margin: 0, color: '#ffffff', letterSpacing: 0.5 }}>
             GenService Platform
           </Title>
           <Text style={{ color: 'rgba(255,255,255,0.65)', fontSize: 13 }}>
             Desicon Group · General Service Management
           </Text>
-
           {ENV_LABEL && (
             <div style={{ marginTop: 10 }}>
-              <Tag
-                color={ENV_LABEL === 'demo' ? 'gold' : 'volcano'}
-                style={{ textTransform: 'uppercase', fontWeight: 600 }}
-              >
+              <Tag color={ENV_LABEL === 'demo' ? 'gold' : 'volcano'} style={{ textTransform: 'uppercase', fontWeight: 600 }}>
                 {ENV_LABEL} environment
               </Tag>
             </div>
@@ -157,106 +185,45 @@ export default function LoginPage() {
             />
           )}
 
-          {/* ── Primary: Microsoft SSO ────────────────────────────────── */}
+          {/* ── Microsoft SSO (production) ────────────────────────────── */}
           {isSsoEnabled && (
             <>
-              <Button
-                block
-                size="large"
-                loading={loading}
-                onClick={handleMicrosoftLogin}
-                style={{
-                  height: 48,
-                  fontWeight: 600,
-                  fontSize: 15,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 10,
-                  background: '#0078d4',
-                  borderColor: '#0078d4',
-                  color: '#fff',
-                  borderRadius: 8,
-                }}
-              >
-                <WindowsOutlined style={{ fontSize: 18 }} />
-                Sign in with Microsoft
-              </Button>
+              {loading ? (
+                <div style={{ textAlign: 'center', padding: '24px 0' }}>
+                  <Spin size="large" />
+                  <div style={{ marginTop: 12 }}>
+                    <Text type="secondary">Completing sign-in…</Text>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <Button
+                    block
+                    size="large"
+                    onClick={handleMicrosoftLogin}
+                    style={{
+                      height: 48, fontWeight: 600, fontSize: 15,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                      background: '#0078d4', borderColor: '#0078d4', color: '#fff', borderRadius: 8,
+                    }}
+                  >
+                    <WindowsOutlined style={{ fontSize: 18 }} />
+                    Sign in with Microsoft
+                  </Button>
+                  <div style={{ marginTop: 12, textAlign: 'center' }}>
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      Use your Desicon Group Microsoft account
+                    </Text>
+                  </div>
+                </>
+              )}
 
-              <div style={{ marginTop: 12, textAlign: 'center' }}>
-                <Text type="secondary" style={{ fontSize: 12 }}>
-                  Use your Desicon Group Microsoft account
-                </Text>
-              </div>
-            </>
-          )}
-
-          {/* ── Dev / fallback: email + password ─────────────────────── */}
-          {!isSsoEnabled && (
-            <Form
-              form={form}
-              layout="vertical"
-              onFinish={handleSubmit}
-              requiredMark={false}
-              size="large"
-            >
-              <Form.Item
-                name="email"
-                label="Email Address"
-                rules={[
-                  { required: true, message: 'Email is required' },
-                  { type: 'email', message: 'Enter a valid email' },
-                ]}
-              >
-                <Input
-                  prefix={<MailOutlined style={{ color: '#bfbfbf' }} />}
-                  placeholder="your.email@company.com"
-                  autoComplete="email"
-                  autoFocus
-                />
-              </Form.Item>
-
-              <Form.Item
-                name="password"
-                label="Password"
-                rules={[{ required: true, message: 'Password is required' }]}
-              >
-                <Input.Password
-                  prefix={<LockOutlined style={{ color: '#bfbfbf' }} />}
-                  placeholder="••••••••"
-                  autoComplete="current-password"
-                />
-              </Form.Item>
-
-              <Form.Item style={{ marginBottom: 0 }}>
-                <Button
-                  type="primary"
-                  htmlType="submit"
-                  loading={loading}
-                  block
-                  style={{ height: 44, fontWeight: 600 }}
-                >
-                  Sign In
-                </Button>
-              </Form.Item>
-            </Form>
-          )}
-
-          {/* ── SSO mode: developer login collapsed ──────────────────── */}
-          {isSsoEnabled && (
-            <Collapse
-              ghost
-              style={{ marginTop: 20 }}
-              items={[{
+              {/* Developer login (collapsed) */}
+              <Collapse ghost style={{ marginTop: 20 }} items={[{
                 key: 'dev',
                 label: <Text type="secondary" style={{ fontSize: 12 }}>Developer login</Text>,
                 children: (
-                  <Form
-                    form={form}
-                    layout="vertical"
-                    onFinish={handleSubmit}
-                    requiredMark={false}
-                  >
+                  <Form form={form} layout="vertical" onFinish={handleSubmit} requiredMark={false}>
                     <Form.Item name="email" rules={[{ required: true }, { type: 'email' }]}>
                       <Input prefix={<MailOutlined />} placeholder="Email" size="middle" />
                     </Form.Item>
@@ -268,31 +235,41 @@ export default function LoginPage() {
                     </Button>
                   </Form>
                 ),
-              }]}
-            />
+              }]} />
+            </>
           )}
 
-          {/* ── Quick login (dev / demo only) ─────────────────────────── */}
+          {/* ── Email / password (dev mode) ───────────────────────────── */}
+          {!isSsoEnabled && (
+            <Form form={form} layout="vertical" onFinish={handleSubmit} requiredMark={false} size="large">
+              <Form.Item name="email" label="Email Address"
+                rules={[{ required: true, message: 'Email is required' }, { type: 'email', message: 'Enter a valid email' }]}>
+                <Input prefix={<MailOutlined style={{ color: '#bfbfbf' }} />} placeholder="your.email@company.com"
+                  autoComplete="email" autoFocus />
+              </Form.Item>
+              <Form.Item name="password" label="Password" rules={[{ required: true, message: 'Password is required' }]}>
+                <Input.Password prefix={<LockOutlined style={{ color: '#bfbfbf' }} />} placeholder="••••••••"
+                  autoComplete="current-password" />
+              </Form.Item>
+              <Form.Item style={{ marginBottom: 0 }}>
+                <Button type="primary" htmlType="submit" loading={loading} block style={{ height: 44, fontWeight: 600 }}>
+                  Sign In
+                </Button>
+              </Form.Item>
+            </Form>
+          )}
+
           {!isSsoEnabled && (
             <>
               <Divider style={{ marginBlock: 24 }}>
                 <Text type="secondary" style={{ fontSize: 12 }}>Quick login</Text>
               </Divider>
-
               <Paragraph style={{ textAlign: 'center', marginBottom: 12 }}>
-                <Text type="secondary" style={{ fontSize: 12 }}>
-                  Demo credentials — click to fill &amp; sign in
-                </Text>
+                <Text type="secondary" style={{ fontSize: 12 }}>Demo credentials — click to fill &amp; sign in</Text>
               </Paragraph>
-
               <Space wrap size={8} style={{ justifyContent: 'center', width: '100%' }}>
                 {DEMO_USERS.map((u) => (
-                  <Button
-                    key={u.email}
-                    size="small"
-                    onClick={() => quickLogin(u.email, u.password)}
-                    disabled={loading}
-                  >
+                  <Button key={u.email} size="small" onClick={() => quickLogin(u.email, u.password)} disabled={loading}>
                     {u.label}
                   </Button>
                 ))}
@@ -301,7 +278,6 @@ export default function LoginPage() {
           )}
         </Card>
 
-        {/* ── Footer ───────────────────────────────────────────────────── */}
         <div style={{ textAlign: 'center', marginTop: 20 }}>
           <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12 }}>
             © 2026 Desicon Group · All rights reserved
