@@ -82,7 +82,7 @@ export default function LoginPage() {
       await msalInstance.initialize();
       await msalInstance.loginRedirect({
         ...loginRequest,
-        redirectUri: window.location.origin,
+        redirectUri: `${window.location.origin}/login`,
       });
       // Page navigates away — nothing after this runs
     } catch (err: unknown) {

@@ -4,7 +4,9 @@ const msalConfig: Configuration = {
   auth: {
     clientId:              import.meta.env.VITE_ENTRA_CLIENT_ID || '',
     authority:             `https://login.microsoftonline.com/${import.meta.env.VITE_ENTRA_TENANT_ID || 'common'}`,
-    redirectUri:           window.location.origin,
+    // Redirect to /login directly so React Router never strips the ?code= params.
+    // The root (origin) causes a client-side redirect to /login which loses the auth code.
+    redirectUri:           `${window.location.origin}/login`,
     postLogoutRedirectUri: window.location.origin,
   },
   cache: {
