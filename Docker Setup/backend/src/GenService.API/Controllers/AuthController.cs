@@ -3,6 +3,8 @@ using GenService.API.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Protocols;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -120,6 +122,93 @@ public class AuthController(
             Role:       role,
             Department: user?.Department ?? "General Service",
             ExpiresAt:  expiresAt
+        ));
+    }
+
+    /// <summary>
+    /// Exchange a Microsoft Entra ID token for a platform JWT.
+    /// The frontend calls this after the user completes MSAL loginPopup.
+    /// </summary>
+    [HttpPost("entra-login")]
+    [AllowAnonymous]
+    public async Task<IActionResult> EntraLogin([FromBody] EntraLoginRequest request)
+    {
+        var tenantId = config["Auth:Entra:TenantId"];
+        var clientId = config["Auth:Entra:ClientId"];
+
+        if (string.IsNullOrEmpty(tenantId) || string.IsNullOrEmpty(clientId))
+            return StatusCode(StatusCodes.Status501NotImplemented,
+                new { message = "Microsoft SSO is not configured on this server." });
+
+        // Validate the Microsoft ID token against Entra's public keys
+        ClaimsPrincipal principal;
+        try
+        {
+            var metadataUri = $"https://login.microsoftonline.com/{tenantId}/v2.0/.well-known/openid-configuration";
+            var configManager = new ConfigurationManager<OpenIdConnectConfiguration>(
+                metadataUri,
+                new OpenIdConnectConfigurationRetriever(),
+                new HttpDocumentRetriever());
+
+            var openIdConfig = await configManager.GetConfigurationAsync(CancellationToken.None);
+
+            var validationParams = new TokenValidationParameters
+            {
+                ValidIssuer       = $"https://login.microsoftonline.com/{tenantId}/v2.0",
+                ValidAudience     = clientId,
+                IssuerSigningKeys = openIdConfig.SigningKeys,
+                ValidateLifetime  = true,
+                ValidateIssuer    = true,
+                ValidateAudience  = true,
+                ClockSkew         = TimeSpan.FromMinutes(5)
+            };
+
+            var handler = new JwtSecurityTokenHandler();
+            principal = handler.ValidateToken(request.IdToken, validationParams, out _);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning("Entra ID token validation failed: {Message}", ex.Message);
+            return Unauthorized(new { message = "Invalid Microsoft token. Please sign in again." });
+        }
+
+        // Extract UPN / email (Entra uses 'preferred_username' for work accounts)
+        var email = principal.FindFirst("preferred_username")?.Value
+                 ?? principal.FindFirst("email")?.Value
+                 ?? principal.FindFirst(ClaimTypes.Email)?.Value;
+
+        if (string.IsNullOrEmpty(email))
+            return Unauthorized(new { message = "Could not read email from your Microsoft account." });
+
+        email = email.Trim().ToLowerInvariant();
+
+        // Match to a platform user
+        var user = await db.AppUsers
+            .FirstOrDefaultAsync(u => u.Email.ToLower() == email && u.IsActive);
+
+        if (user is null)
+        {
+            logger.LogWarning("Entra login — no platform account for {Email}", email);
+            return Unauthorized(new { message = $"No platform account found for {email}. Ask your administrator to create one." });
+        }
+
+        user.LastLoginAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+
+        var expiresAt = DateTime.UtcNow.AddHours(8);
+        var token     = GenerateJwt(user.Email, user.FullName, user.Role, expiresAt);
+
+        logger.LogInformation("Entra login OK: {Email} ({Role})", email, user.Role);
+
+        return Ok(new LoginResponse(
+            Token: token,
+            User:  new UserInfo(
+                Email:      user.Email,
+                FullName:   user.FullName,
+                Role:       user.Role,
+                Department: user.Department,
+                ExpiresAt:  expiresAt
+            )
         ));
     }
 
