@@ -1,4 +1,5 @@
 using GenService.API.Data;
+using GenService.API.Domain;
 using GenService.API.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
