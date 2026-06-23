@@ -10,6 +10,10 @@ import ActivitiesPage from '../pages/activities/ActivitiesPage';
 import MaintenancePage from '../pages/maintenance/MaintenancePage';
 import FuelPage from '../pages/fuel/FuelPage';
 import ReportsPage from '../pages/reports/ReportsPage';
+import DailyLogPage from '../pages/daily-log/DailyLogPage';
+import UserManagementPage from '../pages/users/UserManagementPage';
+import StoreManagementPage from '../pages/store/StoreManagementPage';
+import NotificationsPage from '../pages/notifications/NotificationsPage';
 
 // ── Auth guard ────────────────────────────────────────────────────────────────
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -39,7 +43,11 @@ export const router = createBrowserRouter([
       { path: 'activities',    element: <ActivitiesPage /> },
       { path: 'maintenance',   element: <MaintenancePage /> },
       { path: 'fuel',          element: <FuelPage /> },
+      { path: 'daily-log',     element: <DailyLogPage /> },
+      { path: 'users',         element: <UserManagementPage /> },
+      { path: 'store',         element: <StoreManagementPage /> },
       { path: 'reports',       element: <ReportsPage /> },
+      { path: 'notifications', element: <NotificationsPage /> },
     ],
   },
   {

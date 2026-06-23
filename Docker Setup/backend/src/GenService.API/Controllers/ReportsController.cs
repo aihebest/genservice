@@ -255,6 +255,155 @@ public class ReportsController(GenServiceDbContext db) : ControllerBase
     }
 
     // ══════════════════════════════════════════════════════════════════════════
+    //  GET /api/v1/reports/vehicle-register
+    //  Returns per-vehicle summaries, spares costs, long-standing list,
+    //  monthly completion trends, and status×type breakdown for the register.
+    // ══════════════════════════════════════════════════════════════════════════
+    [HttpGet("vehicle-register")]
+    public async Task<IActionResult> VehicleRegisterReport([FromQuery] string? regNo = null)
+    {
+        var now  = DateTime.UtcNow;
+        var all  = await db.VehicleMaintenanceRequests.AsNoTracking().ToListAsync();
+
+        // Optionally filter to a single vehicle
+        var filtered = regNo != null
+            ? all.Where(r => r.VehicleRegNo.ToUpper() == regNo.ToUpper().Trim()).ToList()
+            : all;
+
+        // ── Per-vehicle register summary ─────────────────────────────────────
+        var perVehicle = all
+            .GroupBy(r => new { r.VehicleRegNo, r.VehicleType })
+            .Select(g => new
+            {
+                vehicleRegNo        = g.Key.VehicleRegNo,
+                vehicleType         = g.Key.VehicleType,
+                totalJobs           = g.Count(),
+                completedJobs       = g.Count(r => r.Status == VehicleMaintenanceStatus.Completed),
+                activeJobs          = g.Count(r => r.Status != VehicleMaintenanceStatus.Completed
+                                               && r.Status != VehicleMaintenanceStatus.Rejected),
+                totalSparesCost     = g.Where(r => r.SparesCostNaira.HasValue)
+                                       .Sum(r => r.SparesCostNaira ?? 0),
+                lastServiceDate     = g.Where(r => r.CompletedAt.HasValue)
+                                       .OrderByDescending(r => r.CompletedAt)
+                                       .Select(r => (DateTime?)r.CompletedAt!.Value)
+                                       .FirstOrDefault(),
+                currentStatus       = g.OrderByDescending(r => r.CreatedAt)
+                                       .Select(r => r.Status.ToString())
+                                       .FirstOrDefault(),
+            })
+            .OrderBy(v => v.vehicleRegNo)
+            .ToList();
+
+        // ── Spares cost summary (only vehicles with cost > 0) ────────────────
+        var sparesCostSummary = perVehicle
+            .Where(v => v.totalSparesCost > 0)
+            .OrderByDescending(v => v.totalSparesCost)
+            .Select(v => new
+            {
+                label = v.vehicleRegNo,
+                v.vehicleType,
+                v.totalSparesCost,
+                count = v.totalJobs,
+            })
+            .ToList();
+
+        // ── Per-vehicle history (for the selected vehicle, or most recent 20) ─
+        var history = filtered
+            .OrderByDescending(r => r.CreatedAt)
+            .Take(regNo != null ? 100 : 20)
+            .Select(r => new
+            {
+                r.RequestNumber,
+                r.VehicleRegNo,
+                r.VehicleType,
+                r.MaintenanceType,
+                r.Status,
+                r.Priority,
+                r.WorkshopName,
+                r.WorkshopLocation,
+                r.FaultIdentified,
+                r.ProposedSolution,
+                r.WorkDone,
+                r.ActionedBy,
+                r.SparesCostNaira,
+                r.HandoverConfirmed,
+                DaysOpen   = r.Status != VehicleMaintenanceStatus.Completed
+                             ? (int)(now - r.CreatedAt).TotalDays : 0,
+                r.CreatedAt,
+                r.CompletedAt,
+            })
+            .ToList();
+
+        // ── Long-standing vehicles (InWorkshop > 7 days) ─────────────────────
+        var longStanding = all
+            .Where(r => (r.Status == VehicleMaintenanceStatus.InWorkshop
+                      || r.Status == VehicleMaintenanceStatus.AwaitingParts
+                      || r.Status == VehicleMaintenanceStatus.AwaitingFunds)
+                      && r.SentToWorkshopAt.HasValue
+                      && (now - r.SentToWorkshopAt.Value).TotalDays > 7)
+            .OrderByDescending(r => r.SentToWorkshopAt)
+            .Select(r => new
+            {
+                r.RequestNumber,
+                r.VehicleRegNo,
+                r.VehicleType,
+                r.Status,
+                r.WorkshopName,
+                r.FaultIdentified,
+                DaysInWorkshop = (int)(now - r.SentToWorkshopAt!.Value).TotalDays,
+                r.SentToWorkshopAt,
+            })
+            .ToList();
+
+        // ── Monthly completion trends (last 6 months) ────────────────────────
+        var monthlyTrends = Enumerable.Range(0, 6)
+            .Select(i =>
+            {
+                var m = new DateTime(now.Year, now.Month, 1).AddMonths(-i);
+                return new
+                {
+                    month      = m.ToString("MMM yy"),
+                    completed  = all.Count(r => r.Status == VehicleMaintenanceStatus.Completed
+                                             && r.CompletedAt.HasValue
+                                             && r.CompletedAt.Value.Year  == m.Year
+                                             && r.CompletedAt.Value.Month == m.Month),
+                    newJobs    = all.Count(r => r.CreatedAt.Year  == m.Year
+                                             && r.CreatedAt.Month == m.Month),
+                };
+            })
+            .OrderBy(x => x.month)
+            .ToList();
+
+        // ── Status × Type breakdown ──────────────────────────────────────────
+        var statusByType = all
+            .GroupBy(r => r.MaintenanceType.ToString())
+            .Select(g => new
+            {
+                type          = g.Key,
+                pending       = g.Count(r => r.Status == VehicleMaintenanceStatus.Pending),
+                inWorkshop    = g.Count(r => r.Status == VehicleMaintenanceStatus.InWorkshop),
+                awaitingParts = g.Count(r => r.Status == VehicleMaintenanceStatus.AwaitingParts),
+                awaitingFunds = g.Count(r => r.Status == VehicleMaintenanceStatus.AwaitingFunds),
+                completed     = g.Count(r => r.Status == VehicleMaintenanceStatus.Completed),
+                rejected      = g.Count(r => r.Status == VehicleMaintenanceStatus.Rejected),
+            })
+            .ToList();
+
+        return Ok(new
+        {
+            perVehicle,
+            sparesCostSummary,
+            history,
+            longStanding,
+            monthlyTrends,
+            statusByType,
+            totalVehicles        = perVehicle.Count,
+            totalSparesCostAll   = all.Where(r => r.SparesCostNaira.HasValue).Sum(r => r.SparesCostNaira ?? 0),
+            activeJobsCount      = all.Count(r => r.Status != VehicleMaintenanceStatus.Completed && r.Status != VehicleMaintenanceStatus.Rejected),
+            longStandingCount    = longStanding.Count,
+        });
+    }
+
     //  GET /api/v1/reports/vehicle?period=30d
     // ══════════════════════════════════════════════════════════════════════════
     [HttpGet("vehicle")]

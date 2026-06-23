@@ -236,9 +236,7 @@ export default function RequestsPage() {
               placeholder="Search by ticket, title, name, location…"
               style={{ width: 300 }}
               allowClear
-              onSearch={handleSearch}
               onChange={e => !e.target.value && handleSearch('')}
-              // @ts-expect-error - antd Input doesn't expose onSearch but works with onPressEnter + onClear
               onPressEnter={(e: React.KeyboardEvent<HTMLInputElement>) =>
                 handleSearch((e.target as HTMLInputElement).value)
               }

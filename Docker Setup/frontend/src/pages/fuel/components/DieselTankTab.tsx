@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import {
   Alert, Button, Col, Descriptions, Divider, Drawer,
   Form, Input, InputNumber, Modal, Row, Select, Space,
-  Statistic, Table, Tag, Tooltip, Typography,
+  Statistic, Table, Tag, Typography,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { PlusOutlined, ArrowDownOutlined, CheckCircleOutlined } from '@ant-design/icons';
@@ -14,6 +14,7 @@ import { OFFICE_LOCATIONS } from '../../../types';
 import type { DieselTankReading } from '../../../types';
 
 dayjs.extend(relativeTime);
+
 const { Text } = Typography;
 const { TextArea } = Input;
 
@@ -89,6 +90,25 @@ function buildColumns(onView: (r: DieselTankReading) => void): ColumnsType<Diese
   ];
 }
 
+
+type LatestTankEntry = {
+  location: string; tankIdentifier: string;
+  tankLevelLitres: number; consumptionLitres?: number; readingDate: string;
+};
+function toLatestTankEntry(e: Record<string, unknown>): LatestTankEntry {
+  return {
+    location:          String(e['location'] ?? ''),
+    tankIdentifier:    String(e['tankIdentifier'] ?? ''),
+    tankLevelLitres:   Number(e['tankLevelLitres'] ?? 0),
+    consumptionLitres: e['consumptionLitres'] != null ? Number(e['consumptionLitres']) : undefined,
+    readingDate:       String(e['readingDate'] ?? ''),
+  };
+}
+function toLatestTankEntries(v: unknown): LatestTankEntry[] {
+  if (!Array.isArray(v)) return [];
+  return v.map((e: unknown) => toLatestTankEntry(e as Record<string, unknown>));
+}
+
 export default function DieselTankTab() {
   const qc = useQueryClient();
 
@@ -107,7 +127,7 @@ export default function DieselTankTab() {
 
   const { data, isFetching } = useQuery({
     queryKey: ['diesel-tank', 'list', locationFilter, page],
-    queryFn: () => dieselTankApi.list({ location: locationFilter, days: 60, page, pageSize: 20 }),
+    queryFn: () => dieselTankApi.list({ location: locationFilter, days: 60, page }),
   });
 
   const { data: summary } = useQuery({
@@ -145,23 +165,27 @@ export default function DieselTankTab() {
     } finally { setCreateLoading(false); }
   };
 
+  const latestPerTank = toLatestTankEntries(sumData?.latestPerTank);
+
+  type TankStat = { label: string; value: number; color: string; suffix: string; fmt: boolean };
+  const tankStats: TankStat[] = [
+    { label: 'Tanks Tracked',        value: Number(sumData?.tankCount ?? 0),                  color: '#1677ff', suffix: '',   fmt: false },
+    { label: 'Total Consumed (30d)', value: Number(sumData?.totalConsumptionLitres ?? 0),     color: '#fa8c16', suffix: ' L', fmt: false },
+    { label: 'Avg Daily (L)',        value: Number(sumData?.avgDailyConsumptionLitres ?? 0),  color: '#722ed1', suffix: ' L', fmt: false },
+    { label: 'Total Cost (30d)',     value: Number(sumData?.totalCostNaira ?? 0),             color: '#52c41a', suffix: '',   fmt: true  },
+  ];
+
   return (
     <div>
       {/* Summary stats */}
       <Row gutter={12} style={{ marginBottom: 20 }}>
-        {[
-          { label: 'Tanks Tracked',       value: sumData?.tankCount         as number, color: '#1677ff' },
-          { label: 'Total Consumed (30d)', value: sumData?.totalConsumptionLitres as number, color: '#fa8c16', suffix: ' L' },
-          { label: 'Avg Daily (L)',        value: sumData?.avgDailyConsumptionLitres as number, color: '#722ed1', suffix: ' L' },
-          { label: 'Total Cost (30d)',     value: sumData?.totalCostNaira    as number, color: '#52c41a',
-            prefix: '₦', fmt: true },
-        ].map(s => (
+        {tankStats.map(s => (
           <Col key={s.label} style={{ flex: '1 1 140px', minWidth: 130, marginBottom: 8 }}>
             <div style={{ background: '#fff', borderRadius: 8, padding: '12px 16px',
               border: '1px solid #f0f0f0' }}>
               <Statistic
                 title={<Text style={{ fontSize: 11 }}>{s.label}</Text>}
-                value={s.fmt ? `₦${Number(s.value ?? 0).toLocaleString()}` : (s.value ?? 0)}
+                value={s.fmt ? `₦${Number(s.value ?? 0).toLocaleString()}` : Number(s.value ?? 0)}
                 suffix={!s.fmt ? (s.suffix ?? '') : ''}
                 valueStyle={{ color: s.color, fontSize: 20, fontWeight: 700 }}
               />
@@ -171,17 +195,14 @@ export default function DieselTankTab() {
       </Row>
 
       {/* Latest reading per tank cards */}
-      {sumData?.latestPerTank && (sumData.latestPerTank as unknown[]).length > 0 && (
+      {latestPerTank.length > 0 && (
         <div style={{ background: '#fff', borderRadius: 8, border: '1px solid #f0f0f0',
           marginBottom: 20, padding: 16 }}>
           <Text strong style={{ marginBottom: 12, display: 'block' }}>
             Current Tank Levels
           </Text>
           <Row gutter={12}>
-            {(sumData.latestPerTank as Array<{
-              location: string; tankIdentifier: string;
-              tankLevelLitres: number; consumptionLitres?: number; readingDate: string;
-            }>).map((t, i) => (
+            {latestPerTank.map((t, i) => (
               <Col key={i} style={{ flex: '1 1 200px', minWidth: 180, marginBottom: 8 }}>
                 <div style={{
                   border: `1px solid ${t.tankLevelLitres < 500 ? '#ff4d4f' : t.tankLevelLitres < 1500 ? '#fa8c16' : '#e8e8e8'}`,
@@ -290,7 +311,7 @@ export default function DieselTankTab() {
                 tooltip="Used to calculate consumption cost. Leave blank to skip cost calculation.">
                 <InputNumber style={{ width: '100%' }} placeholder="e.g. 1,250"
                   formatter={v => `₦ ${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                  parser={(v) => v?.replace(/₦\s?|(,*)/g, '') as unknown as number}
+                  parser={(v: string | undefined) => parseFloat(v?.replace(/₦\s?|(,*)/g, '') ?? '0') as 0}
                   min={0} />
               </Form.Item>
             </Col>
@@ -349,7 +370,7 @@ export default function DieselTankTab() {
 
           {selected.consumptionLitres != null && (
             <>
-              <Divider orientation="left" orientationMargin={0} style={{ fontSize: 12 }}>
+              <Divider titlePlacement="left" orientationMargin={0} style={{ fontSize: 12 }}>
                 Auto-Calculated Consumption
               </Divider>
               <Descriptions column={1} size="small" bordered>
@@ -381,12 +402,12 @@ export default function DieselTankTab() {
 
           {selected.notes && (
             <>
-              <Divider orientation="left" orientationMargin={0} style={{ fontSize: 12 }}>Notes</Divider>
+              <Divider titlePlacement="left" orientationMargin={0} style={{ fontSize: 12 }}>Notes</Divider>
               <Text type="secondary">{selected.notes}</Text>
             </>
           )}
 
-          <Divider orientation="left" orientationMargin={0} style={{ fontSize: 12 }}>Logged By</Divider>
+          <Divider titlePlacement="left" orientationMargin={0} style={{ fontSize: 12 }}>Logged By</Divider>
           <Text>{selected.loggedByName}</Text>
           <Text type="secondary" style={{ fontSize: 12, marginLeft: 8 }}>
             {dayjs(selected.createdAt).fromNow()}

@@ -10,17 +10,34 @@ public record CreateEquipmentMaintenanceRequest(
     string  Location,
     string  Description,
     string  Priority,
-    double? RunningHours,
-    double? NextServiceHour
+    double? RunningHours    = null,
+    double? NextServiceHour = null
 );
 
 public record ApproveEquipmentRequest(string? Notes);
 public record RejectEquipmentRequest(string Reason);
 
+/// <summary>Record fault assessment / findings after inspection</summary>
+public record EquipmentAssessmentRequest(
+    string?  FaultIdentified,
+    string?  ProposedSolution,
+    string?  ResolutionType,       // Internal | Outsourced
+    bool     PartsRequired,
+    string?  PartsSource,          // StoreInventory | NewPurchase
+    string?  ProcurementMethod,    // PO | CashAdvance
+    decimal? SparesCostNaira
+);
+
 public record CompleteEquipmentRequest(
-    string  WorkDone,
-    string? ActionedBy,
-    string? Notes
+    string   WorkDone,
+    string?  ActionedBy,
+    decimal? SparesCostNaira = null,
+    string?  Notes           = null
+);
+
+public record EquipmentHandoverRequest(
+    string    HandedOverBy,
+    DateTime? DateHandedOver = null
 );
 
 public record EquipmentQuery(
@@ -52,10 +69,24 @@ public record EquipmentMaintenanceDto(
     string?   ApprovedByName,
     DateTime? ApprovedAt,
     string?   RejectionReason,
+    // Assessment
+    string?   FaultIdentified,
+    string?   ProposedSolution,
+    string?   ResolutionType,
+    // Parts
+    bool      PartsRequired,
+    string?   PartsSource,
+    string?   ProcurementMethod,
+    decimal?  SparesCostNaira,
+    // Completion
     string?   WorkDone,
     string?   ActionedBy,
-    string?   Notes,
     DateTime? CompletedAt,
+    // Handover
+    bool      HandoverConfirmed,
+    DateTime? DateHandedOver,
+    string?   HandedOverBy,
+    string?   Notes,
     DateTime  CreatedAt,
     DateTime  UpdatedAt,
     int       DaysOpen

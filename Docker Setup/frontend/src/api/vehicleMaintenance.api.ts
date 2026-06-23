@@ -26,6 +26,7 @@ export const vehicleMaintenanceApi = {
     description:     string;
     priority:        string;
     currentLocation: string;
+    odometerReading?: string;
   }) => apiClient.post<VehicleMaintenance>('/vehicle-maintenance', data).then(r => r.data),
 
   approve: (id: string, notes?: string) =>
@@ -34,9 +35,32 @@ export const vehicleMaintenanceApi = {
   reject: (id: string, reason: string) =>
     apiClient.post<VehicleMaintenance>(`/vehicle-maintenance/${id}/reject`, { reason }).then(r => r.data),
 
-  dispatch: (id: string, workshopName: string, workshopLocation?: string) =>
-    apiClient.post<VehicleMaintenance>(`/vehicle-maintenance/${id}/dispatch`, { workshopName, workshopLocation }).then(r => r.data),
+  dispatch: (id: string, data: {
+    workshopName:            string;
+    workshopLocation?:       string;
+    dateDeliveredToWorkshop?: string;
+  }) => apiClient.post<VehicleMaintenance>(`/vehicle-maintenance/${id}/dispatch`, data).then(r => r.data),
 
-  complete: (id: string, notes?: string) =>
-    apiClient.post<VehicleMaintenance>(`/vehicle-maintenance/${id}/complete`, { notes }).then(r => r.data),
+  assess: (id: string, data: {
+    faultIdentified?:   string;
+    proposedSolution?:  string;
+    resolutionType?:    string;
+    partsRequired:      boolean;
+    partsSource?:       string;
+    procurementMethod?: string;
+    partsSuppliedBy?:   string;
+    sparesCostNaira?:   number;
+  }) => apiClient.post<VehicleMaintenance>(`/vehicle-maintenance/${id}/assess`, data).then(r => r.data),
+
+  complete: (id: string, data: {
+    workDone?:       string;
+    actionedBy?:     string;
+    sparesCostNaira?: number;
+    notes?:          string;
+  }) => apiClient.post<VehicleMaintenance>(`/vehicle-maintenance/${id}/complete`, data).then(r => r.data),
+
+  handover: (id: string, data: {
+    handedOverBy:   string;
+    dateHandedOver?: string;
+  }) => apiClient.post<VehicleMaintenance>(`/vehicle-maintenance/${id}/handover`, data).then(r => r.data),
 };

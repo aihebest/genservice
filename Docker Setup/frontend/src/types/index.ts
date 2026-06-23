@@ -292,6 +292,9 @@ export interface AppNotification {
 export interface NotificationsResponse {
   items:       AppNotification[];
   unreadCount: number;
+  total:       number;
+  page:        number;
+  take:        number;
 }
 
 export const OFFICE_LOCATIONS = [
@@ -461,6 +464,10 @@ export interface MaintenanceSchedule {
   isActive:             boolean;
   createdAt:            string;
   updatedAt:            string;
+  // Reminder / escalation tracking
+  escalationLevel:      number;   // 0 = none, 1 = supervisor, 2 = manager
+  lastReminderSentAt?:  string;
+  lastEscalationSentAt?: string;
 }
 
 export interface ScheduleListResponse {
@@ -607,11 +614,119 @@ export const DIESEL_RECORD_TYPE_META: Record<DieselRecordType, { label: string; 
 
 // ── Vehicle Maintenance ────────────────────────────────────────────────────────
 
+/** Complete Desicon Group vehicle fleet (from MRSF Vehicle Asset Register) */
+export const VEHICLE_LIST: Array<{ regNo: string; description: string }> = [
+  { regNo: 'PF 4079 SPY',   description: 'TOYOTA LAND CRUISER PRADO' },
+  { regNo: 'PHC 185 AM',    description: 'NISSAN PICKUP' },
+  { regNo: 'PHC 178 AM',    description: 'NISSAN NAVARA' },
+  { regNo: 'KRD 341 CE',    description: 'TOYOTA LAND CRUISER PRADO' },
+  { regNo: 'KRD 339 CE',    description: 'TOYOTA LAND CRUISER PRADO' },
+  { regNo: 'KRD 338 CE',    description: 'TOYOTA LAND CRUISER PRADO' },
+  { regNo: 'PHC 177 AM',    description: 'TOYOTA PRADO' },
+  { regNo: 'GGU 693 TX',    description: 'TOYOTA HILUX' },
+  { regNo: 'GGU 692 TX',    description: 'TOYOTA HILUX' },
+  { regNo: 'PHC 179 AM',    description: 'TOYOTA HILUX' },
+  { regNo: 'GGU 695 TX',    description: 'TOYOTA HILUX' },
+  { regNo: 'GGU 696 TX',    description: 'TOYOTA HILUX' },
+  { regNo: 'CX 211 RBC',    description: 'TOYOTA CAMRY' },
+  { regNo: 'GGE 70 AY',     description: 'TOYOTA LAND CRUISER' },
+  { regNo: 'LSD 65 BP',     description: 'HYUNDAI CAR' },
+  { regNo: 'AGL 105 BU',    description: 'TOYOTA HIACE BUS' },
+  { regNo: 'SMK 126 CE',    description: 'TOYOTA LAND CRUISER' },
+  { regNo: 'KRD 407 CG',    description: 'TOYOTA HILUX' },
+  { regNo: 'KRD 406 CG',    description: 'TOYOTA HILUX' },
+  { regNo: 'KTU 905 CK',    description: 'TOYOTA HIACE BUS' },
+  { regNo: 'JJJ 599 CM',    description: 'LEXUS LX 570 SUV' },
+  { regNo: 'JJJ 597 CM',    description: 'LEXUS LX 570 SUV' },
+  { regNo: 'AKD 90 CP',     description: 'TOYOTA PRADO VX' },
+  { regNo: 'SMK 179 CW',    description: 'TOYOTA CAMRY XLE' },
+  { regNo: 'APP 785 CU',    description: 'LEXUS LX570 B6 ARMOURED' },
+  { regNo: 'FKJ 877 DB',    description: 'TOYOTA LAND CRUISER' },
+  { regNo: 'FKJ 876 DB',    description: 'TOYOTA LAND CRUISER' },
+  { regNo: 'LSR 261 CX',    description: 'TOYOTA PRADO VX' },
+  { regNo: 'SMK 51 DM',     description: 'HYUNDAI IX 35 ELEGANCE' },
+  { regNo: 'SMK 48 DM',     description: 'HYUNDAI SANTA FE IX 45' },
+  { regNo: 'FKJ 862 DJ',    description: 'HYUNDAI IX 35 ELEGANCE' },
+  { regNo: 'FKJ 988 DJ',    description: 'HYUNDAI IX 35 ELEGANCE' },
+  { regNo: 'GGE 223 DK',    description: 'HYUNDAI IX 35 ELEGANCE' },
+  { regNo: 'SMK 50 DM',     description: 'HYUNDAI SANTA FE IX 45 ELEGANCE' },
+  { regNo: 'APP 40 DQ',     description: 'KIA SPORTAGE' },
+  { regNo: 'APP 42 DQ',     description: 'KIA CERATO' },
+  { regNo: 'APP 41 DQ',     description: 'LEXUS GX' },
+  { regNo: 'APP 43 DQ',     description: 'LEXUS GX 470 JEEP' },
+  { regNo: 'PHC 896 FW',    description: 'NISSAN NAVARA PICKUP' },
+  { regNo: 'PHC 895 FW',    description: 'NISSAN NAVARA PICKUP' },
+  { regNo: 'PHC 118 NT',    description: 'NISSAN PICKUP NP300' },
+  { regNo: 'LND 583 ET',    description: 'TOYOTA FORTUNER' },
+  { regNo: 'APP 388 ET',    description: 'TOYOTA FORTUNER' },
+  { regNo: 'NCH 53 ST',     description: 'MITSUBISHI OUTLANDER' },
+  { regNo: 'NCH 52 ST',     description: 'MITSUBISHI OUTLANDER' },
+  { regNo: 'AGL 272 EU',    description: 'TOYOTA HILUX PICKUP' },
+  { regNo: 'AGL 273 EU',    description: 'TOYOTA HILUX PICKUP' },
+  { regNo: 'AGL 274 EU',    description: 'TOYOTA HILUX PICKUP' },
+  { regNo: 'AGL 275 EU',    description: 'TOYOTA HILUX PICKUP' },
+  { regNo: 'PHC 82 AJ',     description: 'TOYOTA HILUX PICKUP' },
+  { regNo: 'EPE-776-EW',    description: 'NISSAN URVAN 15-SEATER BUS' },
+  { regNo: 'KTU 570 EU',    description: 'HYUNDAI TUCSON EVOLUTION' },
+  { regNo: 'KSF 375 EY',    description: 'NISSAN PICKUP NP300' },
+  { regNo: 'KSF 376 EY',    description: 'NISSAN PICKUP NP300' },
+  { regNo: 'NCH 54 ST',     description: 'FOTON VIEW C1 MHR 15-SEATER BUS' },
+  { regNo: 'BDG 285 FA',    description: 'TOYOTA RAV4' },
+  { regNo: 'BDG 286 FA',    description: 'TOYOTA RAV4' },
+  { regNo: 'LSR 74 FC',     description: 'TOYOTA LAND CRUISER' },
+  { regNo: 'YAB 47 NQ',     description: 'TOYOTA LAND CRUISER' },
+  { regNo: 'APP 231 FQ',    description: 'LEXUS GX470 JEEP' },
+  { regNo: 'SKN 317 AU',    description: 'TOYOTA HIACE AMBULANCE' },
+  { regNo: 'BDG 159 CL',    description: 'TOYOTA CAMRY (PRIVATE-GML)' },
+  { regNo: 'AKD 407 BD',    description: 'TOYOTA PRADO (PRIVATE-AK)' },
+  { regNo: 'AJ 464 AJ',     description: 'TOYOTA PRADO (PRIVATE-AK)' },
+  { regNo: 'AAA 07 UB',     description: 'RANGE ROVER (PRIVATE-DGS)' },
+  { regNo: 'FST 06 AZ',     description: 'TOYOTA PRADO (PRIVATE-GML)' },
+  { regNo: 'AKD 490 SU',    description: 'TOYOTA PRADO (PRIVATE-CHAIRMAN)' },
+  { regNo: 'KSF 761 DV',    description: 'LEXUS (PRIVATE)' },
+  { regNo: 'DE 51 CON',     description: 'MERCEDES G-WAGON (PRIVATE)' },
+  { regNo: 'RBC 899 HN',    description: 'TOYOTA HILUX (PRIVATE)' },
+  { regNo: 'EPE 520 CH',    description: 'TOYOTA PRADO (PRIVATE)' },
+  { regNo: 'AKD 380 EJ',    description: 'WRANGLER JEEP (PRIVATE)' },
+  { regNo: 'DBU 519 AA',    description: 'TOYOTA HILUX' },
+  { regNo: 'RUM 513 CB',    description: 'TOYOTA LAND CRUISER PRADO TXL' },
+  { regNo: 'BER 500 MU',    description: 'HYUNDAI MINI TRUCK' },
+];
+
+/** Complete Desicon Group generator fleet (from Daily Routine Report register) */
+export const GENERATOR_LIST: Array<{ assetNo: string; description: string; location: string }> = [
+  { assetNo: '02135', description: 'PHC OFFICE CAT 350KVA GENERATOR',       location: 'Port Harcourt Office' },
+  { assetNo: '03189', description: 'PHC OFFICE CUMMINS 275KVA GENERATOR',   location: 'Port Harcourt Office' },
+  { assetNo: '01819', description: 'PHC OFFICE MIKANO 200KVA GENERATOR',    location: 'Port Harcourt Office' },
+  { assetNo: '03188', description: 'DR CUMMINS 275KVA GENERATOR',           location: 'DR' },
+  { assetNo: '24031', description: 'DR FG WILSON 150KVA GENERATOR',         location: 'DR' },
+  { assetNo: '00794', description: 'DGS PERKINS 50KVA GENERATOR',           location: 'DGS' },
+  { assetNo: '03092', description: 'DGS MIKANO 50KVA GENERATOR',            location: 'DGS' },
+  { assetNo: '01346', description: 'GML PERKINS 50KVA GENERATOR',           location: 'GML' },
+  { assetNo: 'GML-M',  description: 'GML M SALEH 50KVA GENERATOR',          location: 'GML' },
+  { assetNo: '00017', description: 'WOJI YARD FG WILSON 40KVA GENERATOR',   location: 'Woji' },
+  { assetNo: 'LGOS1', description: 'LAGOS OFFICE PERKINS 100KVA GENERATOR', location: 'Lagos Office' },
+  { assetNo: 'LGOS2', description: 'LAGOS OFFICE CUMMINS 135KVA GENERATOR', location: 'Lagos Office' },
+  { assetNo: 'AKLG1', description: 'AK LAGOS 80KVA GENERATOR',              location: 'AK Lagos' },
+  { assetNo: 'AKLG2', description: 'AK LAGOS CAT 100KVA GENERATOR',         location: 'AK Lagos' },
+  { assetNo: 'AKLG3', description: 'AK LAGOS 20KVA GENERATOR',              location: 'AK Lagos' },
+  { assetNo: 'MDYO1', description: 'AK UYO MARAPCO 100KVA GENERATOR',       location: 'AK Uyo' },
+  { assetNo: 'MDYO65',description: 'AK UYO PERKINS 65KVA GENERATOR',        location: 'AK Uyo' },
+  { assetNo: 'CHRM47',description: "CHAIRMAN'S PERKINS 47KVA GENERATOR",    location: 'Chairman Uyo' },
+  { assetNo: 'CHRM40',description: "CHAIRMAN'S PERKINS 40KVA GENERATOR",    location: 'Chairman Uyo' },
+  { assetNo: 'CHRM50',description: "CHAIRMAN'S MIKANO 50KVA GENERATOR",     location: 'Chairman Uyo' },
+  { assetNo: 'TOMY1', description: 'TOMY PERKINS 80KVA GENERATOR',          location: 'Tomy Residence' },
+  { assetNo: 'TOMY2', description: 'TOMY PERKINS 40KVA GENERATOR',          location: 'Tomy Residence' },
+  { assetNo: 'BNNY1', description: 'BONNY PERKINS 60KVA GENERATOR',         location: 'Bonny' },
+];
+
 export type VehicleMaintenanceStatus =
-  | 'Pending' | 'Approved' | 'InWorkshop' | 'Completed' | 'Rejected';
+  | 'Pending' | 'Approved' | 'InWorkshop'
+  | 'AwaitingParts' | 'AwaitingFunds'
+  | 'Completed' | 'Rejected';
 
 export type VehicleMaintenanceType =
-  | 'Servicing' | 'Repair' | 'Inspection' | 'Bodywork' | 'TyreChange' | 'Battery' | 'Other';
+  | 'RoutineService' | 'MinorRepair' | 'MajorRepair';
 
 export interface VehicleMaintenance {
   id:               string;
@@ -623,27 +738,49 @@ export interface VehicleMaintenance {
   priority:         RequestPriority;
   status:           VehicleMaintenanceStatus;
   currentLocation:  string;
+  odometerReading?: string;
   requestedByEmail: string;
   requestedByName:  string;
   approvedByEmail?: string;
   approvedByName?:  string;
   approvedAt?:      string;
   rejectionReason?: string;
-  workshopName?:    string;
-  workshopLocation?:string;
-  sentToWorkshopAt?:string;
-  completedAt?:     string;
-  notes?:           string;
-  createdAt:        string;
-  updatedAt:        string;
-  daysOpen:         number;
-  daysInWorkshop?:  number;
+  // workshop
+  workshopName?:            string;
+  workshopLocation?:        string;
+  dateDeliveredToWorkshop?: string;
+  sentToWorkshopAt?:        string;
+  // assessment
+  faultIdentified?:  string;
+  proposedSolution?: string;
+  resolutionType?:   string;   // Internal | Outsourced
+  // parts
+  partsRequired:     boolean;
+  partsSource?:      string;   // StoreInventory | NewPurchase
+  procurementMethod?:string;   // PO | CashAdvance
+  partsSuppliedBy?:  string;
+  sparesCostNaira?:  number;
+  // completion
+  workDone?:    string;
+  actionedBy?:  string;
+  completedAt?: string;
+  // handover
+  handoverConfirmed: boolean;
+  dateHandedOver?:   string;
+  handedOverBy?:     string;
+  notes?:            string;
+  createdAt:         string;
+  updatedAt:         string;
+  daysOpen:          number;
+  daysInWorkshop?:   number;
 }
 
 export interface VehicleMaintenanceStats {
   pending:            number;
   approved:           number;
   inWorkshop:         number;
+  awaitingParts:      number;
+  awaitingFunds:      number;
   completedThisMonth: number;
   rejected:           number;
   longStanding:       number;
@@ -657,21 +794,19 @@ export interface VehicleMaintenanceListResponse {
 }
 
 export const VM_STATUS_META: Record<VehicleMaintenanceStatus, { label: string; color: string; badge: string }> = {
-  Pending:    { label: 'Pending',     color: 'orange',     badge: 'warning'    },
-  Approved:   { label: 'Approved',    color: 'blue',       badge: 'processing' },
-  InWorkshop: { label: 'In Workshop', color: 'purple',     badge: 'processing' },
-  Completed:  { label: 'Completed',   color: 'green',      badge: 'success'    },
-  Rejected:   { label: 'Rejected',    color: 'red',        badge: 'error'      },
+  Pending:       { label: 'Pending',        color: 'orange',  badge: 'warning'    },
+  Approved:      { label: 'Approved',       color: 'blue',    badge: 'processing' },
+  InWorkshop:    { label: 'In Workshop',    color: 'purple',  badge: 'processing' },
+  AwaitingParts: { label: 'Awaiting Parts', color: 'gold',    badge: 'warning'    },
+  AwaitingFunds: { label: 'Awaiting Funds', color: 'volcano', badge: 'warning'    },
+  Completed:     { label: 'Completed',      color: 'green',   badge: 'success'    },
+  Rejected:      { label: 'Rejected',       color: 'red',     badge: 'error'      },
 };
 
 export const VM_TYPE_META: Record<VehicleMaintenanceType, { label: string; color: string }> = {
-  Servicing:  { label: 'Servicing',         color: 'blue'     },
-  Repair:     { label: 'Repair',            color: 'orange'   },
-  Inspection: { label: 'Inspection',        color: 'cyan'     },
-  Bodywork:   { label: 'Bodywork',          color: 'purple'   },
-  TyreChange: { label: 'Tyre Change',       color: 'volcano'  },
-  Battery:    { label: 'Battery',           color: 'gold'     },
-  Other:      { label: 'Other',             color: 'default'  },
+  RoutineService: { label: 'Routine Service & Maintenance', color: 'blue'    },
+  MinorRepair:    { label: 'Minor Repair & Maintenance',    color: 'orange'  },
+  MajorRepair:    { label: 'Major Repair & Maintenance',    color: 'red'     },
 };
 
 // ── Equipment & Facility Maintenance ──────────────────────────────────────────
@@ -693,15 +828,19 @@ export const MR_STATUS_META: Record<MaintenanceRequestStatus, { label: string; c
 
 // Equipment
 export type EquipmentMaintenanceType =
-  | 'GeneratorService' | 'ACService' | 'UPSMaintenance' | 'PumpService' | 'Electrical' | 'Other';
+  | 'GeneratorService' | 'GeneratorRepair'
+  | 'ACService' | 'ACRepair'
+  | 'UPSMaintenance' | 'PumpService' | 'Electrical' | 'Other';
 
 export const EQUIPMENT_TYPE_META: Record<EquipmentMaintenanceType, { label: string; color: string }> = {
-  GeneratorService: { label: 'Generator Service', color: 'volcano'  },
-  ACService:        { label: 'Air Conditioning',  color: 'blue'     },
-  UPSMaintenance:   { label: 'UPS Maintenance',   color: 'geekblue' },
-  PumpService:      { label: 'Pump Service',      color: 'cyan'     },
-  Electrical:       { label: 'Electrical',        color: 'gold'     },
-  Other:            { label: 'Other',             color: 'default'  },
+  GeneratorService: { label: 'Generator Service (250hr)',  color: 'volcano'  },
+  GeneratorRepair:  { label: 'Generator Repair',          color: 'red'      },
+  ACService:        { label: 'A/C Service',               color: 'blue'     },
+  ACRepair:         { label: 'A/C Repair',                color: 'geekblue' },
+  UPSMaintenance:   { label: 'UPS / Inverter',            color: 'purple'   },
+  PumpService:      { label: 'Pump Service',              color: 'cyan'     },
+  Electrical:       { label: 'Electrical Equipment',      color: 'gold'     },
+  Other:            { label: 'Other',                     color: 'default'  },
 };
 
 export interface EquipmentMaintenance {
@@ -723,13 +862,27 @@ export interface EquipmentMaintenance {
   approvedByName?:  string;
   approvedAt?:      string;
   rejectionReason?: string;
-  workDone?:        string;
-  actionedBy?:      string;
-  notes?:           string;
-  completedAt?:     string;
-  createdAt:        string;
-  updatedAt:        string;
-  daysOpen:         number;
+  // assessment
+  faultIdentified?:  string;
+  proposedSolution?: string;
+  resolutionType?:   string;
+  // parts
+  partsRequired:     boolean;
+  partsSource?:      string;
+  procurementMethod?:string;
+  sparesCostNaira?:  number;
+  // completion
+  workDone?:     string;
+  actionedBy?:   string;
+  completedAt?:  string;
+  // handover
+  handoverConfirmed: boolean;
+  dateHandedOver?:   string;
+  handedOverBy?:     string;
+  notes?:            string;
+  createdAt:         string;
+  updatedAt:         string;
+  daysOpen:          number;
 }
 
 export interface EquipmentMaintenanceStats {
@@ -752,17 +905,21 @@ export interface EquipmentMaintenanceListResponse {
 // Facility
 export type FacilityMaintenanceType =
   | 'Electrical' | 'Plumbing' | 'CivilWorks' | 'Painting'
-  | 'TankWashing' | 'FireSafety' | 'Fumigation' | 'Carpentry' | 'General';
+  | 'TankWashing' | 'FireSafety' | 'Fumigation' | 'Carpentry'
+  | 'ACService' | 'SepticTank' | 'Glasswork' | 'General';
 
 export const FACILITY_TYPE_META: Record<FacilityMaintenanceType, { label: string; color: string }> = {
   Electrical:  { label: 'Electrical Works', color: 'gold'    },
   Plumbing:    { label: 'Plumbing',         color: 'cyan'    },
   CivilWorks:  { label: 'Civil Works',      color: 'brown' as any },
-  Painting:    { label: 'Painting',         color: 'lime'    },
+  Painting:    { label: 'Painting / Repainting', color: 'lime' },
   TankWashing: { label: 'Tank Washing',     color: 'blue'    },
   FireSafety:  { label: 'Fire Safety',      color: 'red'     },
   Fumigation:  { label: 'Fumigation',       color: 'purple'  },
   Carpentry:   { label: 'Carpentry',        color: 'orange'  },
+  ACService:   { label: 'A/C Service / Repair', color: 'geekblue' },
+  SepticTank:  { label: 'Septic Tank',      color: 'volcano' },
+  Glasswork:   { label: 'Glasswork',        color: 'cyan'    },
   General:     { label: 'General',          color: 'default' },
 };
 
@@ -782,13 +939,27 @@ export interface FacilityMaintenance {
   approvedByName?:  string;
   approvedAt?:      string;
   rejectionReason?: string;
-  workDone?:        string;
-  actionedBy?:      string;
-  notes?:           string;
-  completedAt?:     string;
-  createdAt:        string;
-  updatedAt:        string;
-  daysOpen:         number;
+  // assessment
+  faultIdentified?:  string;
+  proposedSolution?: string;
+  resolutionType?:   string;
+  // parts
+  partsRequired:     boolean;
+  partsSource?:      string;
+  procurementMethod?:string;
+  sparesCostNaira?:  number;
+  // completion
+  workDone?:    string;
+  actionedBy?:  string;
+  completedAt?: string;
+  // handover
+  handoverConfirmed: boolean;
+  dateHandedOver?:   string;
+  handedOverBy?:     string;
+  notes?:            string;
+  createdAt:         string;
+  updatedAt:         string;
+  daysOpen:          number;
 }
 
 export interface FacilityMaintenanceStats {
@@ -806,4 +977,423 @@ export interface FacilityMaintenanceListResponse {
   totalCount: number;
   page:       number;
   pageSize:   number;
+}
+
+// ── Daily Parameter Log ────────────────────────────────────────────────────────
+
+export type GeneratorStatusType = 'Running' | 'Standby' | 'Fault' | 'Off';
+export type WaterSourceType     = 'Municipal' | 'Borehole' | 'Both' | 'None';
+export type WaterStatusType     = 'Adequate' | 'Low' | 'Critical' | 'Refilled';
+export type SecurityStatusType  = 'Normal' | 'Incident Reported';
+
+export interface DailyParameterLog {
+  id:                    string;
+  logDate:               string;   // "YYYY-MM-DD"
+  location:              string;
+  // Power
+  nepaHoursAvailable?:   number;
+  generatorHoursRun?:    number;
+  dieselConsumedLitres?: number;
+  dieselBalanceLitres?:  number;
+  generatorStatus?:      GeneratorStatusType;
+  generatorRunHourMeter?:number;
+  // Water
+  waterSource?:          WaterSourceType;
+  waterTankLevelPercent?:number;
+  waterStatus?:          WaterStatusType;
+  // Staff
+  staffPresent?:         number;
+  expectedStaff?:        number;
+  visitorCount?:         number;
+  // Facility
+  cleaningDone:          boolean;
+  wasteDisposed:         boolean;
+  securityStatus?:       SecurityStatusType;
+  // Observations
+  maintenanceIssues?:    string;
+  actionsTaken?:         string;
+  pendingActions?:       string;
+  generalRemarks?:       string;
+  // Logger
+  loggedByEmail:         string;
+  loggedByName:          string;
+  createdAt:             string;
+  updatedAt:             string;
+}
+
+export interface DailyParameterLogListResponse {
+  items:      DailyParameterLog[];
+  totalCount: number;
+  page:       number;
+  pageSize:   number;
+}
+
+export interface DailyParameterLogStats {
+  logsThisMonth:              number;
+  avgNepaHoursThisMonth?:     number;
+  avgGeneratorHoursThisMonth?:number;
+  totalDieselThisMonth?:      number;
+  locationsLogged:            number;
+}
+
+export interface CreateDailyParameterLogPayload {
+  logDate:               string;
+  location:              string;
+  nepaHoursAvailable?:   number;
+  generatorHoursRun?:    number;
+  dieselConsumedLitres?: number;
+  dieselBalanceLitres?:  number;
+  generatorStatus?:      string;
+  generatorRunHourMeter?:number;
+  waterSource?:          string;
+  waterTankLevelPercent?:number;
+  waterStatus?:          string;
+  staffPresent?:         number;
+  expectedStaff?:        number;
+  visitorCount?:         number;
+  cleaningDone:          boolean;
+  wasteDisposed:         boolean;
+  securityStatus?:       string;
+  maintenanceIssues?:    string;
+  actionsTaken?:         string;
+  pendingActions?:       string;
+  generalRemarks?:       string;
+}
+
+export interface UpdateDailyParameterLogPayload extends Partial<Omit<CreateDailyParameterLogPayload, 'logDate' | 'location'>> {}
+
+// ── User Management ────────────────────────────────────────────────────────────
+
+export const ALL_ROLES = [
+  'SystemAdmin',
+  'DepartmentManager',
+  'Supervisor',
+  'Technician',
+  'Driver',
+  'Requester',
+  'StoreOfficer',
+] as const;
+
+export type AppUserRole = typeof ALL_ROLES[number];
+
+export const ROLE_META: Record<AppUserRole, { label: string; color: string }> = {
+  SystemAdmin:       { label: 'System Admin',       color: 'red'      },
+  DepartmentManager: { label: 'Dept. Manager',      color: 'purple'   },
+  Supervisor:        { label: 'Supervisor',          color: 'blue'     },
+  Technician:        { label: 'Technician',          color: 'cyan'     },
+  Driver:            { label: 'Driver',              color: 'geekblue' },
+  Requester:         { label: 'Requester',           color: 'default'  },
+  StoreOfficer:      { label: 'Store Officer',       color: 'orange'   },
+};
+
+export interface AppUserRecord {
+  id:              string;
+  email:           string;
+  fullName:        string;
+  role:            AppUserRole;
+  department:      string;
+  isActive:        boolean;
+  lastLoginAt?:    string;
+  createdByEmail?: string;
+  createdAt:       string;
+  updatedAt:       string;
+}
+
+export interface UserListResponse {
+  items:      AppUserRecord[];
+  totalCount: number;
+  page:       number;
+  pageSize:   number;
+}
+
+export interface UserSummary {
+  total:    number;
+  active:   number;
+  inactive: number;
+  byRole:   { role: string; count: number }[];
+}
+
+export interface CreateUserPayload {
+  email:      string;
+  fullName:   string;
+  role:       string;
+  department: string;
+  password:   string;
+}
+
+export interface UpdateUserPayload {
+  fullName?:   string;
+  role?:       string;
+  department?: string;
+}
+
+export interface ResetPasswordResponse {
+  email:             string;
+  temporaryPassword: string;
+  message:           string;
+}
+
+// ── Store / Inventory ─────────────────────────────────────────────────────────
+
+export const STORE_CATEGORIES = [
+  'Generator Parts',
+  'AC Parts',
+  'Electrical Items',
+  'Plumbing Items',
+  'Cleaning Supplies',
+  'Lubricants & Oils',
+  'Vehicle Parts',
+  'Safety Items',
+  'Office Supplies',
+  'General Store',
+] as const;
+
+export type StoreCategory = typeof STORE_CATEGORIES[number];
+
+export const STORE_UNITS = [
+  'Pieces','Litres','Metres','Kg','Rolls',
+  'Packets','Pairs','Sets','Boxes','Cartons','Gallons','Bags','Drums',
+] as const;
+
+export type StoreUnit = typeof STORE_UNITS[number];
+
+export const STORE_MOVEMENT_TYPES = ['Receipt','Issue','Adjustment','Return'] as const;
+export type StoreMovementType = typeof STORE_MOVEMENT_TYPES[number];
+
+export const STORE_REQUISITION_STATUSES = ['Pending','Approved','Issued','Rejected'] as const;
+export type StoreRequisitionStatus = typeof STORE_REQUISITION_STATUSES[number];
+
+export interface StoreItem {
+  id:              string;
+  itemCode:        string;
+  name:            string;
+  category:        string;
+  unit:            string;
+  quantityInStock: number;
+  reorderLevel:    number;
+  isLowStock:      boolean;
+  unitCostNaira:   number;
+  totalValueNaira: number;
+  description?:    string;
+  storeLocation?:  string;
+  supplier?:       string;
+  isActive:        boolean;
+  createdByEmail:  string;
+  createdAt:       string;
+  updatedAt:       string;
+}
+
+export interface StoreItemListResponse {
+  items:               StoreItem[];
+  total:               number;
+  page:                number;
+  pageSize:            number;
+  totalPages:          number;
+  lowStockCount:       number;
+  totalStoreValueNaira:number;
+}
+
+export interface StoreMovement {
+  id:             string;
+  itemCode:       string;
+  itemName:       string;
+  movementType:   StoreMovementType;
+  quantityBefore: number;
+  quantityChange: number;
+  quantityAfter:  number;
+  reference?:     string;
+  notes?:         string;
+  movedByEmail:   string;
+  movedByName:    string;
+  createdAt:      string;
+}
+
+// Requisitions
+export interface StoreRequisitionItem {
+  id:                string;
+  storeItemId:       string;
+  itemCode:          string;
+  itemName:          string;
+  unit:              string;
+  quantityRequested: number;
+  quantityIssued:    number;
+  unitCostNaira:     number;
+  totalCost:         number;
+  currentStock:      number;
+}
+
+export interface StoreRequisition {
+  id:                string;
+  requisitionNumber: string;
+  requestedByEmail:  string;
+  requestedByName:   string;
+  department:        string;
+  purpose:           string;
+  linkedReference?:  string;
+  status:            StoreRequisitionStatus;
+  approvedByName?:   string;
+  approvedAt?:       string;
+  rejectedByEmail?:  string;
+  rejectionReason?:  string;
+  rejectedAt?:       string;
+  issuedByName?:     string;
+  issuedAt?:         string;
+  notes?:            string;
+  createdAt:         string;
+  updatedAt:         string;
+  items:             StoreRequisitionItem[];
+  totalCostNaira:    number;
+}
+
+export interface StoreRequisitionListResponse {
+  items:         StoreRequisition[];
+  total:         number;
+  page:          number;
+  pageSize:      number;
+  totalPages:    number;
+  pendingCount:  number;
+  approvedCount: number;
+}
+
+// Payloads
+export interface CreateStoreItemPayload {
+  name:            string;
+  category:        string;
+  unit:            string;
+  quantityInStock: number;
+  reorderLevel:    number;
+  unitCostNaira:   number;
+  description?:    string;
+  storeLocation?:  string;
+  supplier?:       string;
+}
+
+export interface UpdateStoreItemPayload {
+  name:           string;
+  category:       string;
+  unit:           string;
+  reorderLevel:   number;
+  unitCostNaira:  number;
+  description?:   string;
+  storeLocation?: string;
+  supplier?:      string;
+  isActive:       boolean;
+}
+
+export interface RestockPayload {
+  quantity:      number;
+  unitCostNaira: number;
+  reference?:    string;
+  notes?:        string;
+}
+
+export interface AdjustStockPayload {
+  newQuantity: number;
+  reason:      string;
+}
+
+export interface CreateRequisitionLineItem {
+  storeItemId:       string;
+  quantityRequested: number;
+}
+
+export interface CreateStoreRequisitionPayload {
+  purpose:         string;
+  linkedReference?: string;
+  notes?:          string;
+  items:           CreateRequisitionLineItem[];
+}
+
+export interface IssueLineItem {
+  storeRequisitionItemId: string;
+  quantityIssued:         number;
+}
+
+export interface IssueRequisitionPayload {
+  items:  IssueLineItem[];
+  notes?: string;
+}
+
+// ── Diesel Requisitions ───────────────────────────────────────────────────────
+
+export const DIESEL_EQUIPMENT_TYPES = ['Generator', 'Vehicle', 'Fuel Store', 'Other'] as const;
+export type DieselEquipmentType = typeof DIESEL_EQUIPMENT_TYPES[number];
+
+export const DIESEL_REQUISITION_STATUSES = ['Pending', 'Approved', 'Dispensed', 'Rejected'] as const;
+export type DieselRequisitionStatus = typeof DIESEL_REQUISITION_STATUSES[number];
+
+export interface DieselRequisition {
+  id:                       string;
+  requisitionNumber:        string;
+  purpose:                  string;
+  equipmentType:            DieselEquipmentType;
+  equipmentReference?:      string;
+  location:                 string;
+  quantityRequestedLitres:  number;
+  requestedByEmail:         string;
+  requestedByName:          string;
+  department:               string;
+  status:                   DieselRequisitionStatus;
+  // Approval
+  approvedByName?:          string;
+  approvedAt?:              string;
+  // Rejection
+  rejectedByEmail?:         string;
+  rejectionReason?:         string;
+  rejectedAt?:              string;
+  // Dispense
+  dispensedByName?:         string;
+  dispensedAt?:             string;
+  quantityDispensedLitres?: number;
+  tankLevelBeforeLitres?:   number;
+  tankLevelAfterLitres?:    number;
+  unitCostPerLitreNaira?:   number;
+  totalCostNaira?:          number;
+  linkedDieselRecordId?:    string;
+  notes?:                   string;
+  createdAt:                string;
+  updatedAt:                string;
+}
+
+export interface DieselRequisitionListResponse {
+  items:                       DieselRequisition[];
+  total:                       number;
+  page:                        number;
+  pageSize:                    number;
+  totalPages:                  number;
+  pendingCount:                number;
+  approvedCount:               number;
+  totalDispensedLitresThisMonth: number;
+  totalCostThisMonth:          number;
+}
+
+export interface DieselRequisitionStats {
+  totalAllTime:       number;
+  pendingCount:       number;
+  approvedCount:      number;
+  dispensedCount:     number;
+  rejectedCount:      number;
+  litresThisMonth:    number;
+  costThisMonth:      number;
+  litresThisYear:     number;
+  costThisYear:       number;
+  byEquipmentType:    { type: string; count: number; litres: number }[];
+  monthlyTrend:       { month: string; litres: number; cost: number }[];
+}
+
+// Payloads
+export interface CreateDieselRequisitionPayload {
+  purpose:                 string;
+  equipmentType:           DieselEquipmentType;
+  equipmentReference?:     string;
+  location:                string;
+  quantityRequestedLitres: number;
+  notes?:                  string;
+}
+
+export interface DispenseDieselPayload {
+  quantityDispensedLitres: number;
+  tankLevelBeforeLitres:   number;
+  unitCostPerLitreNaira:   number;
+  notes?:                  string;
 }

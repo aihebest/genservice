@@ -16,6 +16,7 @@ import { useAuthStore } from '../../../store/authStore';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 
+
 dayjs.extend(relativeTime);
 
 const { TextArea } = Input;
@@ -201,7 +202,7 @@ export default function RequestDetailDrawer({ request, open, onClose, onUpdate }
         {/* Assignment info */}
         {(request.assignedToName || request.assignedToEmail) && (
           <>
-            <Divider orientation="left" orientationMargin={0} style={{ fontSize: 12 }}>Assignment</Divider>
+            <Divider titlePlacement="left" orientationMargin={0} style={{ fontSize: 12 }}>Assignment</Divider>
             <Descriptions column={1} size="small" bordered>
               <Descriptions.Item label="Assigned To">
                 {request.assignedToName}{' '}
@@ -214,7 +215,7 @@ export default function RequestDetailDrawer({ request, open, onClose, onUpdate }
         {/* Reassignment info */}
         {request.reassignedToName && (
           <>
-            <Divider orientation="left" orientationMargin={0} style={{ fontSize: 12 }}>Reassignment</Divider>
+            <Divider titlePlacement="left" orientationMargin={0} style={{ fontSize: 12 }}>Reassignment</Divider>
             <Descriptions column={1} size="small" bordered>
               <Descriptions.Item label="Reassigned To">
                 <Tag color="purple">{request.reassignedToType}</Tag> {request.reassignedToName}
@@ -234,7 +235,7 @@ export default function RequestDetailDrawer({ request, open, onClose, onUpdate }
         {/* Line Manager approval trail */}
         {request.lineManagerName && (
           <>
-            <Divider orientation="left" orientationMargin={0} style={{ fontSize: 12 }}>Line Manager Review</Divider>
+            <Divider titlePlacement="left" orientationMargin={0} style={{ fontSize: 12 }}>Line Manager Review</Divider>
             <Descriptions column={1} size="small" bordered>
               <Descriptions.Item label="Approved By">{request.lineManagerName}</Descriptions.Item>
               {request.lineManagerApprovedAt && (
@@ -249,7 +250,7 @@ export default function RequestDetailDrawer({ request, open, onClose, onUpdate }
         {/* GS Approval / Rejection info */}
         {(request.approvedByName || request.rejectionReason) && (
           <>
-            <Divider orientation="left" orientationMargin={0} style={{ fontSize: 12 }}>
+            <Divider titlePlacement="left" orientationMargin={0} style={{ fontSize: 12 }}>
               {request.status === 'Rejected' ? 'Rejection Details' : 'GS Approval'}
             </Divider>
             <Descriptions column={1} size="small" bordered>
@@ -274,7 +275,7 @@ export default function RequestDetailDrawer({ request, open, onClose, onUpdate }
 
         {request.notes && (
           <>
-            <Divider orientation="left" orientationMargin={0} style={{ fontSize: 12 }}>Notes</Divider>
+            <Divider titlePlacement="left" orientationMargin={0} style={{ fontSize: 12 }}>Notes</Divider>
             <Text type="secondary" style={{ fontSize: 13 }}>{request.notes}</Text>
           </>
         )}

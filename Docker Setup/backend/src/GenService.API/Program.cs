@@ -56,6 +56,9 @@ builder.Services.AddScoped<IEmailService, SmtpEmailService>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<AuditService>();
 
+// ── Background services ────────────────────────────────────────────────────────
+builder.Services.AddHostedService<MaintenanceReminderService>();
+
 // ── Controllers & API Explorer ────────────────────────────────────────────────
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -93,29 +96,44 @@ builder.Services.AddSwaggerGen(c =>
 // ── Health Checks ─────────────────────────────────────────────────────────────
 builder.Services.AddHealthChecks();
 
+// ── QuestPDF Community license ────────────────────────────────────────────────
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
+
 // ── Build app ─────────────────────────────────────────────────────────────────
 var app = builder.Build();
 
-// ── Database bootstrap (dev / demo) ─────────────────────────────────────────
-if (!app.Environment.IsProduction())
+// ── Database bootstrap ───────────────────────────────────────────────────────
+// Schema creation runs in ALL environments (required for first-time Azure deploy).
+// Demo data seeding runs only in non-Production environments.
 {
     using var scope = app.Services.CreateScope();
     var db  = scope.ServiceProvider.GetRequiredService<GenServiceDbContext>();
     var log = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
 
-    // Schema
+    // Schema — create fresh OR apply column additions to existing DB
     try
     {
         var created = await db.Database.EnsureCreatedAsync();
         log.LogInformation(created
             ? "✅ Database created fresh — seeding demo data..."
             : "✅ Database already exists — checking seed guards...");
+
+        if (!created)
+        {
+            // Add any columns that were introduced after the initial EnsureCreated.
+            // Each statement is wrapped in IF NOT EXISTS so it is safe to run repeatedly.
+            await ApplySchemaUpdatesAsync(db, log);
+        }
     }
     catch (Exception ex)
     {
         log.LogError(ex, "❌ EnsureCreated failed — DB may be unavailable.");
         // continue; auth still works without DB
     }
+
+    // ── Demo data seeding — skipped in Production ────────────────────────────
+    if (!app.Environment.IsProduction())
+    {
 
     // ── Seed demo requests ───────────────────────────────────────────────────
     try
@@ -235,11 +253,67 @@ if (!app.Environment.IsProduction())
         {
             var now = DateTime.UtcNow;
             db.VehicleMaintenanceRequests.AddRange(
-                new GenService.API.Domain.VehicleMaintenanceRequest { RequestNumber = "V/26/001", VehicleRegNo = "LAG-342-TE", VehicleType = "Toyota Hilux", MaintenanceType = "Repair",      Description = "Engine oil leak detected during routine check. Oil dripping from the undercarriage.",      Priority = "High",   Status = "InWorkshop", CurrentLocation = "Lagos Office",         ApprovedByEmail = "supervisor@demo.local", ApprovedByName = "Emeka Okonkwo", ApprovedAt = now.AddDays(-10), WorkshopName = "AutoFix Garage", WorkshopLocation = "Ilupeju, Lagos", SentToWorkshopAt = now.AddDays(-9),  RequestedByEmail = "driver@demo.local", RequestedByName = "Bola Adeyemi", CreatedAt = now.AddDays(-10), UpdatedAt = now.AddDays(-9) },
-                new GenService.API.Domain.VehicleMaintenanceRequest { RequestNumber = "V/26/002", VehicleRegNo = "RVS-098-BT", VehicleType = "Toyota Coaster Bus", MaintenanceType = "Servicing",  Description = "Routine 10,000km service — oil change, filter replacement, brake inspection.",            Priority = "Normal", Status = "InWorkshop", CurrentLocation = "Port Harcourt Office", ApprovedByEmail = "supervisor@demo.local", ApprovedByName = "Emeka Okonkwo", ApprovedAt = now.AddDays(-3),  WorkshopName = "PH Motors Workshop", WorkshopLocation = "GRA, Port Harcourt", SentToWorkshopAt = now.AddDays(-2),  RequestedByEmail = "driver2@demo.local", RequestedByName = "Kwame Asante",  CreatedAt = now.AddDays(-3),  UpdatedAt = now.AddDays(-2) },
-                new GenService.API.Domain.VehicleMaintenanceRequest { RequestNumber = "V/26/003", VehicleRegNo = "ABJ-211-FC", VehicleType = "Ford Ranger", MaintenanceType = "TyreChange",    Description = "Two front tyres have worn treads and need immediate replacement before next field trip.",   Priority = "Urgent", Status = "Approved",   CurrentLocation = "Abuja Office",         ApprovedByEmail = "manager@demo.local",    ApprovedByName = "Bobby Tholath", ApprovedAt = now.AddHours(-6),                                                                                                                          RequestedByEmail = "driver@demo.local", RequestedByName = "Bola Adeyemi", CreatedAt = now.AddDays(-1),  UpdatedAt = now.AddHours(-6) },
-                new GenService.API.Domain.VehicleMaintenanceRequest { RequestNumber = "V/26/004", VehicleRegNo = "LAG-502-KE", VehicleType = "Honda CR-V",    MaintenanceType = "Inspection",    Description = "Pre-travel vehicle inspection required before Lagos to Bonny trip scheduled next week.",   Priority = "Normal", Status = "Pending",    CurrentLocation = "Lagos Office",                                                                                                                                                                                                                       RequestedByEmail = "driver2@demo.local", RequestedByName = "Kwame Asante",  CreatedAt = now.AddHours(-4),  UpdatedAt = now.AddHours(-4) },
-                new GenService.API.Domain.VehicleMaintenanceRequest { RequestNumber = "V/26/005", VehicleRegNo = "LAG-342-TE", VehicleType = "Toyota Hilux", MaintenanceType = "Bodywork",      Description = "Minor dent and paint damage on the front bumper after a parking lot incident.",            Priority = "Low",    Status = "Completed",  CurrentLocation = "Lagos Office",         ApprovedByEmail = "supervisor@demo.local", ApprovedByName = "Emeka Okonkwo", ApprovedAt = now.AddDays(-22), WorkshopName = "Classic Body Works",  WorkshopLocation = "Ikeja, Lagos",       SentToWorkshopAt = now.AddDays(-21), RequestedByEmail = "driver@demo.local", RequestedByName = "Bola Adeyemi", CompletedAt = now.AddDays(-15), CreatedAt = now.AddDays(-25), UpdatedAt = now.AddDays(-15) }
+                // V/26/001 — In Workshop, assessed, awaiting parts
+                new GenService.API.Domain.VehicleMaintenanceRequest {
+                    RequestNumber = "V/26/001", VehicleRegNo = "PF 4079 SPY", VehicleType = "TOYOTA LAND CRUISER PRADO",
+                    MaintenanceType = "MajorRepair", OdometerReading = "142,500 km",
+                    Description = "Engine oil leak detected during pre-trip inspection. Oil dripping from undercarriage near crankshaft area.",
+                    Priority = "High", Status = "AwaitingParts", CurrentLocation = "Port Harcourt Office",
+                    ApprovedByEmail = "supervisor@demo.local", ApprovedByName = "Emeka Okonkwo", ApprovedAt = now.AddDays(-10),
+                    WorkshopName = "AutoFix Garage", WorkshopLocation = "Woji, Port Harcourt",
+                    DateDeliveredToWorkshop = now.AddDays(-9), SentToWorkshopAt = now.AddDays(-9),
+                    FaultIdentified = "Crankshaft rear oil seal worn out. Oil leaking into bell housing.",
+                    ProposedSolution = "Replace crankshaft rear oil seal and inspect flywheel housing gasket.",
+                    ResolutionType = "Outsourced", PartsRequired = true, PartsSource = "NewPurchase",
+                    ProcurementMethod = "PurchaseOrder", PartsSuppliedBy = "Third Party Vendor",
+                    SparesCostNaira = 45000,
+                    RequestedByEmail = "driver@demo.local", RequestedByName = "Bola Adeyemi", CreatedAt = now.AddDays(-10), UpdatedAt = now.AddDays(-9)
+                },
+                // V/26/002 — In Workshop, routine service
+                new GenService.API.Domain.VehicleMaintenanceRequest {
+                    RequestNumber = "V/26/002", VehicleRegNo = "PHC 185 AM", VehicleType = "NISSAN PICKUP",
+                    MaintenanceType = "RoutineService", OdometerReading = "87,200 km",
+                    Description = "Routine 10,000km service — oil change, oil filter, fuel filter, air filter and brake inspection.",
+                    Priority = "Normal", Status = "InWorkshop", CurrentLocation = "Port Harcourt Office",
+                    ApprovedByEmail = "supervisor@demo.local", ApprovedByName = "Emeka Okonkwo", ApprovedAt = now.AddDays(-3),
+                    WorkshopName = "PH Motors Workshop", WorkshopLocation = "GRA, Port Harcourt",
+                    DateDeliveredToWorkshop = now.AddDays(-2), SentToWorkshopAt = now.AddDays(-2),
+                    RequestedByEmail = "driver2@demo.local", RequestedByName = "Kwame Asante", CreatedAt = now.AddDays(-3), UpdatedAt = now.AddDays(-2)
+                },
+                // V/26/003 — Approved, minor repair
+                new GenService.API.Domain.VehicleMaintenanceRequest {
+                    RequestNumber = "V/26/003", VehicleRegNo = "RVS 526 BC", VehicleType = "TOYOTA LAND CRUISER (200 SERIES)",
+                    MaintenanceType = "MinorRepair",
+                    Description = "Two front tyres have severely worn treads and need replacement before next field trip to Bonny.",
+                    Priority = "Urgent", Status = "Approved", CurrentLocation = "Port Harcourt Office",
+                    ApprovedByEmail = "manager@demo.local", ApprovedByName = "Bobby Tholath", ApprovedAt = now.AddHours(-6),
+                    RequestedByEmail = "driver@demo.local", RequestedByName = "Bola Adeyemi", CreatedAt = now.AddDays(-1), UpdatedAt = now.AddHours(-6)
+                },
+                // V/26/004 — Pending
+                new GenService.API.Domain.VehicleMaintenanceRequest {
+                    RequestNumber = "V/26/004", VehicleRegNo = "LAG 001 DES", VehicleType = "TOYOTA HILUX",
+                    MaintenanceType = "RoutineService",
+                    Description = "Pre-travel vehicle inspection required before Lagos to Bonny trip scheduled next week.",
+                    Priority = "Normal", Status = "Pending", CurrentLocation = "Lagos Office",
+                    RequestedByEmail = "driver2@demo.local", RequestedByName = "Kwame Asante", CreatedAt = now.AddHours(-4), UpdatedAt = now.AddHours(-4)
+                },
+                // V/26/005 — Completed with handover
+                new GenService.API.Domain.VehicleMaintenanceRequest {
+                    RequestNumber = "V/26/005", VehicleRegNo = "BER 500 MU", VehicleType = "HYUNDAI MINI TRUCK",
+                    MaintenanceType = "MinorRepair", OdometerReading = "63,400 km",
+                    Description = "Minor dent and paint damage on front bumper after compound parking incident.",
+                    Priority = "Low", Status = "Completed", CurrentLocation = "Lagos Office",
+                    ApprovedByEmail = "supervisor@demo.local", ApprovedByName = "Emeka Okonkwo", ApprovedAt = now.AddDays(-22),
+                    WorkshopName = "Classic Body Works", WorkshopLocation = "Ikeja, Lagos",
+                    DateDeliveredToWorkshop = now.AddDays(-21), SentToWorkshopAt = now.AddDays(-21),
+                    FaultIdentified = "Front bumper has 3 dents and cracked paint on driver side. No structural damage.",
+                    ProposedSolution = "Panel beating and full repaint of front bumper.", ResolutionType = "Outsourced",
+                    PartsRequired = false, WorkDone = "Front bumper panel beaten, primed and repainted to match original colour.",
+                    ActionedBy = "Classic Body Works", SparesCostNaira = 25000,
+                    HandoverConfirmed = true, HandedOverBy = "Emeka Okonkwo", DateHandedOver = now.AddDays(-15),
+                    CompletedAt = now.AddDays(-16), RequestedByEmail = "driver@demo.local",
+                    RequestedByName = "Bola Adeyemi", CreatedAt = now.AddDays(-25), UpdatedAt = now.AddDays(-15)
+                }
             );
             await db.SaveChangesAsync();
             log.LogInformation("✅ Seeded 5 demo vehicle maintenance requests.");
@@ -399,6 +473,413 @@ if (!app.Environment.IsProduction())
     }
     catch (Exception ex) { log.LogError(ex, "❌ Seed failed: DieselTankReadings"); }
 
+    // ── Seed daily parameter logs ────────────────────────────────────────────
+    try
+    {
+        if (!await db.DailyParameterLogs.AnyAsync())
+        {
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            db.DailyParameterLogs.AddRange(
+                // PHC Office — today
+                new GenService.API.Domain.DailyParameterLog
+                {
+                    LogDate=today, Location="Port Harcourt Office",
+                    NepaHoursAvailable=8, GeneratorHoursRun=8.5, DieselConsumedLitres=65, DieselBalanceLitres=380,
+                    GeneratorStatus="Running", GeneratorRunHourMeter=16245,
+                    WaterSource="Borehole", WaterTankLevelPercent=75, WaterStatus="Adequate",
+                    StaffPresent=32, ExpectedStaff=35, VisitorCount=4,
+                    CleaningDone=true, WasteDisposed=true, SecurityStatus="Normal",
+                    MaintenanceIssues="AC unit in Conference Room B making noise — already reported.",
+                    ActionsTaken="Conference room AC referred to maintenance. Generator oil level topped up.",
+                    PendingActions="Await AC repair completion.",
+                    GeneralRemarks="Day went smoothly. NEPA was available from 08:00-16:00.",
+                    LoggedByEmail="supervisor@demo.local", LoggedByName="Emeka Okonkwo",
+                    CreatedAt=DateTime.UtcNow, UpdatedAt=DateTime.UtcNow
+                },
+                // PHC Office — yesterday
+                new GenService.API.Domain.DailyParameterLog
+                {
+                    LogDate=today.AddDays(-1), Location="Port Harcourt Office",
+                    NepaHoursAvailable=10, GeneratorHoursRun=6, DieselConsumedLitres=55, DieselBalanceLitres=445,
+                    GeneratorStatus="Standby", GeneratorRunHourMeter=16238,
+                    WaterSource="Borehole", WaterTankLevelPercent=80, WaterStatus="Adequate",
+                    StaffPresent=35, ExpectedStaff=35, VisitorCount=2,
+                    CleaningDone=true, WasteDisposed=true, SecurityStatus="Normal",
+                    MaintenanceIssues=null, ActionsTaken="Routine checks completed.",
+                    PendingActions=null, GeneralRemarks="Good NEPA supply today.",
+                    LoggedByEmail="supervisor@demo.local", LoggedByName="Emeka Okonkwo",
+                    CreatedAt=DateTime.UtcNow.AddDays(-1), UpdatedAt=DateTime.UtcNow.AddDays(-1)
+                },
+                // Lagos Office — today
+                new GenService.API.Domain.DailyParameterLog
+                {
+                    LogDate=today, Location="Lagos Office",
+                    NepaHoursAvailable=14, GeneratorHoursRun=4, DieselConsumedLitres=40, DieselBalanceLitres=180,
+                    GeneratorStatus="Standby", GeneratorRunHourMeter=8920,
+                    WaterSource="Municipal", WaterTankLevelPercent=90, WaterStatus="Adequate",
+                    StaffPresent=18, ExpectedStaff=20, VisitorCount=6,
+                    CleaningDone=true, WasteDisposed=false, SecurityStatus="Normal",
+                    MaintenanceIssues="Waste disposal pending — contractor did not show up.",
+                    ActionsTaken="Generator ran for 4hrs during midday outage (12:00-16:00).",
+                    PendingActions="Chase waste disposal contractor tomorrow.",
+                    GeneralRemarks="Relatively good NEPA supply in Lagos today.",
+                    LoggedByEmail="supervisor@demo.local", LoggedByName="Emeka Okonkwo",
+                    CreatedAt=DateTime.UtcNow, UpdatedAt=DateTime.UtcNow
+                },
+                // DR — today
+                new GenService.API.Domain.DailyParameterLog
+                {
+                    LogDate=today, Location="DR",
+                    NepaHoursAvailable=4, GeneratorHoursRun=8, DieselConsumedLitres=80, DieselBalanceLitres=220,
+                    GeneratorStatus="Running", GeneratorRunHourMeter=13750,
+                    WaterSource="Borehole", WaterTankLevelPercent=60, WaterStatus="Adequate",
+                    StaffPresent=8, ExpectedStaff=10, VisitorCount=1,
+                    CleaningDone=true, WasteDisposed=true, SecurityStatus="Normal",
+                    MaintenanceIssues="Borehole pump pressure slightly low.",
+                    ActionsTaken="Adjusted pressure valve. Will monitor tomorrow.",
+                    PendingActions="Monitor borehole pump pressure.",
+                    GeneralRemarks="Poor NEPA supply — generator ran most of the day.",
+                    LoggedByEmail="technician@demo.local", LoggedByName="Chukwudi Nwosu",
+                    CreatedAt=DateTime.UtcNow, UpdatedAt=DateTime.UtcNow
+                },
+                // Woji — today (low diesel warning)
+                new GenService.API.Domain.DailyParameterLog
+                {
+                    LogDate=today, Location="Woji",
+                    NepaHoursAvailable=16, GeneratorHoursRun=3.5, DieselConsumedLitres=35, DieselBalanceLitres=45,
+                    GeneratorStatus="Standby", GeneratorRunHourMeter=10835,
+                    WaterSource="Borehole", WaterTankLevelPercent=85, WaterStatus="Adequate",
+                    StaffPresent=5, ExpectedStaff=6, VisitorCount=0,
+                    CleaningDone=true, WasteDisposed=true, SecurityStatus="Normal",
+                    MaintenanceIssues="Diesel tank critically low — 45 litres remaining.",
+                    ActionsTaken="Diesel requisition raised urgently (DR-2026-087).",
+                    PendingActions="Await diesel delivery — expected tomorrow morning.",
+                    GeneralRemarks="Good NEPA supply. Diesel urgent — supply expected tomorrow.",
+                    LoggedByEmail="driver@demo.local", LoggedByName="Bola Adeyemi",
+                    CreatedAt=DateTime.UtcNow, UpdatedAt=DateTime.UtcNow
+                }
+            );
+            await db.SaveChangesAsync();
+            log.LogInformation("✅ Seeded 5 demo daily parameter logs.");
+        }
+    }
+    catch (Exception ex) { log.LogError(ex, "❌ Seed failed: DailyParameterLogs"); }
+
+    // ── Seed AppUsers ────────────────────────────────────────────────────────
+    try
+    {
+        // Seed all dev/demo users if the table is empty
+        if (!await db.AppUsers.AnyAsync())
+        {
+            string Hash(string pw) => BCrypt.Net.BCrypt.HashPassword(pw, workFactor: 11);
+
+            db.AppUsers.AddRange(
+                new GenService.API.Domain.AppUser
+                {
+                    Email="admin@dev.local",          FullName="Dev Administrator",
+                    PasswordHash=Hash("Dev2026!"),
+                    Role="SystemAdmin",               Department="IT",
+                    IsActive=true, CreatedAt=DateTime.UtcNow, UpdatedAt=DateTime.UtcNow
+                },
+                new GenService.API.Domain.AppUser
+                {
+                    Email="manager@demo.local",       FullName="Bobby Tholath",
+                    PasswordHash=Hash("DemoManager2026!"),
+                    Role="DepartmentManager",         Department="General Service",
+                    IsActive=true, CreatedAt=DateTime.UtcNow, UpdatedAt=DateTime.UtcNow
+                },
+                new GenService.API.Domain.AppUser
+                {
+                    Email="supervisor@demo.local",    FullName="Emeka Okonkwo",
+                    PasswordHash=Hash("DemoSuper2026!"),
+                    Role="Supervisor",                Department="General Service",
+                    IsActive=true, CreatedAt=DateTime.UtcNow, UpdatedAt=DateTime.UtcNow
+                },
+                new GenService.API.Domain.AppUser
+                {
+                    Email="technician@demo.local",    FullName="Chukwudi Nwosu",
+                    PasswordHash=Hash("DemoTech2026!"),
+                    Role="Technician",                Department="General Service",
+                    IsActive=true, CreatedAt=DateTime.UtcNow, UpdatedAt=DateTime.UtcNow
+                },
+                new GenService.API.Domain.AppUser
+                {
+                    Email="tech2@demo.local",         FullName="Grace Obi",
+                    PasswordHash=Hash("DemoTech2026!"),
+                    Role="Technician",                Department="General Service",
+                    IsActive=true, CreatedAt=DateTime.UtcNow, UpdatedAt=DateTime.UtcNow
+                },
+                new GenService.API.Domain.AppUser
+                {
+                    Email="driver@demo.local",        FullName="Bola Adeyemi",
+                    PasswordHash=Hash("DemoDriver2026!"),
+                    Role="Driver",                    Department="General Service",
+                    IsActive=true, CreatedAt=DateTime.UtcNow, UpdatedAt=DateTime.UtcNow
+                },
+                new GenService.API.Domain.AppUser
+                {
+                    Email="driver2@demo.local",       FullName="Kwame Asante",
+                    PasswordHash=Hash("DemoDriver2026!"),
+                    Role="Driver",                    Department="General Service",
+                    IsActive=true, CreatedAt=DateTime.UtcNow, UpdatedAt=DateTime.UtcNow
+                },
+                new GenService.API.Domain.AppUser
+                {
+                    Email="requester1@demo.local",    FullName="Fatima Al-Hassan",
+                    PasswordHash=Hash("DemoReq2026!"),
+                    Role="Requester",                 Department="Finance",
+                    IsActive=true, CreatedAt=DateTime.UtcNow, UpdatedAt=DateTime.UtcNow
+                },
+                new GenService.API.Domain.AppUser
+                {
+                    Email="requester2@demo.local",    FullName="Tunde Babatunde",
+                    PasswordHash=Hash("DemoReq2026!"),
+                    Role="Requester",                 Department="HR",
+                    IsActive=true, CreatedAt=DateTime.UtcNow, UpdatedAt=DateTime.UtcNow
+                }
+            );
+            await db.SaveChangesAsync();
+            log.LogInformation("✅ Seeded 9 app users with BCrypt-hashed passwords.");
+        }
+    }
+    catch (Exception ex) { log.LogError(ex, "❌ Seed failed: AppUsers"); }
+
+    // ── Seed store items ─────────────────────────────────────────────────────
+    try
+    {
+        if (!await db.StoreItems.AnyAsync())
+        {
+            var year = DateTime.UtcNow.Year.ToString()[2..]; // "26"
+            int seq = 1;
+            string Code() => $"SI/{year}/{seq++:D3}";
+            var now = DateTime.UtcNow;
+
+            db.StoreItems.AddRange(
+                // Generator parts
+                new GenService.API.Domain.StoreItem { ItemCode=Code(), Name="Engine Oil (Total 15W-40) 20L",         Category="Lubricants & Oils",   Unit="Drums",  QuantityInStock=8,  ReorderLevel=3,  UnitCostNaira=52000,  StoreLocation="Store A — Shelf 1", Supplier="Total Nigeria",   CreatedByEmail="admin@dev.local", CreatedAt=now, UpdatedAt=now },
+                new GenService.API.Domain.StoreItem { ItemCode=Code(), Name="Fuel Filter (CAT Generator)",           Category="Generator Parts",     Unit="Pieces", QuantityInStock=6,  ReorderLevel=4,  UnitCostNaira=8500,   StoreLocation="Store A — Shelf 2", Supplier="CAT Dealer Lagos",CreatedByEmail="admin@dev.local", CreatedAt=now, UpdatedAt=now },
+                new GenService.API.Domain.StoreItem { ItemCode=Code(), Name="Oil Filter (CAT 350KVA)",              Category="Generator Parts",     Unit="Pieces", QuantityInStock=5,  ReorderLevel=4,  UnitCostNaira=7200,   StoreLocation="Store A — Shelf 2", Supplier="CAT Dealer Lagos",CreatedByEmail="admin@dev.local", CreatedAt=now, UpdatedAt=now },
+                new GenService.API.Domain.StoreItem { ItemCode=Code(), Name="Air Filter (Cummins 275KVA)",          Category="Generator Parts",     Unit="Pieces", QuantityInStock=3,  ReorderLevel=2,  UnitCostNaira=12500,  StoreLocation="Store A — Shelf 2", Supplier="Cummins Nigeria", CreatedByEmail="admin@dev.local", CreatedAt=now, UpdatedAt=now },
+                new GenService.API.Domain.StoreItem { ItemCode=Code(), Name="V-Belt (Generator Alternator)",        Category="Generator Parts",     Unit="Pieces", QuantityInStock=4,  ReorderLevel=2,  UnitCostNaira=3800,   StoreLocation="Store A — Shelf 3", Supplier="Local Supplier",  CreatedByEmail="admin@dev.local", CreatedAt=now, UpdatedAt=now },
+                new GenService.API.Domain.StoreItem { ItemCode=Code(), Name="Coolant (Generator) 5L",              Category="Lubricants & Oils",   Unit="Pieces", QuantityInStock=10, ReorderLevel=4,  UnitCostNaira=6500,   StoreLocation="Store A — Shelf 1", Supplier="Total Nigeria",   CreatedByEmail="admin@dev.local", CreatedAt=now, UpdatedAt=now },
+                // AC parts
+                new GenService.API.Domain.StoreItem { ItemCode=Code(), Name="R22 Refrigerant Gas 500g",            Category="AC Parts",            Unit="Pieces", QuantityInStock=12, ReorderLevel=5,  UnitCostNaira=18500,  StoreLocation="Store A — Shelf 4", Supplier="AC Supplies Ltd", CreatedByEmail="admin@dev.local", CreatedAt=now, UpdatedAt=now },
+                new GenService.API.Domain.StoreItem { ItemCode=Code(), Name="R410A Refrigerant Gas 500g",          Category="AC Parts",            Unit="Pieces", QuantityInStock=8,  ReorderLevel=4,  UnitCostNaira=22000,  StoreLocation="Store A — Shelf 4", Supplier="AC Supplies Ltd", CreatedByEmail="admin@dev.local", CreatedAt=now, UpdatedAt=now },
+                new GenService.API.Domain.StoreItem { ItemCode=Code(), Name="AC Capacitor (25μF)",                 Category="AC Parts",            Unit="Pieces", QuantityInStock=6,  ReorderLevel=3,  UnitCostNaira=3500,   StoreLocation="Store A — Shelf 4", Supplier="Local Supplier",  CreatedByEmail="admin@dev.local", CreatedAt=now, UpdatedAt=now },
+                new GenService.API.Domain.StoreItem { ItemCode=Code(), Name="AC Compressor Gasket",               Category="AC Parts",            Unit="Pieces", QuantityInStock=2,  ReorderLevel=3,  UnitCostNaira=5200,   StoreLocation="Store A — Shelf 4", Supplier="AC Supplies Ltd", CreatedByEmail="admin@dev.local", CreatedAt=now, UpdatedAt=now },
+                // Electrical
+                new GenService.API.Domain.StoreItem { ItemCode=Code(), Name="LED Bulb 18W (Energy Saver)",         Category="Electrical Items",    Unit="Pieces", QuantityInStock=45, ReorderLevel=20, UnitCostNaira=2200,   StoreLocation="Store B — Shelf 1", Supplier="Philips Distributor", CreatedByEmail="admin@dev.local", CreatedAt=now, UpdatedAt=now },
+                new GenService.API.Domain.StoreItem { ItemCode=Code(), Name="MCB Circuit Breaker 32A",             Category="Electrical Items",    Unit="Pieces", QuantityInStock=8,  ReorderLevel=4,  UnitCostNaira=4800,   StoreLocation="Store B — Shelf 2", Supplier="Schneider Distributor", CreatedByEmail="admin@dev.local", CreatedAt=now, UpdatedAt=now },
+                new GenService.API.Domain.StoreItem { ItemCode=Code(), Name="Extension Socket (4-Way)",            Category="Electrical Items",    Unit="Pieces", QuantityInStock=15, ReorderLevel=6,  UnitCostNaira=3500,   StoreLocation="Store B — Shelf 2", Supplier="Local Supplier",  CreatedByEmail="admin@dev.local", CreatedAt=now, UpdatedAt=now },
+                new GenService.API.Domain.StoreItem { ItemCode=Code(), Name="Electrical Cable 2.5mm (Per Roll)",   Category="Electrical Items",    Unit="Rolls",  QuantityInStock=4,  ReorderLevel=2,  UnitCostNaira=35000,  StoreLocation="Store B — Shelf 3", Supplier="Nigerchin",       CreatedByEmail="admin@dev.local", CreatedAt=now, UpdatedAt=now },
+                // Plumbing
+                new GenService.API.Domain.StoreItem { ItemCode=Code(), Name="PVC Pipe 1/2\" (Per Length)",         Category="Plumbing Items",      Unit="Pieces", QuantityInStock=20, ReorderLevel=8,  UnitCostNaira=1800,   StoreLocation="Store B — Shelf 5", Supplier="Local Supplier",  CreatedByEmail="admin@dev.local", CreatedAt=now, UpdatedAt=now },
+                new GenService.API.Domain.StoreItem { ItemCode=Code(), Name="Water Tap (Brass)",                   Category="Plumbing Items",      Unit="Pieces", QuantityInStock=5,  ReorderLevel=3,  UnitCostNaira=4200,   StoreLocation="Store B — Shelf 5", Supplier="Local Supplier",  CreatedByEmail="admin@dev.local", CreatedAt=now, UpdatedAt=now },
+                // Cleaning supplies
+                new GenService.API.Domain.StoreItem { ItemCode=Code(), Name="Floor Cleaner 5L",                    Category="Cleaning Supplies",   Unit="Pieces", QuantityInStock=18, ReorderLevel=8,  UnitCostNaira=6500,   StoreLocation="Store C — Shelf 1", Supplier="Unilever Dist.",  CreatedByEmail="admin@dev.local", CreatedAt=now, UpdatedAt=now },
+                new GenService.API.Domain.StoreItem { ItemCode=Code(), Name="Toilet Cleaner 1L",                   Category="Cleaning Supplies",   Unit="Pieces", QuantityInStock=24, ReorderLevel=10, UnitCostNaira=1800,   StoreLocation="Store C — Shelf 1", Supplier="Unilever Dist.",  CreatedByEmail="admin@dev.local", CreatedAt=now, UpdatedAt=now },
+                new GenService.API.Domain.StoreItem { ItemCode=Code(), Name="Garbage Bags (Pack of 50)",           Category="Cleaning Supplies",   Unit="Packets",QuantityInStock=30, ReorderLevel=12, UnitCostNaira=2200,   StoreLocation="Store C — Shelf 2", Supplier="Local Supplier",  CreatedByEmail="admin@dev.local", CreatedAt=now, UpdatedAt=now },
+                new GenService.API.Domain.StoreItem { ItemCode=Code(), Name="Hand Wash Liquid 5L",                 Category="Cleaning Supplies",   Unit="Pieces", QuantityInStock=10, ReorderLevel=5,  UnitCostNaira=4800,   StoreLocation="Store C — Shelf 2", Supplier="PZ Cussons Dist.",CreatedByEmail="admin@dev.local", CreatedAt=now, UpdatedAt=now },
+                // Vehicle parts (critical — low stock)
+                new GenService.API.Domain.StoreItem { ItemCode=Code(), Name="Engine Oil Filter (Toyota Hilux)",    Category="Vehicle Parts",       Unit="Pieces", QuantityInStock=2,  ReorderLevel=3,  UnitCostNaira=3500,   StoreLocation="Store A — Shelf 6", Supplier="Toyota Authorised",CreatedByEmail="admin@dev.local", CreatedAt=now, UpdatedAt=now },
+                new GenService.API.Domain.StoreItem { ItemCode=Code(), Name="Brake Pad Set (Toyota Land Cruiser)", Category="Vehicle Parts",       Unit="Sets",   QuantityInStock=1,  ReorderLevel=2,  UnitCostNaira=35000,  StoreLocation="Store A — Shelf 6", Supplier="Toyota Authorised",CreatedByEmail="admin@dev.local", CreatedAt=now, UpdatedAt=now },
+                // Safety
+                new GenService.API.Domain.StoreItem { ItemCode=Code(), Name="Safety Gloves (Pairs)",              Category="Safety Items",        Unit="Pairs",  QuantityInStock=25, ReorderLevel=10, UnitCostNaira=1500,   StoreLocation="Store C — Shelf 3", Supplier="Safety Supplies", CreatedByEmail="admin@dev.local", CreatedAt=now, UpdatedAt=now },
+                new GenService.API.Domain.StoreItem { ItemCode=Code(), Name="Safety Boots (Size 42)",             Category="Safety Items",        Unit="Pairs",  QuantityInStock=3,  ReorderLevel=3,  UnitCostNaira=18000,  StoreLocation="Store C — Shelf 3", Supplier="Safety Supplies", CreatedByEmail="admin@dev.local", CreatedAt=now, UpdatedAt=now }
+            );
+            await db.SaveChangesAsync();
+            log.LogInformation("✅ Seeded 24 store items.");
+        }
+    }
+    catch (Exception ex) { log.LogError(ex, "❌ Seed failed: StoreItems"); }
+
+    // ── Seed store requisitions ──────────────────────────────────────────────
+    try
+    {
+        if (!await db.StoreRequisitions.AnyAsync())
+        {
+            var items   = await db.StoreItems.ToListAsync();
+            var now     = DateTime.UtcNow;
+            var year    = now.Year.ToString()[2..];
+
+            var getItem = (string name) => items.FirstOrDefault(i => i.Name.Contains(name));
+
+            var oilItem     = getItem("Engine Oil (Total");
+            var fuelFilter  = getItem("Fuel Filter");
+            var ledBulb     = getItem("LED Bulb");
+            var floorCleaner= getItem("Floor Cleaner");
+            var toilet      = getItem("Toilet Cleaner");
+            var garbageBags = getItem("Garbage Bags");
+            var rfGas       = getItem("R22 Refrigerant");
+
+            var reqs = new List<GenService.API.Domain.StoreRequisition>();
+
+            // SR/26/001 — Issued (completed)
+            if (oilItem != null && fuelFilter != null)
+            {
+                reqs.Add(new GenService.API.Domain.StoreRequisition
+                {
+                    RequisitionNumber = $"SR/{year}/001",
+                    RequestedByEmail  = "technician@demo.local",
+                    RequestedByName   = "Chukwudi Nwosu",
+                    Department        = "General Service",
+                    Purpose           = "Generator 250hr service — CAT 350KVA PHC Office",
+                    LinkedReference   = "E/26/001",
+                    Status            = GenService.API.Domain.StoreRequisitionStatus.Issued,
+                    ApprovedByEmail   = "supervisor@demo.local",
+                    ApprovedByName    = "Emeka Okonkwo",
+                    ApprovedAt        = now.AddDays(-5),
+                    IssuedByEmail     = "admin@dev.local",
+                    IssuedByName      = "Dev Administrator",
+                    IssuedAt          = now.AddDays(-5),
+                    CreatedAt         = now.AddDays(-6),
+                    UpdatedAt         = now.AddDays(-5),
+                    Items             =
+                    [
+                        new() { StoreItemId=oilItem.Id,    ItemName=oilItem.Name,    Unit=oilItem.Unit,    QuantityRequested=2, QuantityIssued=2, UnitCostNaira=oilItem.UnitCostNaira },
+                        new() { StoreItemId=fuelFilter.Id, ItemName=fuelFilter.Name, Unit=fuelFilter.Unit, QuantityRequested=1, QuantityIssued=1, UnitCostNaira=fuelFilter.UnitCostNaira },
+                    ]
+                });
+            }
+
+            // SR/26/002 — Approved (waiting for issuance)
+            if (ledBulb != null)
+            {
+                reqs.Add(new GenService.API.Domain.StoreRequisition
+                {
+                    RequisitionNumber = $"SR/{year}/002",
+                    RequestedByEmail  = "supervisor@demo.local",
+                    RequestedByName   = "Emeka Okonkwo",
+                    Department        = "General Service",
+                    Purpose           = "Replacement of faulty lights in HR corridor and meeting rooms",
+                    Status            = GenService.API.Domain.StoreRequisitionStatus.Approved,
+                    ApprovedByEmail   = "manager@demo.local",
+                    ApprovedByName    = "Bobby Tholath",
+                    ApprovedAt        = now.AddDays(-1),
+                    CreatedAt         = now.AddDays(-2),
+                    UpdatedAt         = now.AddDays(-1),
+                    Items             =
+                    [
+                        new() { StoreItemId=ledBulb.Id, ItemName=ledBulb.Name, Unit=ledBulb.Unit, QuantityRequested=10, QuantityIssued=0, UnitCostNaira=ledBulb.UnitCostNaira },
+                    ]
+                });
+            }
+
+            // SR/26/003 — Pending (just submitted)
+            if (floorCleaner != null && toilet != null && garbageBags != null)
+            {
+                reqs.Add(new GenService.API.Domain.StoreRequisition
+                {
+                    RequisitionNumber = $"SR/{year}/003",
+                    RequestedByEmail  = "driver@demo.local",
+                    RequestedByName   = "Bola Adeyemi",
+                    Department        = "General Service",
+                    Purpose           = "Monthly cleaning supply replenishment — Lagos Office",
+                    Status            = GenService.API.Domain.StoreRequisitionStatus.Pending,
+                    CreatedAt         = now.AddHours(-3),
+                    UpdatedAt         = now.AddHours(-3),
+                    Items             =
+                    [
+                        new() { StoreItemId=floorCleaner.Id, ItemName=floorCleaner.Name, Unit=floorCleaner.Unit, QuantityRequested=3, QuantityIssued=0, UnitCostNaira=floorCleaner.UnitCostNaira },
+                        new() { StoreItemId=toilet.Id,       ItemName=toilet.Name,       Unit=toilet.Unit,       QuantityRequested=6, QuantityIssued=0, UnitCostNaira=toilet.UnitCostNaira },
+                        new() { StoreItemId=garbageBags.Id,  ItemName=garbageBags.Name,  Unit=garbageBags.Unit,  QuantityRequested=5, QuantityIssued=0, UnitCostNaira=garbageBags.UnitCostNaira },
+                    ]
+                });
+            }
+
+            if (reqs.Any())
+            {
+                db.StoreRequisitions.AddRange(reqs);
+                await db.SaveChangesAsync();
+                log.LogInformation("✅ Seeded {Count} store requisitions.", reqs.Count);
+            }
+        }
+    }
+    catch (Exception ex) { log.LogError(ex, "❌ Seed failed: StoreRequisitions"); }
+
+    // ── Seed diesel requisitions ─────────────────────────────────────────────
+    try
+    {
+        if (!await db.DieselRequisitions.AnyAsync())
+        {
+            var now  = DateTime.UtcNow;
+            var year = now.Year.ToString()[2..];
+
+            db.DieselRequisitions.AddRange(
+                // DR/26/001 — Dispensed (completed full cycle)
+                new GenService.API.Domain.DieselRequisition
+                {
+                    RequisitionNumber        = $"DR/{year}/001",
+                    Purpose                  = "Weekly generator refuel — DR Building CAT 350KVA",
+                    EquipmentType            = GenService.API.Domain.DieselEquipmentType.Generator,
+                    EquipmentReference       = "CAT-350KVA-DR",
+                    Location                 = "DR Building",
+                    QuantityRequestedLitres  = 400,
+                    RequestedByEmail         = "technician@demo.local",
+                    RequestedByName          = "Chukwudi Nwosu",
+                    Department               = "General Service",
+                    Status                   = GenService.API.Domain.DieselRequisitionStatus.Dispensed,
+                    ApprovedByEmail          = "manager@demo.local",
+                    ApprovedByName           = "Bobby Tholath",
+                    ApprovedAt               = now.AddDays(-3),
+                    DispensedByEmail         = "supervisor@demo.local",
+                    DispensedByName          = "Emeka Okonkwo",
+                    DispensedAt              = now.AddDays(-3).AddHours(2),
+                    QuantityDispensedLitres  = 400,
+                    TankLevelBeforeLitres    = 180,
+                    TankLevelAfterLitres     = 580,
+                    UnitCostPerLitreNaira    = 1050,
+                    TotalCostNaira           = 420000,
+                    Notes                    = "Regular weekly top-up. Tank was approaching critical level.",
+                    CreatedAt                = now.AddDays(-4),
+                    UpdatedAt                = now.AddDays(-3).AddHours(2),
+                },
+                // DR/26/002 — Approved (waiting for dispensing)
+                new GenService.API.Domain.DieselRequisition
+                {
+                    RequisitionNumber        = $"DR/{year}/002",
+                    Purpose                  = "Emergency fuel top-up — PHC Office Cummins 275KVA generator running low",
+                    EquipmentType            = GenService.API.Domain.DieselEquipmentType.Generator,
+                    EquipmentReference       = "CUMMINS-275KVA-PHC",
+                    Location                 = "PHC Office",
+                    QuantityRequestedLitres  = 300,
+                    RequestedByEmail         = "supervisor@demo.local",
+                    RequestedByName          = "Emeka Okonkwo",
+                    Department               = "General Service",
+                    Status                   = GenService.API.Domain.DieselRequisitionStatus.Approved,
+                    ApprovedByEmail          = "manager@demo.local",
+                    ApprovedByName           = "Bobby Tholath",
+                    ApprovedAt               = now.AddHours(-2),
+                    Notes                    = "Tank at 15% capacity — below minimum operating threshold.",
+                    CreatedAt                = now.AddHours(-4),
+                    UpdatedAt                = now.AddHours(-2),
+                },
+                // DR/26/003 — Pending (just submitted)
+                new GenService.API.Domain.DieselRequisition
+                {
+                    RequisitionNumber        = $"DR/{year}/003",
+                    Purpose                  = "Diesel for site vehicle — monthly fleet fuelling allocation",
+                    EquipmentType            = GenService.API.Domain.DieselEquipmentType.Vehicle,
+                    EquipmentReference       = "PHC 185 AM",
+                    Location                 = "PHC Office",
+                    QuantityRequestedLitres  = 80,
+                    RequestedByEmail         = "driver@demo.local",
+                    RequestedByName          = "Bola Adeyemi",
+                    Department               = "General Service",
+                    Status                   = GenService.API.Domain.DieselRequisitionStatus.Pending,
+                    Notes                    = "Vehicle fuel gauge at quarter-tank.",
+                    CreatedAt                = now.AddMinutes(-45),
+                    UpdatedAt                = now.AddMinutes(-45),
+                }
+            );
+            await db.SaveChangesAsync();
+            log.LogInformation("✅ Seeded 3 diesel requisitions.");
+        }
+    }
+    catch (Exception ex) { log.LogError(ex, "❌ Seed failed: DieselRequisitions"); }
+
+    } // end if (!IsProduction) seed block
+
     log.LogInformation("🚀 Database bootstrap complete.");
 }
 
@@ -429,3 +910,300 @@ app.MapGet("/api/v1/ping", () => new
 }).WithName("Ping").WithOpenApi();
 
 app.Run();
+
+// ── Schema upgrade helper ─────────────────────────────────────────────────────
+// Safely adds columns introduced after the initial EnsureCreated.
+// Each ALTER TABLE is wrapped in IF NOT EXISTS, so this is idempotent.
+static async Task ApplySchemaUpdatesAsync(
+    GenService.API.Data.GenServiceDbContext db,
+    ILogger log)
+{
+    try
+    {
+        // Helper: add a nullable column if it doesn't already exist
+        static string AddColIfMissing(string table, string col, string sqlType)
+            => $"""
+                IF NOT EXISTS (
+                    SELECT 1 FROM sys.columns
+                    WHERE object_id = OBJECT_ID(N'{table}') AND name = N'{col}')
+                ALTER TABLE {table} ADD {col} {sqlType} NULL;
+                """;
+
+        // Helper: add a NOT NULL bit column with default 0
+        static string AddBitColIfMissing(string table, string col)
+            => $"""
+                IF NOT EXISTS (
+                    SELECT 1 FROM sys.columns
+                    WHERE object_id = OBJECT_ID(N'{table}') AND name = N'{col}')
+                ALTER TABLE {table} ADD {col} bit NOT NULL DEFAULT 0;
+                """;
+
+        var statements = new List<string>
+        {
+            // ── VehicleMaintenanceRequests ──────────────────────────────────
+            AddColIfMissing ("VehicleMaintenanceRequests", "OdometerReading",          "nvarchar(100)"),
+            AddColIfMissing ("VehicleMaintenanceRequests", "DateDeliveredToWorkshop",   "datetime2"),
+            AddColIfMissing ("VehicleMaintenanceRequests", "SentToWorkshopAt",          "datetime2"),
+            AddColIfMissing ("VehicleMaintenanceRequests", "FaultIdentified",           "nvarchar(2000)"),
+            AddColIfMissing ("VehicleMaintenanceRequests", "ProposedSolution",          "nvarchar(2000)"),
+            AddColIfMissing ("VehicleMaintenanceRequests", "ResolutionType",            "nvarchar(30)"),
+            AddBitColIfMissing("VehicleMaintenanceRequests", "PartsRequired"),
+            AddColIfMissing ("VehicleMaintenanceRequests", "PartsSource",               "nvarchar(30)"),
+            AddColIfMissing ("VehicleMaintenanceRequests", "ProcurementMethod",         "nvarchar(30)"),
+            AddColIfMissing ("VehicleMaintenanceRequests", "PartsSuppliedBy",           "nvarchar(200)"),
+            AddColIfMissing ("VehicleMaintenanceRequests", "SparesCostNaira",           "decimal(18,2)"),
+            AddColIfMissing ("VehicleMaintenanceRequests", "WorkDone",                  "nvarchar(2000)"),
+            AddColIfMissing ("VehicleMaintenanceRequests", "ActionedBy",                "nvarchar(200)"),
+            AddColIfMissing ("VehicleMaintenanceRequests", "CompletedAt",               "datetime2"),
+            AddBitColIfMissing("VehicleMaintenanceRequests", "HandoverConfirmed"),
+            AddColIfMissing ("VehicleMaintenanceRequests", "DateHandedOver",            "datetime2"),
+            AddColIfMissing ("VehicleMaintenanceRequests", "HandedOverBy",              "nvarchar(100)"),
+
+            // ── EquipmentMaintenanceRequests ────────────────────────────────
+            AddColIfMissing ("EquipmentMaintenanceRequests", "FaultIdentified",         "nvarchar(2000)"),
+            AddColIfMissing ("EquipmentMaintenanceRequests", "ProposedSolution",        "nvarchar(2000)"),
+            AddColIfMissing ("EquipmentMaintenanceRequests", "ResolutionType",          "nvarchar(30)"),
+            AddBitColIfMissing("EquipmentMaintenanceRequests", "PartsRequired"),
+            AddColIfMissing ("EquipmentMaintenanceRequests", "PartsSource",             "nvarchar(30)"),
+            AddColIfMissing ("EquipmentMaintenanceRequests", "ProcurementMethod",       "nvarchar(30)"),
+            AddColIfMissing ("EquipmentMaintenanceRequests", "SparesCostNaira",         "decimal(18,2)"),
+            AddColIfMissing ("EquipmentMaintenanceRequests", "CompletedAt",             "datetime2"),
+            AddBitColIfMissing("EquipmentMaintenanceRequests", "HandoverConfirmed"),
+            AddColIfMissing ("EquipmentMaintenanceRequests", "DateHandedOver",          "datetime2"),
+            AddColIfMissing ("EquipmentMaintenanceRequests", "HandedOverBy",            "nvarchar(100)"),
+
+            // ── FacilityMaintenanceRequests ─────────────────────────────────
+            AddColIfMissing ("FacilityMaintenanceRequests", "FaultIdentified",          "nvarchar(2000)"),
+            AddColIfMissing ("FacilityMaintenanceRequests", "ProposedSolution",         "nvarchar(2000)"),
+            AddColIfMissing ("FacilityMaintenanceRequests", "ResolutionType",           "nvarchar(30)"),
+            AddBitColIfMissing("FacilityMaintenanceRequests", "PartsRequired"),
+            AddColIfMissing ("FacilityMaintenanceRequests", "PartsSource",              "nvarchar(30)"),
+            AddColIfMissing ("FacilityMaintenanceRequests", "ProcurementMethod",        "nvarchar(30)"),
+            AddColIfMissing ("FacilityMaintenanceRequests", "SparesCostNaira",          "decimal(18,2)"),
+            AddColIfMissing ("FacilityMaintenanceRequests", "CompletedAt",              "datetime2"),
+            AddBitColIfMissing("FacilityMaintenanceRequests", "HandoverConfirmed"),
+            AddColIfMissing ("FacilityMaintenanceRequests", "DateHandedOver",           "datetime2"),
+            AddColIfMissing ("FacilityMaintenanceRequests", "HandedOverBy",             "nvarchar(100)"),
+
+            // ── MaintenanceSchedules — reminder / escalation tracking columns ──
+            """
+            IF NOT EXISTS (
+                SELECT 1 FROM sys.columns
+                WHERE object_id = OBJECT_ID(N'MaintenanceSchedules') AND name = N'EscalationLevel')
+            ALTER TABLE MaintenanceSchedules ADD EscalationLevel int NOT NULL DEFAULT 0;
+            """,
+            AddColIfMissing("MaintenanceSchedules", "LastReminderSentAt",   "datetime2"),
+            AddColIfMissing("MaintenanceSchedules", "LastEscalationSentAt", "datetime2"),
+
+            // ── DailyParameterLogs (new table — create if missing) ──────────
+            // EnsureCreated will create it on fresh DBs; on existing DBs we
+            // use IF NOT EXISTS to create the table only if it doesn't exist yet.
+            """
+            IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = N'DailyParameterLogs')
+            CREATE TABLE DailyParameterLogs (
+                Id                    uniqueidentifier  NOT NULL PRIMARY KEY DEFAULT NEWID(),
+                LogDate               date              NOT NULL,
+                Location              nvarchar(200)     NOT NULL,
+                NepaHoursAvailable    float             NULL,
+                GeneratorHoursRun     float             NULL,
+                DieselConsumedLitres  float             NULL,
+                DieselBalanceLitres   float             NULL,
+                GeneratorStatus       nvarchar(30)      NULL,
+                GeneratorRunHourMeter float             NULL,
+                WaterSource           nvarchar(30)      NULL,
+                WaterTankLevelPercent float             NULL,
+                WaterStatus           nvarchar(30)      NULL,
+                StaffPresent          int               NULL,
+                ExpectedStaff         int               NULL,
+                VisitorCount          int               NULL,
+                CleaningDone          bit               NOT NULL DEFAULT 0,
+                WasteDisposed         bit               NOT NULL DEFAULT 0,
+                SecurityStatus        nvarchar(50)      NULL,
+                MaintenanceIssues     nvarchar(2000)    NULL,
+                ActionsTaken          nvarchar(2000)    NULL,
+                PendingActions        nvarchar(2000)    NULL,
+                GeneralRemarks        nvarchar(2000)    NULL,
+                LoggedByEmail         nvarchar(150)     NOT NULL,
+                LoggedByName          nvarchar(100)     NOT NULL,
+                CreatedAt             datetime2         NOT NULL DEFAULT GETUTCDATE(),
+                UpdatedAt             datetime2         NOT NULL DEFAULT GETUTCDATE()
+            );
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_DailyParameterLogs_Location_LogDate')
+                CREATE UNIQUE INDEX IX_DailyParameterLogs_Location_LogDate ON DailyParameterLogs (Location, LogDate);
+            """,
+
+            // ── AppUsers (new table) ─────────────────────────────────────────
+            """
+            IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = N'AppUsers')
+            CREATE TABLE AppUsers (
+                Id              uniqueidentifier  NOT NULL PRIMARY KEY DEFAULT NEWID(),
+                Email           nvarchar(150)     NOT NULL,
+                FullName        nvarchar(100)     NOT NULL,
+                PasswordHash    nvarchar(100)     NOT NULL,
+                Role            nvarchar(30)      NOT NULL DEFAULT 'Requester',
+                Department      nvarchar(100)     NOT NULL DEFAULT 'General Service',
+                IsActive        bit               NOT NULL DEFAULT 1,
+                LastLoginAt     datetime2         NULL,
+                CreatedByEmail  nvarchar(150)     NULL,
+                CreatedAt       datetime2         NOT NULL DEFAULT GETUTCDATE(),
+                UpdatedAt       datetime2         NOT NULL DEFAULT GETUTCDATE()
+            );
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_AppUsers_Email')
+                CREATE UNIQUE INDEX IX_AppUsers_Email ON AppUsers (Email);
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_AppUsers_Role')
+                CREATE INDEX IX_AppUsers_Role ON AppUsers (Role);
+            """,
+
+            // ── StoreItems ────────────────────────────────────────────────────
+            """
+            IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = N'StoreItems')
+            CREATE TABLE StoreItems (
+                Id              uniqueidentifier NOT NULL PRIMARY KEY DEFAULT NEWID(),
+                ItemCode        nvarchar(20)     NOT NULL,
+                Name            nvarchar(200)    NOT NULL,
+                Category        nvarchar(60)     NOT NULL,
+                Unit            nvarchar(30)     NOT NULL DEFAULT 'Pieces',
+                QuantityInStock float            NOT NULL DEFAULT 0,
+                ReorderLevel    float            NOT NULL DEFAULT 0,
+                UnitCostNaira   decimal(18,2)    NOT NULL DEFAULT 0,
+                Description     nvarchar(500)    NULL,
+                StoreLocation   nvarchar(200)    NULL,
+                Supplier        nvarchar(200)    NULL,
+                IsActive        bit              NOT NULL DEFAULT 1,
+                CreatedByEmail  nvarchar(150)    NOT NULL DEFAULT '',
+                CreatedAt       datetime2        NOT NULL DEFAULT GETUTCDATE(),
+                UpdatedAt       datetime2        NOT NULL DEFAULT GETUTCDATE()
+            );
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_StoreItems_ItemCode')
+                CREATE UNIQUE INDEX IX_StoreItems_ItemCode ON StoreItems (ItemCode);
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_StoreItems_Category')
+                CREATE INDEX IX_StoreItems_Category ON StoreItems (Category);
+            """,
+
+            // ── StoreRequisitions ─────────────────────────────────────────────
+            """
+            IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = N'StoreRequisitions')
+            CREATE TABLE StoreRequisitions (
+                Id                  uniqueidentifier NOT NULL PRIMARY KEY DEFAULT NEWID(),
+                RequisitionNumber   nvarchar(20)     NOT NULL,
+                RequestedByEmail    nvarchar(150)    NOT NULL,
+                RequestedByName     nvarchar(100)    NOT NULL,
+                Department          nvarchar(100)    NOT NULL,
+                Purpose             nvarchar(500)    NOT NULL,
+                LinkedReference     nvarchar(50)     NULL,
+                Status              nvarchar(20)     NOT NULL DEFAULT 'Pending',
+                ApprovedByEmail     nvarchar(150)    NULL,
+                ApprovedByName      nvarchar(100)    NULL,
+                ApprovedAt          datetime2        NULL,
+                RejectedByEmail     nvarchar(150)    NULL,
+                RejectionReason     nvarchar(500)    NULL,
+                RejectedAt          datetime2        NULL,
+                IssuedByEmail       nvarchar(150)    NULL,
+                IssuedByName        nvarchar(100)    NULL,
+                IssuedAt            datetime2        NULL,
+                Notes               nvarchar(1000)   NULL,
+                CreatedAt           datetime2        NOT NULL DEFAULT GETUTCDATE(),
+                UpdatedAt           datetime2        NOT NULL DEFAULT GETUTCDATE()
+            );
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_StoreRequisitions_RequisitionNumber')
+                CREATE UNIQUE INDEX IX_StoreRequisitions_RequisitionNumber ON StoreRequisitions (RequisitionNumber);
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_StoreRequisitions_Status')
+                CREATE INDEX IX_StoreRequisitions_Status ON StoreRequisitions (Status);
+            """,
+
+            // ── StoreRequisitionItems ─────────────────────────────────────────
+            """
+            IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = N'StoreRequisitionItems')
+            CREATE TABLE StoreRequisitionItems (
+                Id                  uniqueidentifier NOT NULL PRIMARY KEY DEFAULT NEWID(),
+                RequisitionId       uniqueidentifier NOT NULL REFERENCES StoreRequisitions(Id) ON DELETE CASCADE,
+                StoreItemId         uniqueidentifier NOT NULL REFERENCES StoreItems(Id),
+                ItemName            nvarchar(200)    NOT NULL,
+                Unit                nvarchar(30)     NOT NULL,
+                QuantityRequested   float            NOT NULL,
+                QuantityIssued      float            NOT NULL DEFAULT 0,
+                UnitCostNaira       decimal(18,2)    NOT NULL DEFAULT 0
+            );
+            """,
+
+            // ── StoreMovements ────────────────────────────────────────────────
+            """
+            IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = N'StoreMovements')
+            CREATE TABLE StoreMovements (
+                Id              uniqueidentifier NOT NULL PRIMARY KEY DEFAULT NEWID(),
+                StoreItemId     uniqueidentifier NOT NULL REFERENCES StoreItems(Id),
+                ItemCode        nvarchar(20)     NOT NULL,
+                ItemName        nvarchar(200)    NOT NULL,
+                MovementType    nvarchar(20)     NOT NULL,
+                QuantityBefore  float            NOT NULL,
+                QuantityChange  float            NOT NULL,
+                QuantityAfter   float            NOT NULL,
+                Reference       nvarchar(50)     NULL,
+                Notes           nvarchar(500)    NULL,
+                MovedByEmail    nvarchar(150)    NOT NULL,
+                MovedByName     nvarchar(100)    NOT NULL,
+                CreatedAt       datetime2        NOT NULL DEFAULT GETUTCDATE()
+            );
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_StoreMovements_StoreItemId')
+                CREATE INDEX IX_StoreMovements_StoreItemId ON StoreMovements (StoreItemId);
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_StoreMovements_CreatedAt')
+                CREATE INDEX IX_StoreMovements_CreatedAt ON StoreMovements (CreatedAt);
+            """,
+
+            // ── DieselRequisitions ────────────────────────────────────────────
+            """
+            IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = N'DieselRequisitions')
+            CREATE TABLE DieselRequisitions (
+                Id                       uniqueidentifier NOT NULL PRIMARY KEY DEFAULT NEWID(),
+                RequisitionNumber        nvarchar(20)     NOT NULL,
+                Purpose                  nvarchar(500)    NOT NULL,
+                EquipmentType            nvarchar(30)     NOT NULL DEFAULT 'Generator',
+                EquipmentReference       nvarchar(100)    NULL,
+                Location                 nvarchar(150)    NOT NULL,
+                QuantityRequestedLitres  float            NOT NULL,
+                RequestedByEmail         nvarchar(150)    NOT NULL,
+                RequestedByName          nvarchar(100)    NOT NULL,
+                Department               nvarchar(100)    NOT NULL DEFAULT 'General Service',
+                Status                   nvarchar(20)     NOT NULL DEFAULT 'Pending',
+                ApprovedByEmail          nvarchar(150)    NULL,
+                ApprovedByName           nvarchar(100)    NULL,
+                ApprovedAt               datetime2        NULL,
+                RejectedByEmail          nvarchar(150)    NULL,
+                RejectionReason          nvarchar(500)    NULL,
+                RejectedAt               datetime2        NULL,
+                DispensedByEmail         nvarchar(150)    NULL,
+                DispensedByName          nvarchar(100)    NULL,
+                DispensedAt              datetime2        NULL,
+                QuantityDispensedLitres  float            NULL,
+                TankLevelBeforeLitres    float            NULL,
+                TankLevelAfterLitres     float            NULL,
+                UnitCostPerLitreNaira    decimal(18,4)    NULL,
+                TotalCostNaira           decimal(18,2)    NULL,
+                LinkedDieselRecordId     uniqueidentifier NULL,
+                Notes                    nvarchar(1000)   NULL,
+                CreatedAt                datetime2        NOT NULL DEFAULT GETUTCDATE(),
+                UpdatedAt                datetime2        NOT NULL DEFAULT GETUTCDATE()
+            );
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_DieselRequisitions_RequisitionNumber')
+                CREATE UNIQUE INDEX IX_DieselRequisitions_RequisitionNumber ON DieselRequisitions (RequisitionNumber);
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_DieselRequisitions_Status')
+                CREATE INDEX IX_DieselRequisitions_Status ON DieselRequisitions (Status);
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_DieselRequisitions_RequestedByEmail')
+                CREATE INDEX IX_DieselRequisitions_RequestedByEmail ON DieselRequisitions (RequestedByEmail);
+            """,
+        };
+
+        int applied = 0;
+        foreach (var sql in statements)
+        {
+            await db.Database.ExecuteSqlRawAsync(sql);
+            applied++;
+        }
+
+        log.LogInformation("✅ Schema upgrade: checked/applied {Count} column statements.", applied);
+    }
+    catch (Exception ex)
+    {
+        log.LogError(ex, "❌ Schema upgrade failed — some new columns may be missing.");
+    }
+}

@@ -34,6 +34,13 @@ public static class NotificationType
     public const string RequestCompleted      = "RequestCompleted";
     public const string MaintenancePending    = "MaintenancePending";
     public const string VehicleLongStanding   = "VehicleLongStanding";
+
+    // ── Maintenance Reminder Engine ───────────────────────────────────────────
+    public const string MaintenanceDueSoon             = "MaintenanceDueSoon";             // 7 days warning
+    public const string MaintenanceDueUrgent           = "MaintenanceDueUrgent";           // 1 day warning
+    public const string MaintenanceOverdue             = "MaintenanceOverdue";             // just became overdue
+    public const string MaintenanceEscalationSupervisor = "MaintenanceEscalationSupervisor"; // 1+ days overdue
+    public const string MaintenanceEscalationManager   = "MaintenanceEscalationManager";  // 3+ days overdue
 }
 
 public static class NotificationTarget

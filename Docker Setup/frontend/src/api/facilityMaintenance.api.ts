@@ -41,6 +41,25 @@ export const facilityMaintenanceApi = {
   updateStatus: (id: string, status: string) =>
     apiClient.patch<FacilityMaintenance>(`/facility-maintenance/${id}/status`, { status }).then(r => r.data),
 
-  complete: (id: string, workDone: string, actionedBy?: string, notes?: string) =>
-    apiClient.post<FacilityMaintenance>(`/facility-maintenance/${id}/complete`, { workDone, actionedBy, notes }).then(r => r.data),
+  assess: (id: string, data: {
+    faultIdentified?:   string;
+    proposedSolution?:  string;
+    resolutionType?:    string;
+    partsRequired:      boolean;
+    partsSource?:       string;
+    procurementMethod?: string;
+    sparesCostNaira?:   number;
+  }) => apiClient.post<FacilityMaintenance>(`/facility-maintenance/${id}/assess`, data).then(r => r.data),
+
+  complete: (id: string, data: {
+    workDone?:        string;
+    actionedBy?:      string;
+    sparesCostNaira?: number;
+    notes?:           string;
+  }) => apiClient.post<FacilityMaintenance>(`/facility-maintenance/${id}/complete`, data).then(r => r.data),
+
+  handover: (id: string, data: {
+    handedOverBy:    string;
+    dateHandedOver?: string;
+  }) => apiClient.post<FacilityMaintenance>(`/facility-maintenance/${id}/handover`, data).then(r => r.data),
 };

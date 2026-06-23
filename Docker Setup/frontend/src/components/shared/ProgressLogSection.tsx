@@ -14,6 +14,7 @@ import { useAuthStore } from '../../store/authStore';
 
 dayjs.extend(relativeTime);
 
+
 const { Text } = Typography;
 const { TextArea } = Input;
 
@@ -68,7 +69,7 @@ export default function ProgressLogSection({ module, entityId, refNumber, taskTi
 
   return (
     <div style={{ marginTop: 8 }}>
-      <Divider orientation="left" orientationMargin={0} style={{ fontSize: 12 }}>
+      <Divider titlePlacement="left" orientationMargin={0} style={{ fontSize: 12 }}>
         <Space>
           Progress Log
           {logs.length > 0 && <Badge count={logs.length} size="small" style={{ background: '#1677ff' }} />}

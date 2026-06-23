@@ -82,6 +82,9 @@ export const reportsApi = {
   vehicle:       (period: ReportPeriod = '30d') =>
     apiClient.get<Record<string, unknown>>('/reports/vehicle', { params: { period } }).then(r => r.data),
 
+  vehicleRegister: (regNo?: string) =>
+    apiClient.get<Record<string, unknown>>('/reports/vehicle-register', { params: regNo ? { regNo } : undefined }).then(r => r.data),
+
   facility:      (period: ReportPeriod = '30d') =>
     apiClient.get<Record<string, unknown>>('/reports/facility', { params: { period } }).then(r => r.data),
 

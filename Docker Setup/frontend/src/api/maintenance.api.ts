@@ -32,10 +32,26 @@ export const maintenanceApi = {
     apiClient.post<MaintenanceSchedule>('/maintenance', req)
              .then(r => r.data),
 
+  update: (id: string, patch: Partial<CreateScheduleRequest> & { isActive?: boolean }) =>
+    apiClient.patch<MaintenanceSchedule>(`/maintenance/${id}`, patch)
+             .then(r => r.data),
+
   complete: (id: string, completedByEmail: string, completedByName: string, notes?: string) =>
     apiClient.post<MaintenanceSchedule>(`/maintenance/${id}/complete`, {
       notes, completedByEmail, completedByName,
     }).then(r => r.data),
+
+  upcoming: (days = 30) =>
+    apiClient.get<MaintenanceSchedule[]>('/maintenance/upcoming', { params: { days } })
+             .then(r => r.data),
+
+  escalations: () =>
+    apiClient.get<MaintenanceSchedule[]>('/maintenance/escalations')
+             .then(r => r.data),
+
+  snoozeReminder: (id: string, hoursToSnooze: number) =>
+    apiClient.post<MaintenanceSchedule>(`/maintenance/${id}/snooze-reminder`, { hoursToSnooze })
+             .then(r => r.data),
 
   delete: (id: string) =>
     apiClient.delete(`/maintenance/${id}`),

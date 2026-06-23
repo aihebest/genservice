@@ -11,6 +11,7 @@ obj/
 
 # ASP.NET Core
 appsettings.Development.json
+appsettings.Local.json
 
 # Node / Vite
 node_modules/

@@ -26,8 +26,15 @@ public class FacilityMaintenanceController(
         r.Priority, r.Status,
         r.RequestedByEmail, r.RequestedByName,
         r.ApprovedByEmail, r.ApprovedByName, r.ApprovedAt, r.RejectionReason,
-        r.WorkDone, r.ActionedBy, r.Notes, r.CompletedAt,
-        r.CreatedAt, r.UpdatedAt,
+        // assessment
+        r.FaultIdentified, r.ProposedSolution, r.ResolutionType,
+        // parts
+        r.PartsRequired, r.PartsSource, r.ProcurementMethod, r.SparesCostNaira,
+        // completion
+        r.WorkDone, r.ActionedBy, r.CompletedAt,
+        // handover
+        r.HandoverConfirmed, r.DateHandedOver, r.HandedOverBy,
+        r.Notes, r.CreatedAt, r.UpdatedAt,
         (int)(DateTime.UtcNow - r.CreatedAt).TotalDays
     );
 
@@ -48,19 +55,17 @@ public class FacilityMaintenanceController(
 
         if (!string.IsNullOrWhiteSpace(q.Status))
             query = query.Where(r => r.Status == q.Status);
-
         if (!string.IsNullOrWhiteSpace(q.Type))
             query = query.Where(r => r.MaintenanceType == q.Type);
-
         if (!string.IsNullOrWhiteSpace(q.Search))
         {
             var s = q.Search.ToLower();
             query = query.Where(r =>
-                r.RequestNumber.ToLower().Contains(s)    ||
-                r.Description.ToLower().Contains(s)      ||
-                r.Location.ToLower().Contains(s)         ||
-                r.EndUser.ToLower().Contains(s)          ||
-                r.RequestedByName.ToLower().Contains(s)  ||
+                r.RequestNumber.ToLower().Contains(s)   ||
+                r.Description.ToLower().Contains(s)     ||
+                r.Location.ToLower().Contains(s)        ||
+                r.EndUser.ToLower().Contains(s)         ||
+                r.RequestedByName.ToLower().Contains(s) ||
                 (r.RoomFlat != null && r.RoomFlat.ToLower().Contains(s)));
         }
 
@@ -110,21 +115,20 @@ public class FacilityMaintenanceController(
     {
         var r = new FacilityMaintenanceRequest
         {
-            RequestNumber   = await NextRefAsync(),
-            MaintenanceType = req.MaintenanceType,
-            Description     = req.Description.Trim(),
-            Location        = req.Location.Trim(),
-            EndUser         = req.EndUser.Trim(),
-            RoomFlat        = req.RoomFlat?.Trim(),
-            Priority        = req.Priority,
-            RequestedByEmail= CallerEmail,
-            RequestedByName = CallerName,
-            CreatedAt       = DateTime.UtcNow,
-            UpdatedAt       = DateTime.UtcNow,
+            RequestNumber    = await NextRefAsync(),
+            MaintenanceType  = req.MaintenanceType,
+            Description      = req.Description.Trim(),
+            Location         = req.Location.Trim(),
+            EndUser          = req.EndUser.Trim(),
+            RoomFlat         = req.RoomFlat?.Trim(),
+            Priority         = req.Priority,
+            RequestedByEmail = CallerEmail,
+            RequestedByName  = CallerName,
+            CreatedAt        = DateTime.UtcNow,
+            UpdatedAt        = DateTime.UtcNow,
         };
         db.FacilityMaintenanceRequests.Add(r);
         await db.SaveChangesAsync();
-        logger.LogInformation("{Ref} facility request created by {User}", r.RequestNumber, CallerEmail);
         return CreatedAtAction(nameof(GetById), new { id = r.Id }, ToDto(r));
     }
 
@@ -139,12 +143,12 @@ public class FacilityMaintenanceController(
         if (r.Status != MaintenanceRequestStatus.Pending)
             return BadRequest(new { message = "Only Pending requests can be approved." });
 
-        r.Status         = MaintenanceRequestStatus.Approved;
-        r.ApprovedByEmail= CallerEmail;
-        r.ApprovedByName = CallerName;
-        r.ApprovedAt     = DateTime.UtcNow;
-        r.Notes          = req.Notes ?? r.Notes;
-        r.UpdatedAt      = DateTime.UtcNow;
+        r.Status          = MaintenanceRequestStatus.Approved;
+        r.ApprovedByEmail = CallerEmail;
+        r.ApprovedByName  = CallerName;
+        r.ApprovedAt      = DateTime.UtcNow;
+        r.Notes           = req.Notes ?? r.Notes;
+        r.UpdatedAt       = DateTime.UtcNow;
         await db.SaveChangesAsync();
         return Ok(ToDto(r));
     }
@@ -170,6 +174,35 @@ public class FacilityMaintenanceController(
         return Ok(ToDto(r));
     }
 
+    // ── POST /api/v1/facility-maintenance/{id}/assess ────────────────────────
+    [HttpPost("{id:guid}/assess")]
+    public async Task<ActionResult<FacilityMaintenanceDto>> Assess(
+        Guid id, [FromBody] FacilityAssessmentRequest req)
+    {
+        var r = await db.FacilityMaintenanceRequests.FindAsync(id);
+        if (r is null) return NotFound();
+
+        r.FaultIdentified  = req.FaultIdentified?.Trim();
+        r.ProposedSolution = req.ProposedSolution?.Trim();
+        r.ResolutionType   = req.ResolutionType;
+        r.PartsRequired    = req.PartsRequired;
+        r.PartsSource      = req.PartsSource;
+        r.ProcurementMethod= req.ProcurementMethod;
+        r.SparesCostNaira  = req.SparesCostNaira;
+
+        if (req.PartsRequired && req.PartsSource == "NewPurchase" &&
+            r.Status == MaintenanceRequestStatus.Ongoing)
+        {
+            r.Status = req.ProcurementMethod == "CashAdvance"
+                ? MaintenanceRequestStatus.AwaitingFunds
+                : MaintenanceRequestStatus.AwaitingSpares;
+        }
+
+        r.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+        return Ok(ToDto(r));
+    }
+
     // ── PATCH /api/v1/facility-maintenance/{id}/status ───────────────────────
     [HttpPatch("{id:guid}/status")]
     public async Task<ActionResult<FacilityMaintenanceDto>> UpdateStatus(
@@ -191,18 +224,37 @@ public class FacilityMaintenanceController(
     public async Task<ActionResult<FacilityMaintenanceDto>> Complete(
         Guid id, [FromBody] CompleteFacilityRequest req)
     {
-        if (CallerRole is not ("DepartmentManager" or "Supervisor" or "SystemAdmin" or "Technician")) return Forbid();
+        if (CallerRole is not ("DepartmentManager" or "Supervisor" or "SystemAdmin" or "Technician"))
+            return Forbid();
         var r = await db.FacilityMaintenanceRequests.FindAsync(id);
         if (r is null) return NotFound();
 
-        r.Status      = MaintenanceRequestStatus.Completed;
-        r.WorkDone    = req.WorkDone?.Trim();
-        r.ActionedBy  = req.ActionedBy?.Trim();
-        r.Notes       = req.Notes ?? r.Notes;
-        r.CompletedAt = DateTime.UtcNow;
-        r.UpdatedAt   = DateTime.UtcNow;
+        r.Status          = MaintenanceRequestStatus.Completed;
+        r.WorkDone        = req.WorkDone?.Trim();
+        r.ActionedBy      = req.ActionedBy?.Trim() ?? CallerName;
+        r.SparesCostNaira = req.SparesCostNaira ?? r.SparesCostNaira;
+        r.Notes           = req.Notes ?? r.Notes;
+        r.CompletedAt     = DateTime.UtcNow;
+        r.UpdatedAt       = DateTime.UtcNow;
         await db.SaveChangesAsync();
-        logger.LogInformation("{Ref} facility request completed by {User}", r.RequestNumber, CallerEmail);
+        return Ok(ToDto(r));
+    }
+
+    // ── POST /api/v1/facility-maintenance/{id}/handover ──────────────────────
+    [HttpPost("{id:guid}/handover")]
+    public async Task<ActionResult<FacilityMaintenanceDto>> Handover(
+        Guid id, [FromBody] FacilityHandoverRequest req)
+    {
+        var r = await db.FacilityMaintenanceRequests.FindAsync(id);
+        if (r is null) return NotFound();
+        if (r.Status != MaintenanceRequestStatus.Completed)
+            return BadRequest(new { message = "Handover can only be confirmed after completion." });
+
+        r.HandoverConfirmed = true;
+        r.HandedOverBy      = req.HandedOverBy.Trim();
+        r.DateHandedOver    = req.DateHandedOver ?? DateTime.UtcNow;
+        r.UpdatedAt         = DateTime.UtcNow;
+        await db.SaveChangesAsync();
         return Ok(ToDto(r));
     }
 }

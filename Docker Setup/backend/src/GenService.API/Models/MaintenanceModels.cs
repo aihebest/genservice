@@ -53,7 +53,15 @@ public record ScheduleDto(
     string?   LastCompletionNotes,
     bool      IsActive,
     DateTime  CreatedAt,
-    DateTime  UpdatedAt
+    DateTime  UpdatedAt,
+    // Reminder / escalation tracking
+    int       EscalationLevel,
+    DateTime? LastReminderSentAt,
+    DateTime? LastEscalationSentAt
+);
+
+public record SnoozeReminderRequest(
+    int  HoursToSnooze   // set LastReminderSentAt = now + X hours (delays next reminder)
 );
 
 public record ScheduleListResponse(

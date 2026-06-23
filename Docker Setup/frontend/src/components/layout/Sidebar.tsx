@@ -10,11 +10,14 @@ import {
   ToolOutlined,
   ThunderboltOutlined,
   BarChartOutlined,
+  FileTextOutlined,
+  UserOutlined,
+  ShopOutlined,
+  BellOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '../../store/authStore';
 import type { UserRole } from '../../types';
 
-// ── Menu item definitions (with role whitelist) ────────────────────────────
 interface NavItem {
   key:   string;
   label: string;
@@ -23,61 +26,29 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  {
-    key:   '/dashboard',
-    label: 'Dashboard',
-    icon:  <DashboardOutlined />,
-    roles: 'all',
-  },
-  {
-    key:   '/requests',
-    label: 'Requests',
-    icon:  <FormOutlined />,
-    roles: 'all',
-  },
-  {
-    key:   '/fleet',
-    label: 'Fleet & Vehicles',
-    icon:  <CarOutlined />,
-    roles: ['SystemAdmin', 'DepartmentManager', 'Supervisor', 'Driver'],
-  },
-  {
-    key:   '/activities',
-    label: 'Team Activities',
-    icon:  <TeamOutlined />,
-    roles: ['SystemAdmin', 'DepartmentManager', 'Supervisor', 'Technician'],
-  },
-  {
-    key:   '/maintenance',
-    label: 'Maintenance',
-    icon:  <ToolOutlined />,
-    roles: ['SystemAdmin', 'DepartmentManager', 'Supervisor', 'Technician'],
-  },
-  {
-    key:   '/fuel',
-    label: 'Fuel & Power',
-    icon:  <ThunderboltOutlined />,
-    roles: ['SystemAdmin', 'DepartmentManager', 'Supervisor', 'Driver'],
-  },
-  {
-    key:   '/reports',
-    label: 'Reports',
-    icon:  <BarChartOutlined />,
-    roles: ['SystemAdmin', 'DepartmentManager', 'Supervisor'],
-  },
+  { key: '/dashboard',  label: 'Dashboard',                   icon: <DashboardOutlined />,    roles: 'all' },
+  { key: '/requests',   label: 'Requests',                    icon: <FormOutlined />,         roles: 'all' },
+  { key: '/fleet',      label: 'Vehicle Maintenance Register', icon: <CarOutlined />,          roles: ['SystemAdmin', 'DepartmentManager', 'Supervisor', 'Technician', 'Driver'] },
+  { key: '/activities', label: 'Team Activities',             icon: <TeamOutlined />,         roles: ['SystemAdmin', 'DepartmentManager', 'Supervisor', 'Technician'] },
+  { key: '/maintenance',label: 'Maintenance',                 icon: <ToolOutlined />,         roles: ['SystemAdmin', 'DepartmentManager', 'Supervisor', 'Technician'] },
+  { key: '/fuel',       label: 'Fuel & Power',                icon: <ThunderboltOutlined />,  roles: ['SystemAdmin', 'DepartmentManager', 'Supervisor', 'Driver'] },
+  { key: '/daily-log',  label: 'Daily Parameter Log',         icon: <FileTextOutlined />,     roles: ['SystemAdmin', 'DepartmentManager', 'Supervisor', 'Technician', 'Driver'] },
+  { key: '/store',      label: 'Store Management',            icon: <ShopOutlined />,         roles: ['SystemAdmin', 'DepartmentManager', 'Supervisor', 'StoreOfficer', 'Technician', 'Driver', 'Requester'] },
+  { key: '/users',      label: 'User Management',             icon: <UserOutlined />,         roles: ['SystemAdmin'] },
+  { key: '/reports',    label: 'Reports',                     icon: <BarChartOutlined />,     roles: ['SystemAdmin', 'DepartmentManager', 'Supervisor'] },
+  { key: '/notifications', label: 'Notifications',           icon: <BellOutlined />,         roles: 'all' },
 ];
 
-// ── Component ──────────────────────────────────────────────────────────────
 interface SidebarProps {
   collapsed: boolean;
+  onItemClick?: () => void;
 }
 
-export default function Sidebar({ collapsed }: SidebarProps) {
+export default function Sidebar({ collapsed, onItemClick }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const role     = useAuthStore((s) => s.user?.role);
 
-  // Filter nav items by role
   const visibleItems: MenuProps['items'] = useMemo(() => {
     return NAV_ITEMS
       .filter((item) => {
@@ -92,11 +63,11 @@ export default function Sidebar({ collapsed }: SidebarProps) {
       }));
   }, [role]);
 
-  // Active key — match first path segment
   const selectedKey = '/' + (location.pathname.split('/')[1] || 'dashboard');
 
   const handleClick: MenuProps['onClick'] = ({ key }) => {
     navigate(key);
+    onItemClick?.();
   };
 
   return (

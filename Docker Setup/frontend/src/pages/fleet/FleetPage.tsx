@@ -14,10 +14,11 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import { vehicleMaintenanceApi } from '../../api/vehicleMaintenance.api';
 import ProgressLogSection from '../../components/shared/ProgressLogSection';
 import { VM_STATUS_META, VM_TYPE_META, PRIORITY_META, OFFICE_LOCATIONS } from '../../types';
-import type { VehicleMaintenance, VehicleMaintenanceStatus, RequestPriority } from '../../types';
+import type { VehicleMaintenance, VehicleMaintenanceStatus } from '../../types';
 import { useAuthStore } from '../../store/authStore';
 
 dayjs.extend(relativeTime);
+
 
 const { Title, Text } = Typography;
 const { TextArea }    = Input;
@@ -63,8 +64,8 @@ function buildColumns(onView: (r: VehicleMaintenance) => void): ColumnsType<Vehi
     },
     {
       title: 'Priority', dataIndex: 'priority', key: 'priority', width: 90,
-      render: (v: RequestPriority) => {
-        const m = PRIORITY_META[v];
+      render: (v: string) => {
+        const m = PRIORITY_META[v as keyof typeof PRIORITY_META];
         return <Tag color={m?.color}>{m?.label ?? v}</Tag>;
       },
     },
@@ -352,7 +353,7 @@ export default function FleetPage() {
 
           {selected.workshopName && (
             <>
-              <Divider orientation="left" orientationMargin={0} style={{ fontSize: 12 }}>Workshop</Divider>
+              <Divider titlePlacement="left" orientationMargin={0} style={{ fontSize: 12 }}>Workshop</Divider>
               <Descriptions column={1} size="small" bordered>
                 <Descriptions.Item label="Workshop">{selected.workshopName}</Descriptions.Item>
                 {selected.workshopLocation && <Descriptions.Item label="Location">{selected.workshopLocation}</Descriptions.Item>}
@@ -368,7 +369,7 @@ export default function FleetPage() {
 
           {selected.approvedByName && (
             <>
-              <Divider orientation="left" orientationMargin={0} style={{ fontSize: 12 }}>
+              <Divider titlePlacement="left" orientationMargin={0} style={{ fontSize: 12 }}>
                 {selected.status === 'Rejected' ? 'Rejection' : 'Approval'}
               </Divider>
               <Descriptions column={1} size="small" bordered>
@@ -383,7 +384,7 @@ export default function FleetPage() {
 
           {selected.completedAt && (
             <>
-              <Divider orientation="left" orientationMargin={0} style={{ fontSize: 12 }}>Completion</Divider>
+              <Divider titlePlacement="left" orientationMargin={0} style={{ fontSize: 12 }}>Completion</Divider>
               <Descriptions column={1} size="small" bordered>
                 <Descriptions.Item label="Completed">{dayjs(selected.completedAt).format('D MMM YYYY, HH:mm')}</Descriptions.Item>
                 {selected.notes && <Descriptions.Item label="Notes">{selected.notes}</Descriptions.Item>}
@@ -411,7 +412,7 @@ export default function FleetPage() {
 
       {/* Dispatch modal */}
       <Modal title={<><ToolOutlined /> Send to Workshop</>} open={dispatchOpen}
-        onOk={async () => { if (!workshopName.trim() || !selected) return; await act(() => vehicleMaintenanceApi.dispatch(selected.id, workshopName, workshopLoc || undefined)); setDispatchOpen(false); setWorkshopName(''); setWorkshopLoc(''); }}
+        onOk={async () => { if (!workshopName.trim() || !selected) return; await act(() => vehicleMaintenanceApi.dispatch(selected.id, { workshopName, workshopLocation: workshopLoc || undefined })); setDispatchOpen(false); setWorkshopName(''); setWorkshopLoc(''); }}
         onCancel={() => { setDispatchOpen(false); setWorkshopName(''); setWorkshopLoc(''); }}
         okText="Confirm Dispatch" okButtonProps={{ disabled: !workshopName.trim() }} confirmLoading={actionLoading}>
         <Space direction="vertical" style={{ width: '100%' }} size={12}>
@@ -428,7 +429,7 @@ export default function FleetPage() {
 
       {/* Complete modal */}
       <Modal title={<><CheckOutlined /> Mark as Completed</>} open={completeOpen}
-        onOk={async () => { if (!selected) return; await act(() => vehicleMaintenanceApi.complete(selected.id, completeNotes || undefined)); setCompleteOpen(false); setCompleteNotes(''); }}
+        onOk={async () => { if (!selected) return; await act(() => vehicleMaintenanceApi.complete(selected.id, { notes: completeNotes || undefined })); setCompleteOpen(false); setCompleteNotes(''); }}
         onCancel={() => { setCompleteOpen(false); setCompleteNotes(''); }}
         okText="Confirm Completion" confirmLoading={actionLoading}>
         <p>Mark <strong>{selected?.requestNumber}</strong> ({selected?.vehicleRegNo}) as completed:</p>

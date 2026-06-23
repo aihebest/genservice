@@ -1,29 +1,36 @@
 import { useState } from 'react';
 import {
-  Badge, Button, Card, Col, List, Progress, Row,
-  Select, Space, Statistic, Tabs, Tag, Tooltip, Typography,
+  Alert, Badge, Button, Card, Col, Dropdown, List, Progress, Row,
+  Select, Space, Statistic, Table, Tabs, Tag, Tooltip, Typography,
 } from 'antd';
 import {
-  BarChartOutlined, ToolOutlined, ThunderboltOutlined,
+  BarChartOutlined, DownloadOutlined, ToolOutlined, ThunderboltOutlined,
   ReloadOutlined, CheckCircleOutlined, WarningOutlined,
   ClockCircleOutlined, FireOutlined, CarOutlined,
   HomeOutlined, TeamOutlined, BankOutlined,
 } from '@ant-design/icons';
+import {
+  exportVehicleRegister,
+  exportEquipmentMaintenance,
+  exportFacilityMaintenance,
+  exportGeneratorLog,
+  exportMaintenanceSchedules,
+} from '../../api/export.api';
 import { taskProgressLogApi } from '../../api/taskProgressLog.api';
 import type { TechnicianSummary } from '../../types';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartTooltip,
-  ResponsiveContainer, PieChart, Pie, Cell, Legend, LineChart, Line, Area, AreaChart,
+  ResponsiveContainer, PieChart, Pie, Cell, Legend, Area, AreaChart,
 } from 'recharts';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { reportsApi } from '../../api/reports.api';
 import type { ReportPeriod, PeriodBreakdownItem } from '../../api/reports.api';
 import {
-  CATEGORY_META, STATUS_META, PRIORITY_META,
+  CATEGORY_META, STATUS_META,
   MAINTENANCE_CATEGORY_META, GENERATOR_RUN_REASON_META,
 } from '../../types';
-import type { RequestCategory, RequestStatus, RequestPriority, MaintenanceCategory, GeneratorRunReason } from '../../types';
+import type { RequestCategory, RequestStatus, MaintenanceCategory, GeneratorRunReason } from '../../types';
 
 const { Title, Text } = Typography;
 
@@ -69,8 +76,7 @@ function KpiCard({ label, value, color, icon, suffix }: {
   );
 }
 
-// ── Breakdown bar list ─────────────────────────────────────────────────────────
-function BreakdownList({ items, total, getLabelColor }: {
+export function BreakdownList({ items, total, getLabelColor }: {
   items: PeriodBreakdownItem[];
   total: number;
   getLabelColor?: (label: string) => string;
@@ -118,10 +124,7 @@ function RequestReportTab({ period }: { period: ReportPeriod }) {
     color: STATUS_META[b.label as RequestStatus]?.color,
   }));
 
-  const priorityData = data.byPriority.map(b => ({
-    name:  PRIORITY_META[b.label as RequestPriority]?.label ?? b.label,
-    count: b.count,
-  }));
+  void 0; // priorityData removed
 
   const trendData = data.submissionTrend.map(t => ({ date: t.date, submissions: t.value }));
 
@@ -164,7 +167,7 @@ function RequestReportTab({ period }: { period: ReportPeriod }) {
               <PieChart>
                 <Pie data={statusData} dataKey="count" nameKey="name"
                   cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) =>
-                    percent > 0.05 ? `${name} ${(percent * 100).toFixed(0)}%` : ''
+                    percent != null && percent > 0.05 ? `${name} ${((percent ?? 0) * 100).toFixed(0)}%` : ''
                   } labelLine={false} fontSize={10}>
                   {statusData.map((_, i) => (
                     <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
@@ -244,6 +247,43 @@ function MaintenanceReportTab({ period }: { period: ReportPeriod }) {
 
   return (
     <div>
+      {/* ── Export toolbar ─────────────────────────────────────────────────── */}
+      <Row justify="end" style={{ marginBottom: 12 }}>
+        <Space>
+          <Dropdown menu={{ items: [
+            { key: 'eq-excel', label: 'Equipment Register (Excel)', icon: <DownloadOutlined />,
+              onClick: () => exportEquipmentMaintenance({ format: 'excel' }) },
+            { key: 'eq-pdf',   label: 'Equipment Register (PDF)',   icon: <DownloadOutlined />,
+              onClick: () => exportEquipmentMaintenance({ format: 'pdf' }) },
+          ] }}>
+            <Button icon={<DownloadOutlined />}>Equipment</Button>
+          </Dropdown>
+          <Dropdown menu={{ items: [
+            { key: 'fac-excel', label: 'Facility Register (Excel)', icon: <DownloadOutlined />,
+              onClick: () => exportFacilityMaintenance({ format: 'excel' }) },
+            { key: 'fac-pdf',   label: 'Facility Register (PDF)',   icon: <DownloadOutlined />,
+              onClick: () => exportFacilityMaintenance({ format: 'pdf' }) },
+          ] }}>
+            <Button icon={<DownloadOutlined />}>Facility</Button>
+          </Dropdown>
+          <Dropdown menu={{ items: [
+            { key: 'sched-excel-all',    label: 'Scheduler — All (Excel)',     icon: <DownloadOutlined />,
+              onClick: () => exportMaintenanceSchedules({ format: 'excel', status: 'all' }) },
+            { key: 'sched-excel-active', label: 'Scheduler — Active (Excel)',  icon: <DownloadOutlined />,
+              onClick: () => exportMaintenanceSchedules({ format: 'excel', status: 'active' }) },
+            { key: 'sched-excel-due',    label: 'Scheduler — Overdue (Excel)', icon: <DownloadOutlined />,
+              onClick: () => exportMaintenanceSchedules({ format: 'excel', status: 'overdue' }) },
+            { type: 'divider' },
+            { key: 'sched-pdf-all',      label: 'Scheduler — All (PDF)',       icon: <DownloadOutlined />,
+              onClick: () => exportMaintenanceSchedules({ format: 'pdf', status: 'all' }) },
+            { key: 'sched-pdf-active',   label: 'Scheduler — Active (PDF)',    icon: <DownloadOutlined />,
+              onClick: () => exportMaintenanceSchedules({ format: 'pdf', status: 'active' }) },
+          ] }}>
+            <Button icon={<DownloadOutlined />}>Scheduler</Button>
+          </Dropdown>
+        </Space>
+      </Row>
+
       {/* KPIs */}
       <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
         {[
@@ -291,7 +331,7 @@ function MaintenanceReportTab({ period }: { period: ReportPeriod }) {
                 <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
                 <RechartTooltip />
                 <Bar dataKey="count" name="Schedules" radius={[3, 3, 0, 0]}>
-                  {catData.map((entry, i) => (
+                  {catData.map((_entry, i) => (
                     <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                   ))}
                 </Bar>
@@ -305,7 +345,7 @@ function MaintenanceReportTab({ period }: { period: ReportPeriod }) {
               <PieChart>
                 <Pie data={freqData} dataKey="count" nameKey="name"
                   cx="50%" cy="50%" outerRadius={80}
-                  label={({ name, percent }) => percent > 0.08 ? `${name} ${(percent * 100).toFixed(0)}%` : ''}
+                  label={({ name, percent }) => percent != null && percent > 0.08 ? `${name} ${((percent ?? 0) * 100).toFixed(0)}%` : ''}
                   labelLine={false} fontSize={10}>
                   {freqData.map((_, i) => (
                     <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
@@ -376,6 +416,13 @@ function FuelReportTab({ period }: { period: ReportPeriod }) {
 
   return (
     <div>
+      {/* ── Export toolbar ─────────────────────────────────────────────────── */}
+      <Row justify="end" style={{ marginBottom: 12 }}>
+        <Button icon={<DownloadOutlined />} onClick={() => exportGeneratorLog({})}>
+          Export Generator Log (Excel)
+        </Button>
+      </Row>
+
       {/* Generator KPIs */}
       <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 8 }}>Generator Performance</Text>
       <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
@@ -457,7 +504,7 @@ function FuelReportTab({ period }: { period: ReportPeriod }) {
               <PieChart>
                 <Pie data={outageReasonData} dataKey="count" nameKey="name"
                   cx="50%" cy="50%" outerRadius={70}
-                  label={({ name, percent }) => percent > 0.08 ? `${(percent * 100).toFixed(0)}%` : ''}
+                  label={({ percent }) => percent != null && percent > 0.08 ? `${((percent ?? 0) * 100).toFixed(0)}%` : ''}
                   labelLine={false} fontSize={10}>
                   {outageReasonData.map((_, i) => (
                     <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
@@ -596,62 +643,332 @@ export default function ReportsPage() {
   );
 }
 
-// ── Vehicle Maintenance Report ────────────────────────────────────────────────
+// ── Vehicle Maintenance Report (full register view) ───────────────────────────
+type VehiclePerRow = {
+  vehicleRegNo:    string;
+  vehicleType:     string;
+  totalJobs:       number;
+  completedJobs:   number;
+  activeJobs:      number;
+  totalSparesCost: number;
+  lastServiceDate: string | null;
+  currentStatus:   string | null;
+};
+type LongStandingRow = {
+  requestNumber:  string;
+  vehicleRegNo:   string;
+  vehicleType:    string;
+  status:         string;
+  workshopName:   string | null;
+  faultIdentified:string | null;
+  daysInWorkshop: number;
+  sentToWorkshopAt:string;
+};
+type HistoryRow = {
+  requestNumber:  string;
+  vehicleRegNo:   string;
+  vehicleType:    string;
+  maintenanceType:string;
+  status:         string;
+  priority:       string;
+  workshopName:   string | null;
+  faultIdentified:string | null;
+  workDone:       string | null;
+  sparesCostNaira:number | null;
+  daysOpen:       number;
+  createdAt:      string;
+  completedAt:    string | null;
+};
+type MonthlyTrendRow = { month: string; completed: number; newJobs: number };
+type StatusByTypeRow = {
+  type: string; pending: number; inWorkshop: number;
+  awaitingParts: number; awaitingFunds: number; completed: number; rejected: number;
+};
+
 function VehicleReportTab({ period }: { period: ReportPeriod }) {
-  const { data: d, isFetching } = useQuery({
+  const [filterReg, setFilterReg] = useState<string | undefined>();
+
+  // Aggregate report (period-scoped totals)
+  const { data: agg, isFetching: aggLoading } = useQuery({
     queryKey: ['reports', 'vehicle', period],
     queryFn: () => reportsApi.vehicle(period),
   });
 
-  if (isFetching || !d) return <div style={{ padding: 32, textAlign: 'center' }}>Loading…</div>;
-  const r = d as Record<string, unknown>;
+  // Full register report (all-time, per-vehicle)
+  const { data: reg, isFetching: regLoading } = useQuery({
+    queryKey: ['reports', 'vehicle-register', filterReg],
+    queryFn: () => reportsApi.vehicleRegister(filterReg),
+  });
+
+  const isLoading = aggLoading || regLoading;
+  if (isLoading || !agg || !reg) return <div style={{ padding: 32, textAlign: 'center' }}>Loading…</div>;
+
+  const a  = agg  as Record<string, unknown>;
+  const r  = reg  as Record<string, unknown>;
+
+  const perVehicle    = (r.perVehicle    as VehiclePerRow[])    ?? [];
+  const longStanding  = (r.longStanding  as LongStandingRow[])  ?? [];
+  const history       = (r.history       as HistoryRow[])        ?? [];
+  const monthlyTrends = (r.monthlyTrends as MonthlyTrendRow[])  ?? [];
+  const statusByType  = (r.statusByType  as StatusByTypeRow[])  ?? [];
+  const sparesCost    = (r.sparesCostSummary as { label: string; totalSparesCost: number; count: number }[]) ?? [];
+
+  const fmtCost = (v: number) => v > 0
+    ? `₦${v.toLocaleString('en-NG', { minimumFractionDigits: 0 })}` : '—';
+
+  const statusColor = (s: string) =>
+    ({ Pending:'orange', Approved:'blue', InWorkshop:'purple', AwaitingParts:'gold',
+       AwaitingFunds:'volcano', Completed:'green', Rejected:'red' }[s] ?? 'default');
+
+  // ── Per-vehicle register table columns ──────────────────────────────────────
+  const registerCols = [
+    { title: 'Reg No',        dataIndex: 'vehicleRegNo',    width: 120,
+      render: (v: string) => <strong>{v}</strong> },
+    { title: 'Vehicle Type',  dataIndex: 'vehicleType',     width: 130,
+      render: (v: string) => <Tag>{v}</Tag> },
+    { title: 'Total Jobs',    dataIndex: 'totalJobs',       width: 90,
+      render: (v: number) => <strong>{v}</strong> },
+    { title: 'Active',        dataIndex: 'activeJobs',      width: 80,
+      render: (v: number) => v > 0 ? <Tag color="blue">{v}</Tag> : <Text type="secondary">0</Text> },
+    { title: 'Completed',     dataIndex: 'completedJobs',   width: 90,
+      render: (v: number) => <Tag color="green">{v}</Tag> },
+    { title: 'Total Spares Cost', dataIndex: 'totalSparesCost', width: 140,
+      sorter: (a: VehiclePerRow, b: VehiclePerRow) => a.totalSparesCost - b.totalSparesCost,
+      render: (v: number) => <span style={{ color: v > 0 ? '#722ed1' : '#bfbfbf' }}>{fmtCost(v)}</span> },
+    { title: 'Last Serviced', dataIndex: 'lastServiceDate', width: 120,
+      render: (v: string | null) => v ? dayjs(v).format('DD MMM YYYY') : <Text type="secondary">—</Text> },
+    { title: 'Current Status', dataIndex: 'currentStatus', width: 130,
+      render: (v: string | null) => v
+        ? <Tag color={statusColor(v)}>{v}</Tag> : <Text type="secondary">—</Text> },
+    { title: '',              key: 'action',                width: 80,
+      render: (_: unknown, row: VehiclePerRow) => (
+        <Button size="small" onClick={() => setFilterReg(
+          filterReg === row.vehicleRegNo ? undefined : row.vehicleRegNo
+        )}>
+          {filterReg === row.vehicleRegNo ? 'Clear' : 'History'}
+        </Button>
+      ) },
+  ];
+
+  // ── History table columns ────────────────────────────────────────────────────
+  const historyCols = [
+    { title: 'Ref No',          dataIndex: 'requestNumber',   width: 110 },
+    { title: 'Reg No',          dataIndex: 'vehicleRegNo',    width: 110,
+      render: (v: string) => <Tag color="blue">{v}</Tag> },
+    { title: 'Type',            dataIndex: 'maintenanceType', width: 130,
+      render: (v: string) => <Tag>{v}</Tag> },
+    { title: 'Status',          dataIndex: 'status',          width: 130,
+      render: (v: string) => <Tag color={statusColor(v)}>{v}</Tag> },
+    { title: 'Workshop',        dataIndex: 'workshopName',    width: 130,
+      render: (v: string | null) => v ?? '—' },
+    { title: 'Fault',           dataIndex: 'faultIdentified', width: 200,
+      ellipsis: true,
+      render: (v: string | null) => v ?? '—' },
+    { title: 'Spares Cost',     dataIndex: 'sparesCostNaira', width: 120,
+      render: (v: number | null) => v != null ? fmtCost(v) : '—' },
+    { title: 'Days Open',       dataIndex: 'daysOpen',        width: 80,
+      render: (v: number) => v > 0
+        ? <Tag color={v > 14 ? 'red' : v > 7 ? 'orange' : 'default'}>{v}d</Tag>
+        : <Tag color="green">Done</Tag> },
+    { title: 'Date',            dataIndex: 'createdAt',       width: 110,
+      render: (v: string) => dayjs(v).format('DD MMM YYYY') },
+  ];
+
+  // ── Long-standing table columns ──────────────────────────────────────────────
+  const longStandingCols = [
+    { title: 'Ref No',          dataIndex: 'requestNumber',  width: 110 },
+    { title: 'Reg No',          dataIndex: 'vehicleRegNo',   width: 120,
+      render: (v: string) => <strong>{v}</strong> },
+    { title: 'Status',          dataIndex: 'status',         width: 130,
+      render: (v: string) => <Tag color={statusColor(v)}>{v}</Tag> },
+    { title: 'Workshop',        dataIndex: 'workshopName',   width: 150,
+      render: (v: string | null) => v ?? '—' },
+    { title: 'Fault',           dataIndex: 'faultIdentified',width: 200,
+      ellipsis: true,
+      render: (v: string | null) => v ?? '—' },
+    { title: 'Days in Workshop', dataIndex: 'daysInWorkshop', width: 130,
+      sorter: (a: LongStandingRow, b: LongStandingRow) => a.daysInWorkshop - b.daysInWorkshop,
+      render: (v: number) => (
+        <Tag color={v > 30 ? 'red' : v > 14 ? 'orange' : 'gold'}>
+          ⚠️ {v} days
+        </Tag>
+      ) },
+  ];
 
   return (
     <div>
+      {/* ── Export toolbar ─────────────────────────────────────────────────── */}
+      <Row justify="end" style={{ marginBottom: 12 }}>
+        <Dropdown
+          menu={{
+            items: [
+              { key: 'excel', label: 'Export Register (Excel)', icon: <DownloadOutlined />,
+                onClick: () => exportVehicleRegister({ format: 'excel', regNo: filterReg }) },
+              { key: 'pdf',   label: 'Export Register (PDF)',   icon: <DownloadOutlined />,
+                onClick: () => exportVehicleRegister({ format: 'pdf',   regNo: filterReg }) },
+            ],
+          }}
+        >
+          <Button icon={<DownloadOutlined />}>Export Register</Button>
+        </Dropdown>
+      </Row>
+
+      {/* ── KPI summary ───────────────────────────────────────────────────── */}
       <Row gutter={12} style={{ marginBottom: 20 }}>
         {[
-          { label: 'Total Requests',  value: r.total      as number, color: '#1677ff' },
-          { label: 'Pending',         value: r.pending    as number, color: '#fa8c16' },
-          { label: 'In Workshop',     value: r.inWorkshop as number, color: '#722ed1' },
-          { label: 'Long-Standing',   value: r.longStanding as number, color: '#f5222d' },
-          { label: 'Completed',       value: r.completed  as number, color: '#52c41a' },
+          { label: 'Total Requests (period)', value: a.total      as number, color: '#1677ff' },
+          { label: 'Active Jobs',             value: r.activeJobsCount as number, color: '#722ed1' },
+          { label: 'In Workshop (period)',     value: a.inWorkshop as number, color: '#fa8c16' },
+          { label: 'Long-Standing (>7d)',      value: r.longStandingCount as number, color: '#f5222d' },
+          { label: 'Completed (period)',       value: a.completed  as number, color: '#52c41a' },
+          { label: 'Total Spares Spend',
+            value: `₦${((r.totalSparesCostAll as number) ?? 0).toLocaleString('en-NG', { maximumFractionDigits: 0 })}`,
+            color: '#722ed1' },
         ].map(k => (
           <Col key={k.label} style={{ flex: '1 1 130px', minWidth: 120, marginBottom: 8 }}>
-            <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
-              <Statistic title={<Text style={{ fontSize: 12 }}>{k.label}</Text>}
-                value={k.value ?? 0} valueStyle={{ color: k.color, fontSize: 22, fontWeight: 700 }} />
+            <Card size="small" styles={{ body: { padding: '10px 14px' } }}>
+              <Statistic
+                title={<Text style={{ fontSize: 11 }}>{k.label}</Text>}
+                value={k.value ?? 0}
+                valueStyle={{ color: k.color, fontSize: 18, fontWeight: 700 }}
+              />
             </Card>
           </Col>
         ))}
       </Row>
-      <Row gutter={16}>
+
+      {/* ── Long-standing alert ────────────────────────────────────────────── */}
+      {longStanding.length > 0 && (
+        <Alert
+          type="warning"
+          showIcon
+          message={`${longStanding.length} vehicle(s) have been in workshop for more than 7 days`}
+          style={{ marginBottom: 16 }}
+        />
+      )}
+
+      {/* ── Charts row ────────────────────────────────────────────────────── */}
+      <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col xs={24} md={12}>
-          <ChartCard title="Requests by Maintenance Type">
+          <ChartCard title="Monthly Trends — New Jobs vs Completions" height={200}>
             <ResponsiveContainer>
-              <BarChart data={(r.byType as PeriodBreakdownItem[] ?? [])}>
+              <AreaChart data={monthlyTrends}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} />
+                <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} />
                 <RechartTooltip />
-                <Bar dataKey="count" fill="#722ed1" />
-              </BarChart>
+                <Legend />
+                <Area type="monotone" dataKey="newJobs"   name="New Jobs"   stroke="#1677ff" fill="#1677ff20" />
+                <Area type="monotone" dataKey="completed" name="Completed"  stroke="#52c41a" fill="#52c41a20" />
+              </AreaChart>
             </ResponsiveContainer>
           </ChartCard>
         </Col>
         <Col xs={24} md={12}>
-          <ChartCard title="Requests by Location">
+          <ChartCard title="Spares Cost by Vehicle (Top 10)" height={200}>
             <ResponsiveContainer>
-              <BarChart data={(r.byLocation as PeriodBreakdownItem[] ?? [])}>
+              <BarChart data={sparesCost.slice(0, 10)} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} />
-                <RechartTooltip />
-                <Bar dataKey="count" fill="#1677ff" />
+                <XAxis type="number" tick={{ fontSize: 9 }}
+                  tickFormatter={v => `₦${(v/1000).toFixed(0)}k`} />
+                <YAxis type="category" dataKey="label" tick={{ fontSize: 10 }} width={90} />
+                <RechartTooltip
+                  formatter={(v) => `₦${Number(v ?? 0).toLocaleString('en-NG')}`} />
+                <Bar dataKey="totalSparesCost" name="Spares Cost" fill="#722ed1" />
               </BarChart>
             </ResponsiveContainer>
           </ChartCard>
         </Col>
       </Row>
+
+      {/* ── Status × Type breakdown ────────────────────────────────────────── */}
+      <Card
+        title="Status Breakdown by Maintenance Type"
+        size="small"
+        style={{ marginBottom: 16 }}
+      >
+        <Table
+          dataSource={statusByType}
+          rowKey="type"
+          size="small"
+          pagination={false}
+          scroll={{ x: 'max-content' }}
+          columns={[
+            { title: 'Type',          dataIndex: 'type',          width: 150 },
+            { title: 'Pending',       dataIndex: 'pending',       width: 80,
+              render: (v: number) => <Tag color="orange">{v}</Tag> },
+            { title: 'In Workshop',   dataIndex: 'inWorkshop',    width: 100,
+              render: (v: number) => <Tag color="purple">{v}</Tag> },
+            { title: 'Awaiting Parts',dataIndex: 'awaitingParts', width: 120,
+              render: (v: number) => <Tag color="gold">{v}</Tag> },
+            { title: 'Awaiting Funds',dataIndex: 'awaitingFunds', width: 120,
+              render: (v: number) => <Tag color="volcano">{v}</Tag> },
+            { title: 'Completed',     dataIndex: 'completed',     width: 90,
+              render: (v: number) => <Tag color="green">{v}</Tag> },
+            { title: 'Rejected',      dataIndex: 'rejected',      width: 90,
+              render: (v: number) => <Tag color="red">{v}</Tag> },
+          ]}
+        />
+      </Card>
+
+      {/* ── Long-standing vehicles ──────────────────────────────────────────── */}
+      {longStanding.length > 0 && (
+        <Card
+          title={<><WarningOutlined style={{ color: '#f5222d', marginRight: 6 }} />Long-Standing Vehicles (&gt;7 days in workshop)</>}
+          size="small"
+          style={{ marginBottom: 16 }}
+        >
+          <Table
+            dataSource={longStanding}
+            rowKey="requestNumber"
+            size="small"
+            columns={longStandingCols}
+            pagination={false}
+            scroll={{ x: 800 }}
+          />
+        </Card>
+      )}
+
+      {/* ── Per-vehicle register ─────────────────────────────────────────────── */}
+      <Card
+        title="Vehicle Register Summary (All-Time)"
+        size="small"
+        style={{ marginBottom: 16 }}
+        extra={filterReg
+          ? <Button size="small" onClick={() => setFilterReg(undefined)}>Show All Vehicles</Button>
+          : null}
+      >
+        <Table
+          dataSource={perVehicle}
+          rowKey="vehicleRegNo"
+          size="small"
+          columns={registerCols}
+          scroll={{ x: 900 }}
+          pagination={{ pageSize: 15, showTotal: t => `${t} vehicles` }}
+          rowClassName={(row: VehiclePerRow) =>
+            filterReg === row.vehicleRegNo ? 'ant-table-row-selected' : ''}
+        />
+      </Card>
+
+      {/* ── History (all or per-vehicle) ─────────────────────────────────────── */}
+      <Card
+        title={filterReg
+          ? `Maintenance History — ${filterReg}`
+          : 'Recent Maintenance Records'}
+        size="small"
+        extra={filterReg
+          ? <Button size="small" onClick={() => setFilterReg(undefined)}>Clear Filter</Button>
+          : <Text type="secondary">Click "History" on a vehicle above to filter</Text>}
+      >
+        <Table
+          dataSource={history}
+          rowKey="requestNumber"
+          size="small"
+          columns={historyCols}
+          scroll={{ x: 1000 }}
+          pagination={{ pageSize: 10, showTotal: t => `${t} records` }}
+        />
+      </Card>
     </div>
   );
 }
@@ -668,6 +985,18 @@ function FacilityReportTab({ period }: { period: ReportPeriod }) {
 
   return (
     <div>
+      {/* ── Export toolbar ─────────────────────────────────────────────────── */}
+      <Row justify="end" style={{ marginBottom: 12 }}>
+        <Dropdown menu={{ items: [
+          { key: 'fac-excel', label: 'Export Register (Excel)', icon: <DownloadOutlined />,
+            onClick: () => exportFacilityMaintenance({ format: 'excel' }) },
+          { key: 'fac-pdf',   label: 'Export Register (PDF)',   icon: <DownloadOutlined />,
+            onClick: () => exportFacilityMaintenance({ format: 'pdf' }) },
+        ] }}>
+          <Button icon={<DownloadOutlined />}>Export Register</Button>
+        </Dropdown>
+      </Row>
+
       <Row gutter={12} style={{ marginBottom: 20 }}>
         {[
           { label: 'Total',           value: r.total          as number, color: '#1677ff' },
@@ -704,7 +1033,7 @@ function FacilityReportTab({ period }: { period: ReportPeriod }) {
             <ResponsiveContainer>
               <PieChart>
                 <Pie data={(r.byEndUser as PeriodBreakdownItem[] ?? [])} dataKey="count" nameKey="label"
-                  cx="50%" cy="50%" outerRadius={80} label={({ label, percent }) => `${label} ${((percent ?? 0)*100).toFixed(0)}%`}>
+                  cx="50%" cy="50%" outerRadius={80} label={({ percent }: { name?: string; percent?: number }) => `${((percent ?? 0)*100).toFixed(0)}%`}>
                   {(r.byEndUser as PeriodBreakdownItem[] ?? []).map((_: PeriodBreakdownItem, i: number) =>
                     <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
                 </Pie>

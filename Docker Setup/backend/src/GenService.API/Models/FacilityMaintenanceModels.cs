@@ -14,10 +14,27 @@ public record CreateFacilityMaintenanceRequest(
 public record ApproveFacilityRequest(string? Notes);
 public record RejectFacilityRequest(string Reason);
 
+/// <summary>Record fault assessment after site inspection</summary>
+public record FacilityAssessmentRequest(
+    string?  FaultIdentified,
+    string?  ProposedSolution,
+    string?  ResolutionType,       // Internal | Outsourced
+    bool     PartsRequired,
+    string?  PartsSource,          // StoreInventory | NewPurchase
+    string?  ProcurementMethod,    // PO | CashAdvance
+    decimal? SparesCostNaira
+);
+
 public record CompleteFacilityRequest(
-    string  WorkDone,
-    string? ActionedBy,
-    string? Notes
+    string   WorkDone,
+    string?  ActionedBy,
+    decimal? SparesCostNaira = null,
+    string?  Notes           = null
+);
+
+public record FacilityHandoverRequest(
+    string    HandedOverBy,
+    DateTime? DateHandedOver = null
 );
 
 public record FacilityQuery(
@@ -46,10 +63,24 @@ public record FacilityMaintenanceDto(
     string?   ApprovedByName,
     DateTime? ApprovedAt,
     string?   RejectionReason,
+    // Assessment
+    string?   FaultIdentified,
+    string?   ProposedSolution,
+    string?   ResolutionType,
+    // Parts
+    bool      PartsRequired,
+    string?   PartsSource,
+    string?   ProcurementMethod,
+    decimal?  SparesCostNaira,
+    // Completion
     string?   WorkDone,
     string?   ActionedBy,
-    string?   Notes,
     DateTime? CompletedAt,
+    // Handover
+    bool      HandoverConfirmed,
+    DateTime? DateHandedOver,
+    string?   HandedOverBy,
+    string?   Notes,
     DateTime  CreatedAt,
     DateTime  UpdatedAt,
     int       DaysOpen

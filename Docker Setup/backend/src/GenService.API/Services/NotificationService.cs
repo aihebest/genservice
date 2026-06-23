@@ -159,4 +159,108 @@ public class NotificationService(
             entityId:   entityId,
             refNumber:  refNumber,
             targetRole: NotificationTarget.Management);
+
+    // ── Maintenance Reminder wrappers ─────────────────────────────────────────
+
+    public async Task MaintenanceDueSoonAsync(
+        Guid    scheduleId,
+        string  taskName,
+        string  location,
+        string  category,
+        DateTime dueAt,
+        int      daysLeft,
+        string?  assignedToEmail,
+        string?  assignedToName)
+    {
+        var dueStr  = dueAt.ToString("d MMM yyyy");
+        var dayStr  = daysLeft == 1 ? "1 day" : $"{daysLeft} days";
+        var urgency = daysLeft <= 1 ? NotificationType.MaintenanceDueUrgent : NotificationType.MaintenanceDueSoon;
+        var title   = daysLeft <= 1
+            ? $"⚠️ Due TOMORROW: {taskName}"
+            : $"📅 Due in {dayStr}: {taskName}";
+
+        // In-app — notify management
+        await CreateAsync(
+            title:      title,
+            message:    $"{taskName} at {location} is due on {dueStr}.",
+            type:       urgency,
+            module:     "Maintenance",
+            entityId:   scheduleId.ToString(),
+            targetRole: NotificationTarget.Management);
+
+        // If assigned staff, send email reminder
+        if (!string.IsNullOrWhiteSpace(assignedToEmail) && !string.IsNullOrWhiteSpace(assignedToName))
+        {
+            await email.SendAsync(
+                toEmail:  assignedToEmail,
+                toName:   assignedToName,
+                subject:  $"[GenService] Maintenance Due Soon: {taskName}",
+                htmlBody: EmailTemplates.MaintenanceDueSoon(
+                    assignedToName, taskName, location, category, dueStr, dayStr));
+        }
+    }
+
+    public async Task MaintenanceEscalateToSupervisorAsync(
+        Guid    scheduleId,
+        string  taskName,
+        string  location,
+        string  category,
+        DateTime dueAt,
+        int      daysOverdue,
+        string?  supervisorEmail,
+        string?  supervisorName)
+    {
+        var dueStr     = dueAt.ToString("d MMM yyyy");
+        var overdueStr = daysOverdue == 1 ? "1 day" : $"{daysOverdue} days";
+
+        await CreateAsync(
+            title:      $"🚨 Overdue ({overdueStr}): {taskName}",
+            message:    $"Escalated to Supervisor — {taskName} at {location} was due {dueStr}.",
+            type:       NotificationType.MaintenanceEscalationSupervisor,
+            module:     "Maintenance",
+            entityId:   scheduleId.ToString(),
+            targetRole: NotificationTarget.Management);
+
+        if (!string.IsNullOrWhiteSpace(supervisorEmail) && !string.IsNullOrWhiteSpace(supervisorName))
+        {
+            await email.SendAsync(
+                toEmail:  supervisorEmail,
+                toName:   supervisorName,
+                subject:  $"[GenService] ESCALATION — Maintenance Overdue: {taskName}",
+                htmlBody: EmailTemplates.MaintenanceEscalation(
+                    supervisorName, taskName, location, category, dueStr, overdueStr, "Supervisor"));
+        }
+    }
+
+    public async Task MaintenanceEscalateToManagerAsync(
+        Guid    scheduleId,
+        string  taskName,
+        string  location,
+        string  category,
+        DateTime dueAt,
+        int      daysOverdue,
+        string?  managerEmail,
+        string?  managerName)
+    {
+        var dueStr     = dueAt.ToString("d MMM yyyy");
+        var overdueStr = daysOverdue == 1 ? "1 day" : $"{daysOverdue} days";
+
+        await CreateAsync(
+            title:      $"🆘 Manager Escalation ({overdueStr} overdue): {taskName}",
+            message:    $"Escalated to Department Manager — {taskName} at {location} was due {dueStr}.",
+            type:       NotificationType.MaintenanceEscalationManager,
+            module:     "Maintenance",
+            entityId:   scheduleId.ToString(),
+            targetRole: NotificationTarget.Management);
+
+        if (!string.IsNullOrWhiteSpace(managerEmail) && !string.IsNullOrWhiteSpace(managerName))
+        {
+            await email.SendAsync(
+                toEmail:  managerEmail,
+                toName:   managerName,
+                subject:  $"[GenService] MANAGER ESCALATION — Maintenance Critical: {taskName}",
+                htmlBody: EmailTemplates.MaintenanceEscalation(
+                    managerName, taskName, location, category, dueStr, overdueStr, "Department Manager"));
+        }
+    }
 }

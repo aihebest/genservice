@@ -22,3 +22,19 @@ body {
   min-height: 100vh;
   width: 100%;
 }
+
+/* ── Mobile responsiveness ────────────────────────────────────────────────── */
+
+/* Hide the hamburger menu button on desktop (≥769px) */
+@media (min-width: 769px) {
+  .mobile-menu-btn {
+    display: none !important;
+  }
+}
+
+/* On mobile: reduce the header padding so there's room for the hamburger */
+@media (max-width: 768px) {
+  .ant-layout-header {
+    padding: 0 12px !important;
+  }
+}

@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import {
   Alert, Badge, Button, Card, Col, Row, Select, Space,
-  Statistic, Table, Tag, Tooltip, Tabs, Typography,
+  Table, Tag, Tooltip, Tabs, Typography,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {

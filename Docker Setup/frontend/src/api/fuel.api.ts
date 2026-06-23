@@ -1,7 +1,7 @@
 import { apiClient } from './client';
 import type {
-  GeneratorLog, GeneratorLogListResponse, GeneratorStats,
-  DieselRecord, DieselRecordListResponse, DieselStats,
+  GeneratorLog, GeneratorLogListResponse,
+  DieselRecord, DieselRecordListResponse,
   FuelPowerSummary,
 } from '../types';
 

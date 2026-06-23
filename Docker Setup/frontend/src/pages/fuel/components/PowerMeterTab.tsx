@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import {
   Alert, Button, Col, Form, Input, InputNumber, Modal, Row,
-  Select, Statistic, Table, Tag, Tooltip, Typography,
+  Select, Statistic, Table, Tag, Typography,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { PlusOutlined, BulbOutlined } from '@ant-design/icons';
@@ -57,7 +57,7 @@ export default function PowerMeterTab() {
 
   const { data, isFetching } = useQuery({
     queryKey: ['power-meter', 'list', locationFilter, page],
-    queryFn: () => generatorMonitoringApi.listPowerReadings({ location: locationFilter, days: 60, page, pageSize: 20 }),
+    queryFn: () => generatorMonitoringApi.listPowerReadings({ location: locationFilter, days: 60, page }),
   });
 
   // Summary stats
@@ -178,7 +178,7 @@ export default function PowerMeterTab() {
                 tooltip="Enter tariff rate to auto-calculate daily electricity cost">
                 <InputNumber style={{ width: '100%' }} placeholder="e.g. 200" min={0}
                   formatter={v => `₦ ${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                  parser={(v) => v?.replace(/₦\s?|(,*)/g, '') as unknown as number} />
+                  parser={(v: string | undefined) => parseFloat(v?.replace(/₦\s?|(,*)/g, '') ?? '0') as 0} />
               </Form.Item>
             </Col>
           </Row>

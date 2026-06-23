@@ -30,6 +30,26 @@ public class MaintenanceSchedule
     public string?   LastCompletedByName  { get; set; }
     public string?   LastCompletionNotes  { get; set; }
 
+    // ── Reminder / escalation tracking ───────────────────────────────────
+    /// <summary>
+    /// 0 = no escalation sent yet.
+    /// 1 = Supervisor notified (overdue 1+ days).
+    /// 2 = Manager notified (overdue 3+ days).
+    /// Resets to 0 whenever the task is marked Complete.
+    /// </summary>
+    public int       EscalationLevel        { get; set; } = 0;
+
+    /// <summary>
+    /// When the last "due-soon" reminder notification was sent.
+    /// Used to prevent re-sending within the same reminder window.
+    /// </summary>
+    public DateTime? LastReminderSentAt     { get; set; }
+
+    /// <summary>
+    /// When the last escalation (overdue) notification was sent.
+    /// </summary>
+    public DateTime? LastEscalationSentAt   { get; set; }
+
     // ── Meta ──────────────────────────────────────────────────────────────
     public bool     IsActive  { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

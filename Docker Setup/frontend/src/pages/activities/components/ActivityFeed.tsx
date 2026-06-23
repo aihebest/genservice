@@ -1,5 +1,5 @@
 import { Avatar, Badge, Card, Space, Tag, Typography, Tooltip } from 'antd';
-import { UserOutlined, EnvironmentOutlined, TagOutlined } from '@ant-design/icons';
+import { EnvironmentOutlined, TagOutlined } from '@ant-design/icons';
 import type { StaffActivity } from '../../../types';
 import { ACTIVITY_STATUS_META, ACTIVITY_CATEGORY_META } from '../../../types';
 import dayjs from 'dayjs';

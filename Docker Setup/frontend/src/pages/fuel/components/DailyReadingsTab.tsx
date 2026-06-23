@@ -2,18 +2,19 @@ import { useState, useCallback } from 'react';
 import {
   Alert, Badge, Button, Col, Descriptions, Divider, Drawer, Form,
   Input, InputNumber, Modal, Progress, Row, Select, Space,
-  Statistic, Table, Tag, Tooltip, Typography,
+  Statistic, Table, Tag, Typography,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { PlusOutlined, WarningOutlined, CheckCircleOutlined, ThunderboltOutlined } from '@ant-design/icons';
+import { PlusOutlined, WarningOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { generatorMonitoringApi } from '../../../api/generatorMonitoring.api';
-import { GENERATOR_DAILY_STATUS_META, OFFICE_LOCATIONS, PRIORITY_META } from '../../../types';
+import { GENERATOR_DAILY_STATUS_META, OFFICE_LOCATIONS } from '../../../types';
 import type { GeneratorDailyReading, GeneratorDailyStatus } from '../../../types';
 
 dayjs.extend(relativeTime);
+
 const { Text } = Typography;
 const { TextArea } = Input;
 
@@ -79,7 +80,7 @@ export default function DailyReadingsTab() {
 
   const { data, isFetching } = useQuery({
     queryKey: ['gen-readings', 'list', locationFilter, page],
-    queryFn: () => generatorMonitoringApi.listReadings({ location: locationFilter, days: 60, page, pageSize: 20 }),
+    queryFn: () => generatorMonitoringApi.listReadings({ location: locationFilter, days: 60, page }),
   });
 
   const { data: summary } = useQuery({
@@ -326,7 +327,7 @@ export default function DailyReadingsTab() {
               <Descriptions.Item label="Utility Power">{selected.utilityAvailableHours} h available</Descriptions.Item>
             )}
           </Descriptions>
-          <Divider orientation="left" orientationMargin={0} style={{ fontSize: 12 }}>Service Status</Divider>
+          <Divider titlePlacement="left" orientationMargin={0} style={{ fontSize: 12 }}>Service Status</Divider>
           <Descriptions column={1} size="small" bordered>
             <Descriptions.Item label="Service Interval">{selected.serviceIntervalHours} hours</Descriptions.Item>
             {selected.lastServicedAtHours != null && (
@@ -339,10 +340,10 @@ export default function DailyReadingsTab() {
             </Descriptions.Item>
           </Descriptions>
           {selected.notes && <>
-            <Divider orientation="left" orientationMargin={0} style={{ fontSize: 12 }}>Notes</Divider>
+            <Divider titlePlacement="left" orientationMargin={0} style={{ fontSize: 12 }}>Notes</Divider>
             <Text type="secondary">{selected.notes}</Text>
           </>}
-          <Divider orientation="left" orientationMargin={0} style={{ fontSize: 12 }}>Logged By</Divider>
+          <Divider titlePlacement="left" orientationMargin={0} style={{ fontSize: 12 }}>Logged By</Divider>
           <Text>{selected.loggedByName} · {dayjs(selected.createdAt).fromNow()}</Text>
         </Drawer>
       )}

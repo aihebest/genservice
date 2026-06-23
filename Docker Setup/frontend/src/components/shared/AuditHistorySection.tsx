@@ -7,6 +7,7 @@ import { AUDIT_ACTION_META } from '../../types';
 import type { AuditEntry } from '../../types';
 
 dayjs.extend(relativeTime);
+
 const { Text } = Typography;
 
 interface Props {
@@ -25,7 +26,7 @@ export default function AuditHistorySection({ entityType, entityId }: Props) {
 
   return (
     <div style={{ marginTop: 8 }}>
-      <Divider orientation="left" orientationMargin={0} style={{ fontSize: 12 }}>
+      <Divider titlePlacement="left" orientationMargin={0} style={{ fontSize: 12 }}>
         Audit History
       </Divider>
 

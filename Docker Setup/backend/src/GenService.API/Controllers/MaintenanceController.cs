@@ -26,7 +26,8 @@ public class MaintenanceController(GenServiceDbContext db) : ControllerBase
         m.NextDueAt, m.LastCompletedAt, m.IsOverdue,
         m.AssignedToEmail, m.AssignedToName,
         m.LastCompletedByEmail, m.LastCompletedByName, m.LastCompletionNotes,
-        m.IsActive, m.CreatedAt, m.UpdatedAt
+        m.IsActive, m.CreatedAt, m.UpdatedAt,
+        m.EscalationLevel, m.LastReminderSentAt, m.LastEscalationSentAt
     );
 
     // ── GET /api/v1/maintenance ─────────────────────────────────────────────
@@ -156,7 +157,69 @@ public class MaintenanceController(GenServiceDbContext db) : ControllerBase
         m.LastCompletionNotes  = req.Notes;
         // Advance NextDueAt by the frequency
         m.NextDueAt  = DateTime.UtcNow.AddDays(m.FrequencyDays);
+        // Reset escalation state for the new cycle
+        m.EscalationLevel      = 0;
+        m.LastReminderSentAt   = null;
+        m.LastEscalationSentAt = null;
         m.UpdatedAt  = DateTime.UtcNow;
+
+        await db.SaveChangesAsync();
+        return Ok(ToDto(m));
+    }
+
+    // ── GET /api/v1/maintenance/upcoming ────────────────────────────────────
+    /// <summary>Returns tasks due within the next 30 days, ordered by NextDueAt.</summary>
+    [HttpGet("upcoming")]
+    public async Task<ActionResult<IEnumerable<ScheduleDto>>> Upcoming([FromQuery] int days = 30)
+    {
+        var cutoff = DateTime.UtcNow.AddDays(days);
+        var items  = await db.MaintenanceSchedules
+            .AsNoTracking()
+            .Where(m => m.IsActive && m.NextDueAt >= DateTime.UtcNow && m.NextDueAt <= cutoff)
+            .OrderBy(m => m.NextDueAt)
+            .Select(m => ToDto(m))
+            .ToListAsync();
+
+        return Ok(items);
+    }
+
+    // ── GET /api/v1/maintenance/escalations ─────────────────────────────────
+    /// <summary>Returns all tasks with EscalationLevel > 0 (currently escalated).</summary>
+    [HttpGet("escalations")]
+    [Authorize(Roles = "SystemAdmin,DepartmentManager,Supervisor")]
+    public async Task<ActionResult<IEnumerable<ScheduleDto>>> Escalations()
+    {
+        var items = await db.MaintenanceSchedules
+            .AsNoTracking()
+            .Where(m => m.IsActive && m.EscalationLevel > 0)
+            .OrderByDescending(m => m.EscalationLevel)
+            .ThenBy(m => m.NextDueAt)
+            .Select(m => ToDto(m))
+            .ToListAsync();
+
+        return Ok(items);
+    }
+
+    // ── POST /api/v1/maintenance/{id}/snooze-reminder ───────────────────────
+    /// <summary>
+    /// Snoozes the next automatic reminder for this task by advancing
+    /// LastReminderSentAt into the future, so the background service
+    /// won't re-send until the cooldown elapses.
+    /// </summary>
+    [HttpPost("{id:guid}/snooze-reminder")]
+    [Authorize(Roles = "SystemAdmin,DepartmentManager,Supervisor")]
+    public async Task<ActionResult<ScheduleDto>> SnoozeReminder(
+        Guid id, [FromBody] SnoozeReminderRequest req)
+    {
+        if (req.HoursToSnooze < 1 || req.HoursToSnooze > 168)
+            return BadRequest("Hours to snooze must be between 1 and 168 (7 days).");
+
+        var m = await db.MaintenanceSchedules.FirstOrDefaultAsync(x => x.Id == id);
+        if (m is null) return NotFound();
+
+        // Push LastReminderSentAt forward so the reminder won't fire for HoursToSnooze hours
+        m.LastReminderSentAt = DateTime.UtcNow.AddHours(req.HoursToSnooze - 23); // 23h cooldown
+        m.UpdatedAt          = DateTime.UtcNow;
 
         await db.SaveChangesAsync();
         return Ok(ToDto(m));
