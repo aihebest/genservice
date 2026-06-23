@@ -665,7 +665,7 @@ var app = builder.Build();
     try
     {
         const string prodEmail = "best.aihebholoria@desicongroup.com";
-        if (!await db.AppUsers.AnyAsync(u => u.Email.ToLower() == prodEmail))
+        if (!await db.AppUsers.AnyAsync(u => u.Email == prodEmail))
         {
             db.AppUsers.Add(new GenService.API.Domain.AppUser
             {

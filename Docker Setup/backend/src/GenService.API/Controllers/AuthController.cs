@@ -182,9 +182,18 @@ public class AuthController(
 
         email = email.Trim().ToLowerInvariant();
 
-        // Match to a platform user
-        var user = await db.AppUsers
-            .FirstOrDefaultAsync(u => u.Email.ToLower() == email && u.IsActive);
+        // Match to a platform user (SQL Server collation is case-insensitive so no .ToLower() needed on the DB side)
+        AppUser? user;
+        try
+        {
+            user = await db.AppUsers
+                .FirstOrDefaultAsync(u => u.Email == email && u.IsActive);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Entra login — DB lookup failed for {Email}", email);
+            return StatusCode(500, new { message = "Database error during sign-in. Please try again." });
+        }
 
         if (user is null)
         {
@@ -193,7 +202,8 @@ public class AuthController(
         }
 
         user.LastLoginAt = DateTime.UtcNow;
-        await db.SaveChangesAsync();
+        try { await db.SaveChangesAsync(); }
+        catch (Exception ex) { logger.LogWarning(ex, "Could not update LastLoginAt for {Email}", email); }
 
         var expiresAt = DateTime.UtcNow.AddHours(8);
         var token     = GenerateJwt(user.Email, user.FullName, user.Role, expiresAt);
