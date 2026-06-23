@@ -48,7 +48,7 @@ export default function LoginPage() {
       const axiosErr = err as { response?: { data?: { message?: string } }; code?: string };
       let msg: string;
       if (!axiosErr.response) {
-        msg = 'Cannot reach the API. Make sure Docker containers are running (docker compose up).';
+        msg = 'Cannot reach the API. The server may be starting up — please wait 30 seconds and try again.';
       } else if (axiosErr.response.data?.message) {
         msg = axiosErr.response.data.message;
       } else {
