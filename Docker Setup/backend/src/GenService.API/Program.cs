@@ -40,21 +40,28 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddAuthorization();
 
 // ── CORS ─────────────────────────────────────────────────────────────────────
-// Read configured origins (env var Cors__AllowedOrigins or appsettings Cors:AllowedOrigins).
-// As a hard safety net, we also allow any *.azurestaticapps.net subdomain and localhost
-// so the Azure SWA frontend can always reach the API regardless of config propagation.
+// Hardcoded production origin so this works even if Azure env-var mapping breaks.
+// WithOrigins() is simpler and more reliable than SetIsOriginAllowed() on Azure Linux.
+var hardcodedOrigins = new[]
+{
+    "https://nice-meadow-065144b03.7.azurestaticapps.net",  // Azure SWA production
+    "http://localhost:5173",                                  // Vite dev
+    "https://localhost:5173",
+    "http://localhost:3000",
+};
+// Also include anything in Cors:AllowedOrigins config (additive, not a replacement)
 var configuredOrigins = (builder.Configuration["Cors:AllowedOrigins"] ?? "")
-    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+var allCorsOrigins = hardcodedOrigins
+    .Concat(configuredOrigins)
+    .Where(o => !string.IsNullOrWhiteSpace(o))
+    .Distinct(StringComparer.OrdinalIgnoreCase)
+    .ToArray();
 
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AppPolicy", policy =>
-        policy.SetIsOriginAllowed(origin =>
-                  configuredOrigins.Contains(origin) ||
-                  origin.EndsWith(".azurestaticapps.net", StringComparison.OrdinalIgnoreCase) ||
-                  origin.StartsWith("http://localhost:", StringComparison.OrdinalIgnoreCase) ||
-                  origin.StartsWith("https://localhost:", StringComparison.OrdinalIgnoreCase))
+        policy.WithOrigins(allCorsOrigins)
               .AllowAnyMethod()
               .AllowAnyHeader());
 });
