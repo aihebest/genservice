@@ -40,13 +40,21 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddAuthorization();
 
 // ── CORS ─────────────────────────────────────────────────────────────────────
-var allowedOrigins = (builder.Configuration["Cors:AllowedOrigins"] ?? "http://localhost:5173")
-    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+// Read configured origins (env var Cors__AllowedOrigins or appsettings Cors:AllowedOrigins).
+// As a hard safety net, we also allow any *.azurestaticapps.net subdomain and localhost
+// so the Azure SWA frontend can always reach the API regardless of config propagation.
+var configuredOrigins = (builder.Configuration["Cors:AllowedOrigins"] ?? "")
+    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+    .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AppPolicy", policy =>
-        policy.WithOrigins(allowedOrigins)
+        policy.SetIsOriginAllowed(origin =>
+                  configuredOrigins.Contains(origin) ||
+                  origin.EndsWith(".azurestaticapps.net", StringComparison.OrdinalIgnoreCase) ||
+                  origin.StartsWith("http://localhost:", StringComparison.OrdinalIgnoreCase) ||
+                  origin.StartsWith("https://localhost:", StringComparison.OrdinalIgnoreCase))
               .AllowAnyMethod()
               .AllowAnyHeader());
 });
@@ -899,7 +907,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-app.MapHealthChecks("/health");
+app.MapHealthChecks("/health").RequireCors("AppPolicy");
 
 app.MapGet("/api/v1/ping", () => new
 {
