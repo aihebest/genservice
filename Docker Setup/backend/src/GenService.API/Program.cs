@@ -10,9 +10,17 @@ using System.Text;
 var builder = WebApplication.CreateBuilder(args);
 
 // ── Database ──────────────────────────────────────────────────────────────────
+// GetConnectionString reads the Azure "Connection strings" tab (SQLAZURECONNSTR_DefaultConnection).
+// Fallback to plain app setting "DefaultConnection" in case it was set in the "App settings" tab instead.
+var dbConnectionString =
+    builder.Configuration.GetConnectionString("DefaultConnection")          // Connection strings tab (SQLAzure)
+    ?? builder.Configuration["DefaultConnection"]                            // App settings tab (plain name)
+    ?? builder.Configuration["ConnectionStrings__DefaultConnection"]         // App settings tab (prefixed)
+    ?? builder.Configuration["SQLAZURECONNSTR_DefaultConnection"];           // raw env var
+
 builder.Services.AddDbContext<GenServiceDbContext>(options =>
     options.UseSqlServer(
-        builder.Configuration.GetConnectionString("DefaultConnection"),
+        dbConnectionString,
         sql => sql.EnableRetryOnFailure(5, TimeSpan.FromSeconds(10), null)));
 
 // ── Authentication — JWT Bearer ───────────────────────────────────────────────
