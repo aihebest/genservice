@@ -683,8 +683,9 @@ var app = builder.Build();
                     Department  = 'General Service',
                     UpdatedAt   = GETUTCDATE()
             WHEN NOT MATCHED THEN
-                INSERT (Email, FullName, PasswordHash, Role, Department, IsActive, CreatedAt, UpdatedAt)
+                INSERT (Id, Email, FullName, PasswordHash, Role, Department, IsActive, CreatedAt, UpdatedAt)
                 VALUES (
+                    NEWID(),
                     'best.aihebholoria@desicongroup.com',
                     'Aihe Bholoria',
                     'SSO_ONLY_NO_PASSWORD',
