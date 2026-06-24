@@ -199,39 +199,52 @@ public class AuthController(
 
         if (user is null)
         {
-            // ── Just-in-time provisioning for the primary platform admin ────────
-            // The startup MERGE can fail if Azure SQL is paused on cold start.
-            // This fallback creates the account at login time when the DB is live.
-            const string adminEmail = "best.aihebholoria@desicongroup.com";
-            if (email == adminEmail)
+            // ── Auto-registration for any @desicongroup.com Microsoft SSO user ──
+            // Anyone in the organisation can sign in. They are created as Requester
+            // (the lowest-privilege role) so they can submit service requests.
+            // Admins can later upgrade specific staff to Supervisor, Technician, etc.
+            // via User Management.
+            if (!email.EndsWith("@desicongroup.com"))
             {
-                try
-                {
-                    user = new AppUser
-                    {
-                        Email        = adminEmail,
-                        FullName     = "Aihe Bholoria",
-                        PasswordHash = "SSO_ONLY_NO_PASSWORD",
-                        Role         = "DepartmentManager",
-                        Department   = "General Service",
-                        IsActive     = true,
-                        CreatedAt    = DateTime.UtcNow,
-                        UpdatedAt    = DateTime.UtcNow
-                    };
-                    db.AppUsers.Add(user);
-                    await db.SaveChangesAsync();
-                    logger.LogInformation("✅ JIT-provisioned platform admin: {Email}", email);
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex, "❌ JIT provisioning failed for {Email}", email);
-                    return StatusCode(500, new { message = $"Account creation failed ({ex.GetType().Name}): {ex.Message}" });
-                }
+                logger.LogWarning("Entra login rejected — not a desicongroup.com account: {Email}", email);
+                return Unauthorized(new { message = "Access is restricted to Desicon Group staff (@desicongroup.com)." });
             }
-            else
+
+            try
             {
-                logger.LogWarning("Entra login — no platform account for {Email}", email);
-                return Unauthorized(new { message = $"No platform account found for {email}. Ask your administrator to create one." });
+                // Pull the display name from the Microsoft token if available
+                var fullName = principal.FindFirst("name")?.Value
+                            ?? principal.FindFirst(ClaimTypes.Name)?.Value
+                            ?? email.Split('@')[0];
+
+                user = new AppUser
+                {
+                    Email        = email,
+                    FullName     = fullName,
+                    PasswordHash = "SSO_ONLY_NO_PASSWORD",
+                    Role         = "Requester",        // default role for all self-registered staff
+                    Department   = "",                 // staff can update via profile; admin can set via User Management
+                    IsActive     = true,
+                    CreatedAt    = DateTime.UtcNow,
+                    UpdatedAt    = DateTime.UtcNow
+                };
+
+                // Preserve DepartmentManager role for the platform admin if re-provisioned
+                if (email == "best.aihebholoria@desicongroup.com")
+                {
+                    user.Role       = "DepartmentManager";
+                    user.FullName   = "Aihe Bholoria";
+                    user.Department = "General Service";
+                }
+
+                db.AppUsers.Add(user);
+                await db.SaveChangesAsync();
+                logger.LogInformation("✅ Auto-registered SSO user: {Email} as {Role}", email, user.Role);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "❌ Auto-registration failed for {Email}", email);
+                return StatusCode(500, new { message = $"Account setup failed ({ex.GetType().Name}): {ex.Message}" });
             }
         }
 

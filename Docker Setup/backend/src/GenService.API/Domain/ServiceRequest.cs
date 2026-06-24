@@ -28,6 +28,10 @@ public class ServiceRequest
     public string?   LineManagerName       { get; set; }
     public DateTime? LineManagerApprovedAt { get; set; }
 
+    // ── Email approval token (so line manager can approve without logging in) ──
+    public string?   LineManagerApprovalToken  { get; set; }  // GUID token sent in email
+    public DateTime? LineManagerTokenExpiry    { get; set; }  // valid for 72 hours
+
     // ── General Service approval (Stage 2) ───────────────────────────
     public string?   ApprovedByEmail  { get; set; }
     public string?   ApprovedByName   { get; set; }

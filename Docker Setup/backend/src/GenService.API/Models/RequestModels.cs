@@ -3,11 +3,14 @@ namespace GenService.API.Models;
 // ── Inbound ────────────────────────────────────────────────────────────────
 
 public record CreateRequestRequest(
-    string Title,
-    string Description,
-    string Category,
-    string Priority,
-    string Location
+    string  Title,
+    string  Description,
+    string  Category,
+    string  Priority,
+    string  Location,
+    // Required for approval-needed categories so the email approval link can be sent
+    string? LineManagerEmail = null,
+    string? LineManagerName  = null
 );
 
 public record UpdateStatusRequest(string Status, string? Notes);

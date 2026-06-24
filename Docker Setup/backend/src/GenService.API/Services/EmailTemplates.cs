@@ -89,6 +89,71 @@ public static class EmailTemplates
             <p style="color:#333;">This issue has been escalated to you because it remains unresolved. Please ensure this is actioned immediately and mark it as complete in the platform once done.</p>
             """);
 
+    /// <summary>
+    /// Email sent to the line manager asking them to approve or reject a request.
+    /// approveUrl and rejectUrl are one-click token links — no login needed.
+    /// </summary>
+    public static string LineManagerApprovalRequest(
+        string managerName, string requesterName, string refNumber,
+        string category, string description, string location,
+        string approveUrl, string rejectUrl) =>
+        Wrap($"""
+            <h2 style="color:#1677ff;margin:0 0 16px;">📋 Approval Required — {refNumber}</h2>
+            <p style="color:#333;">Hi {managerName},</p>
+            <p style="color:#333;">
+              <strong>{requesterName}</strong> has submitted a request that requires your approval
+              before it can be processed by the General Service team.
+            </p>
+            <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+              <tr><td style="padding:8px;background:#fafafa;width:140px;font-weight:600;color:#555;">Reference</td><td style="padding:8px;"><strong>{refNumber}</strong></td></tr>
+              <tr><td style="padding:8px;background:#fafafa;font-weight:600;color:#555;">Type</td><td style="padding:8px;">{category}</td></tr>
+              <tr><td style="padding:8px;background:#fafafa;font-weight:600;color:#555;">Location</td><td style="padding:8px;">{location}</td></tr>
+              <tr><td style="padding:8px;background:#fafafa;font-weight:600;color:#555;">Details</td><td style="padding:8px;">{description}</td></tr>
+            </table>
+            <p style="color:#333;">Please review and click one of the buttons below. <strong>No login is required.</strong></p>
+            <div style="margin:24px 0;text-align:center;">
+              <a href="{approveUrl}"
+                 style="display:inline-block;padding:12px 32px;background:#52c41a;color:#fff;text-decoration:none;
+                        border-radius:6px;font-size:16px;font-weight:700;margin-right:16px;">
+                ✅ Approve
+              </a>
+              <a href="{rejectUrl}"
+                 style="display:inline-block;padding:12px 32px;background:#ff4d4f;color:#fff;text-decoration:none;
+                        border-radius:6px;font-size:16px;font-weight:700;">
+                ❌ Reject
+              </a>
+            </div>
+            <p style="color:#aaa;font-size:12px;">
+              This approval link is valid for 72 hours. If you did not expect this email,
+              please contact the General Service team.
+            </p>
+            """);
+
+    public static string LineManagerApproved(string requesterName, string refNumber, string managerName) =>
+        Wrap($"""
+            <h2 style="color:#52c41a;margin:0 0 16px;">✅ Line Manager Approved — {refNumber}</h2>
+            <p style="color:#333;">Hi {requesterName},</p>
+            <p style="color:#333;">
+              Your request <strong>{refNumber}</strong> has been approved by your line manager
+              <strong>{managerName}</strong> and has been forwarded to the General Service team for final review.
+            </p>
+            <p style="color:#333;">You will receive another notification once the General Service team makes a final decision.</p>
+            """);
+
+    public static string LineManagerRejected(string requesterName, string refNumber, string managerName, string reason) =>
+        Wrap($"""
+            <h2 style="color:#ff4d4f;margin:0 0 16px;">❌ Request Declined by Line Manager — {refNumber}</h2>
+            <p style="color:#333;">Hi {requesterName},</p>
+            <p style="color:#333;">
+              Your request <strong>{refNumber}</strong> has been declined by your line manager
+              <strong>{managerName}</strong>.
+            </p>
+            <div style="background:#fff2f0;border:1px solid #ffccc7;border-radius:6px;padding:16px;margin:16px 0;">
+              <strong>Reason:</strong> {(string.IsNullOrWhiteSpace(reason) ? "No reason provided." : reason)}
+            </div>
+            <p style="color:#333;">If you believe this decision is incorrect, please speak with your line manager directly.</p>
+            """);
+
     public static string Submitted(string refNumber, string category, string location, string submittedBy) =>
         Wrap($"""
             <h2 style="color:#1677ff;margin:0 0 16px;">📋 New Request Submitted</h2>

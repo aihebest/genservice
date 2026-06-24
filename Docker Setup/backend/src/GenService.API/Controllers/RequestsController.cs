@@ -7,6 +7,7 @@ using static GenService.API.Domain.AuditAction;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
+using System.Text;
 
 namespace GenService.API.Controllers;
 
@@ -17,6 +18,8 @@ public class RequestsController(
     GenServiceDbContext db,
     NotificationService notifications,
     AuditService audit,
+    IEmailService email,
+    IConfiguration config,
     ILogger<RequestsController> logger) : ControllerBase
 {
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -123,6 +126,14 @@ public class RequestsController(
             ? RequestStatus.PendingLineManager
             : RequestStatus.Open;
 
+        // Validate line manager email for approval-required requests
+        if (requiresApproval && string.IsNullOrWhiteSpace(req.LineManagerEmail))
+            return BadRequest(new { message = "A line manager email is required for this request type." });
+
+        // Generate a one-time email approval token (valid 72 hours)
+        var approvalToken  = requiresApproval ? Guid.NewGuid().ToString("N") : null;
+        var tokenExpiry    = requiresApproval ? DateTime.UtcNow.AddHours(72) : (DateTime?)null;
+
         var ticket = new ServiceRequest
         {
             Id               = Guid.NewGuid(),
@@ -136,6 +147,10 @@ public class RequestsController(
             Location         = req.Location?.Trim() ?? "",
             RequestedByEmail = CallerEmail,
             RequestedByName  = CallerName,
+            LineManagerEmail = req.LineManagerEmail?.Trim().ToLowerInvariant(),
+            LineManagerName  = req.LineManagerName?.Trim(),
+            LineManagerApprovalToken = approvalToken,
+            LineManagerTokenExpiry   = tokenExpiry,
             CreatedAt        = DateTime.UtcNow,
             UpdatedAt        = DateTime.UtcNow,
         };
@@ -150,7 +165,25 @@ public class RequestsController(
         await audit.LogCreatedAsync("Request", ticket.Id.ToString(), ticket.TicketNumber,
             CallerEmail, CallerName, $"Category: {ticket.Category}, Priority: {ticket.Priority}");
 
-        // Fire notification to management
+        // ── Send line-manager approval email ─────────────────────────────────
+        if (requiresApproval && !string.IsNullOrEmpty(approvalToken) && !string.IsNullOrEmpty(ticket.LineManagerEmail))
+        {
+            var baseUrl    = config["App:BaseUrl"] ?? "https://genservice-desicon.azurewebsites.net";
+            var approveUrl = $"{baseUrl}/api/v1/requests/{ticket.Id}/email-approve?token={approvalToken}";
+            var rejectUrl  = $"{baseUrl}/api/v1/requests/{ticket.Id}/email-reject?token={approvalToken}";
+
+            await email.SendAsync(
+                ticket.LineManagerEmail,
+                ticket.LineManagerName ?? ticket.LineManagerEmail,
+                $"[Action Required] Approval needed: {ticket.TicketNumber}",
+                EmailTemplates.LineManagerApprovalRequest(
+                    ticket.LineManagerName ?? ticket.LineManagerEmail,
+                    CallerName, ticket.TicketNumber,
+                    ticket.Category, ticket.Description, ticket.Location,
+                    approveUrl, rejectUrl));
+        }
+
+        // In-platform notification to management
         await notifications.RequestSubmittedAsync(
             ticket.TicketNumber, ticket.Id.ToString(),
             ticket.Category, CallerName, ticket.Location);
@@ -389,5 +422,132 @@ public class RequestsController(
 
         await db.SaveChangesAsync();
         return Ok(ToDto(r));
+    }
+
+    // ── GET /api/v1/requests/{id}/email-approve?token=xxx ───────────────────
+    // One-click link sent to line manager. No login required.
+    [HttpGet("{id:guid}/email-approve")]
+    [AllowAnonymous]
+    public async Task<ContentResult> EmailApprove(Guid id, [FromQuery] string token)
+    {
+        var (html, _) = await ProcessEmailToken(id, token, approve: true, reason: null);
+        return Content(html, "text/html");
+    }
+
+    // ── GET /api/v1/requests/{id}/email-reject?token=xxx&reason=... ─────────
+    // One-click link sent to line manager. No login required.
+    [HttpGet("{id:guid}/email-reject")]
+    [AllowAnonymous]
+    public async Task<ContentResult> EmailReject(
+        Guid id, [FromQuery] string token, [FromQuery] string? reason)
+    {
+        var (html, _) = await ProcessEmailToken(id, token, approve: false, reason: reason);
+        return Content(html, "text/html");
+    }
+
+    // ── Shared token validation + status update logic ────────────────────────
+    private async Task<(string html, bool ok)> ProcessEmailToken(
+        Guid id, string token, bool approve, string? reason)
+    {
+        static string Page(string color, string icon, string heading, string body) => $"""
+            <!DOCTYPE html>
+            <html lang="en">
+            <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+            <title>GenService — {heading}</title>
+            <style>
+              body{{font-family:Arial,sans-serif;display:flex;justify-content:center;align-items:center;
+                    min-height:100vh;margin:0;background:#f0f2f5;}}
+              .card{{background:#fff;border-radius:12px;padding:40px;max-width:480px;width:90%;
+                     text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.1);}}
+              h2{{color:{color};margin:0 0 16px;}}
+              p{{color:#555;line-height:1.6;}}
+              .badge{{display:inline-block;padding:6px 16px;background:{color};color:#fff;
+                      border-radius:20px;font-size:13px;margin-top:16px;}}
+            </style></head>
+            <body><div class="card">
+              <div style="font-size:48px;margin-bottom:16px;">{icon}</div>
+              <h2>{heading}</h2>
+              {body}
+              <div class="badge">Desicon Group · GenService Platform</div>
+            </div></body></html>
+            """;
+
+        if (string.IsNullOrWhiteSpace(token))
+            return (Page("#ff4d4f", "❌", "Invalid Link", "<p>This approval link is missing a token.</p>"), false);
+
+        var r = await db.ServiceRequests.FindAsync(id);
+        if (r is null)
+            return (Page("#ff4d4f", "❌", "Not Found", "<p>This request could not be found.</p>"), false);
+
+        if (r.LineManagerApprovalToken != token)
+            return (Page("#ff4d4f", "❌", "Invalid Token", "<p>This approval link is not valid for this request.</p>"), false);
+
+        if (r.LineManagerTokenExpiry.HasValue && r.LineManagerTokenExpiry < DateTime.UtcNow)
+            return (Page("#fa8c16", "⏰", "Link Expired", "<p>This approval link has expired (72-hour limit). Please contact the requester to generate a new request.</p>"), false);
+
+        if (r.Status != RequestStatus.PendingLineManager)
+        {
+            var msg = r.Status == RequestStatus.Rejected
+                ? "This request has already been rejected."
+                : "This request has already been acted upon.";
+            return (Page("#1677ff", "ℹ️", "Already Processed", $"<p>{msg}</p>"), true);
+        }
+
+        var managerName = r.LineManagerName ?? r.LineManagerEmail ?? "Line Manager";
+
+        if (approve)
+        {
+            r.LineManagerApprovedAt = DateTime.UtcNow;
+            r.Status                = RequestStatus.PendingApproval;
+            r.UpdatedAt             = DateTime.UtcNow;
+            // Invalidate token after use
+            r.LineManagerApprovalToken = null;
+
+            await db.SaveChangesAsync();
+
+            // Notify the requester
+            await email.SendAsync(
+                r.RequestedByEmail, r.RequestedByName,
+                $"[GenService] Your request {r.TicketNumber} has been approved by your line manager",
+                EmailTemplates.LineManagerApproved(r.RequestedByName, r.TicketNumber, managerName));
+
+            // Notify GS management via in-platform notification
+            await notifications.RequestLineManagerApprovedAsync(
+                r.TicketNumber, r.Id.ToString(), managerName,
+                r.RequestedByEmail, r.RequestedByName);
+
+            logger.LogInformation("Request {Ticket} approved by line manager via email token", r.TicketNumber);
+
+            return (Page("#52c41a", "✅", "Request Approved",
+                $"<p>You have <strong>approved</strong> request <strong>{r.TicketNumber}</strong>.</p>" +
+                $"<p>The request has been forwarded to the General Service team for final review.</p>" +
+                $"<p>The requester ({r.RequestedByName}) has been notified.</p>"), true);
+        }
+        else
+        {
+            var rejectionReason = string.IsNullOrWhiteSpace(reason) ? "Declined by line manager." : reason;
+            r.Status              = RequestStatus.Rejected;
+            r.RejectionReason     = rejectionReason;
+            r.UpdatedAt           = DateTime.UtcNow;
+            r.LineManagerApprovalToken = null;
+
+            await db.SaveChangesAsync();
+
+            // Notify the requester
+            await email.SendAsync(
+                r.RequestedByEmail, r.RequestedByName,
+                $"[GenService] Your request {r.TicketNumber} was declined",
+                EmailTemplates.LineManagerRejected(r.RequestedByName, r.TicketNumber, managerName, rejectionReason));
+
+            await notifications.RequestLineManagerRejectedAsync(
+                r.TicketNumber, r.Id.ToString(), managerName,
+                rejectionReason, r.RequestedByEmail, r.RequestedByName);
+
+            logger.LogInformation("Request {Ticket} rejected by line manager via email token", r.TicketNumber);
+
+            return (Page("#ff4d4f", "❌", "Request Declined",
+                $"<p>You have <strong>declined</strong> request <strong>{r.TicketNumber}</strong>.</p>" +
+                $"<p>The requester ({r.RequestedByName}) has been notified.</p>"), true);
+        }
     }
 }

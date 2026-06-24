@@ -1092,6 +1092,10 @@ static async Task ApplySchemaUpdatesAsync(
             AddColIfMissing("AppUsers", "LastLoginAt",    "datetime2"),
             AddColIfMissing("AppUsers", "CreatedByEmail", "nvarchar(150)"),
 
+            // ── ServiceRequests — email-based approval token columns ─────────────
+            AddColIfMissing("ServiceRequests", "LineManagerApprovalToken", "nvarchar(100)"),
+            AddColIfMissing("ServiceRequests", "LineManagerTokenExpiry",   "datetime2"),
+
             // ── AppUsers (new table) ─────────────────────────────────────────
             """
             IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = N'AppUsers')

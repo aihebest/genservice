@@ -88,11 +88,13 @@ export interface ServiceRequest {
 }
 
 export interface CreateRequestDto {
-  title:       string;
-  description: string;
-  category:    RequestCategory;
-  priority:    RequestPriority;
-  location:    string;
+  title:             string;
+  description:       string;
+  category:          RequestCategory;
+  priority:          RequestPriority;
+  location:          string;
+  lineManagerEmail?: string;  // required when category requires approval
+  lineManagerName?:  string;
 }
 
 export interface RequestListResponse {

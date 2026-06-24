@@ -12,19 +12,31 @@ public class SmtpEmailService(IConfiguration config, ILogger<SmtpEmailService> l
 {
     public async Task SendAsync(string toEmail, string toName, string subject, string htmlBody)
     {
-        var host     = config["Email:Host"]     ?? "mailhog";
-        var port     = int.Parse(config["Email:Port"] ?? "1025");
-        var fromAddr = config["Email:From"]     ?? "noreply@genservice.local";
+        var host     = config["Email:Host"]     ?? "";
+        var port     = int.Parse(config["Email:Port"] ?? "587");
+        var fromAddr = config["Email:From"]     ?? "";
         var fromName = config["Email:FromName"] ?? "GenService Platform";
+        var user     = config["Email:User"]     ?? "";
+        var password = config["Email:Password"] ?? "";
+        var enableSsl= bool.Parse(config["Email:EnableSsl"] ?? "true");
+
+        // If no SMTP host is configured, log and skip (non-fatal)
+        if (string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(fromAddr))
+        {
+            log.LogWarning("📧 Email NOT sent (no SMTP configured). To: {Email} | Subject: {Subject}", toEmail, subject);
+            return;
+        }
 
         try
         {
             using var client = new SmtpClient(host, port)
             {
-                EnableSsl            = false,
+                EnableSsl            = enableSsl,
                 DeliveryMethod       = SmtpDeliveryMethod.Network,
                 UseDefaultCredentials= false,
-                Credentials          = new NetworkCredential("", ""),
+                Credentials          = string.IsNullOrWhiteSpace(user)
+                    ? null
+                    : new NetworkCredential(user, password),
             };
 
             using var msg = new MailMessage

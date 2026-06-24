@@ -29,11 +29,13 @@ export default function NewRequestModal({ open, onClose, onCreated }: Props) {
         : values.locationSelect;
 
       await requestsApi.create({
-        title:       values.title,
-        description: values.description,
-        category:    values.category,
-        priority:    values.priority,
+        title:             values.title,
+        description:       values.description,
+        category:          values.category,
+        priority:          values.priority,
         location,
+        lineManagerEmail:  values.lineManagerEmail,
+        lineManagerName:   values.lineManagerName,
       });
       form.resetFields();
       setSelectedCat(null);
@@ -150,6 +152,37 @@ export default function NewRequestModal({ open, onClose, onCreated }: Props) {
             }))
           } />
         </Form.Item>
+
+        {/* ── Line manager fields — only for approval-required categories ── */}
+        {needsApproval && (
+          <>
+            <Form.Item
+              name="lineManagerName"
+              label="Your Line Manager's Name"
+              rules={[{ required: true, message: "Enter your line manager's name" }]}
+            >
+              <Input placeholder="e.g. John Adebayo" />
+            </Form.Item>
+
+            <Form.Item
+              name="lineManagerEmail"
+              label="Your Line Manager's Email"
+              rules={[
+                { required: true, message: "Enter your line manager's work email" },
+                { type: 'email', message: 'Enter a valid email address' },
+              ]}
+            >
+              <Input placeholder="e.g. j.adebayo@desicongroup.com" />
+            </Form.Item>
+
+            <Alert
+              type="info"
+              showIcon
+              style={{ marginBottom: 8 }}
+              message="Your line manager will receive an email with Approve / Reject buttons. They do not need to log into the platform."
+            />
+          </>
+        )}
 
       </Form>
     </Modal>
