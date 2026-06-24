@@ -1077,6 +1077,10 @@ static async Task ApplySchemaUpdatesAsync(
                 CREATE UNIQUE INDEX IX_DailyParameterLogs_Location_LogDate ON DailyParameterLogs (Location, LogDate);
             """,
 
+            // ── AppUsers — ensure nullable columns added after initial create ──
+            AddColIfMissing("AppUsers", "LastLoginAt",    "datetime2"),
+            AddColIfMissing("AppUsers", "CreatedByEmail", "nvarchar(150)"),
+
             // ── AppUsers (new table) ─────────────────────────────────────────
             """
             IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = N'AppUsers')

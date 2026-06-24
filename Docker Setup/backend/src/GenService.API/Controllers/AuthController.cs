@@ -193,7 +193,8 @@ public class AuthController(
         catch (Exception ex)
         {
             logger.LogError(ex, "Entra login — DB lookup failed for {Email}", email);
-            return StatusCode(500, new { message = "Database error during sign-in. Please try again." });
+            // Temporarily expose exception type and message for diagnostics — remove before go-live
+            return StatusCode(500, new { message = $"DB error ({ex.GetType().Name}): {ex.Message}" });
         }
 
         if (user is null)
