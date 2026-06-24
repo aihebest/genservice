@@ -199,8 +199,40 @@ public class AuthController(
 
         if (user is null)
         {
-            logger.LogWarning("Entra login — no platform account for {Email}", email);
-            return Unauthorized(new { message = $"No platform account found for {email}. Ask your administrator to create one." });
+            // ── Just-in-time provisioning for the primary platform admin ────────
+            // The startup MERGE can fail if Azure SQL is paused on cold start.
+            // This fallback creates the account at login time when the DB is live.
+            const string adminEmail = "best.aihebholoria@desicongroup.com";
+            if (email == adminEmail)
+            {
+                try
+                {
+                    user = new AppUser
+                    {
+                        Email        = adminEmail,
+                        FullName     = "Aihe Bholoria",
+                        PasswordHash = "SSO_ONLY_NO_PASSWORD",
+                        Role         = "DepartmentManager",
+                        Department   = "General Service",
+                        IsActive     = true,
+                        CreatedAt    = DateTime.UtcNow,
+                        UpdatedAt    = DateTime.UtcNow
+                    };
+                    db.AppUsers.Add(user);
+                    await db.SaveChangesAsync();
+                    logger.LogInformation("✅ JIT-provisioned platform admin: {Email}", email);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "❌ JIT provisioning failed for {Email}", email);
+                    return StatusCode(500, new { message = $"Account creation failed ({ex.GetType().Name}): {ex.Message}" });
+                }
+            }
+            else
+            {
+                logger.LogWarning("Entra login — no platform account for {Email}", email);
+                return Unauthorized(new { message = $"No platform account found for {email}. Ask your administrator to create one." });
+            }
         }
 
         user.LastLoginAt = DateTime.UtcNow;
