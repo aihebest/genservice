@@ -449,26 +449,27 @@ public class RequestsController(
     private async Task<(string html, bool ok)> ProcessEmailToken(
         Guid id, string token, bool approve, string? reason)
     {
-        static string Page(string color, string icon, string heading, string body) => $"""
+        // $$""" = double-dollar raw string: {{expr}} is interpolation, single { is literal CSS brace
+        static string Page(string color, string icon, string heading, string body) => $$"""
             <!DOCTYPE html>
             <html lang="en">
             <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-            <title>GenService — {heading}</title>
+            <title>GenService &#8212; {{heading}}</title>
             <style>
-              body{{font-family:Arial,sans-serif;display:flex;justify-content:center;align-items:center;
-                    min-height:100vh;margin:0;background:#f0f2f5;}}
-              .card{{background:#fff;border-radius:12px;padding:40px;max-width:480px;width:90%;
-                     text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.1);}}
-              h2{{color:{color};margin:0 0 16px;}}
-              p{{color:#555;line-height:1.6;}}
-              .badge{{display:inline-block;padding:6px 16px;background:{color};color:#fff;
-                      border-radius:20px;font-size:13px;margin-top:16px;}}
+              body{font-family:Arial,sans-serif;display:flex;justify-content:center;align-items:center;
+                    min-height:100vh;margin:0;background:#f0f2f5;}
+              .card{background:#fff;border-radius:12px;padding:40px;max-width:480px;width:90%;
+                     text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.1);}
+              h2{color:{{color}};margin:0 0 16px;}
+              p{color:#555;line-height:1.6;}
+              .badge{display:inline-block;padding:6px 16px;background:{{color}};color:#fff;
+                      border-radius:20px;font-size:13px;margin-top:16px;}
             </style></head>
             <body><div class="card">
-              <div style="font-size:48px;margin-bottom:16px;">{icon}</div>
-              <h2>{heading}</h2>
-              {body}
-              <div class="badge">Desicon Group · GenService Platform</div>
+              <div style="font-size:48px;margin-bottom:16px;">{{icon}}</div>
+              <h2>{{heading}}</h2>
+              {{body}}
+              <div class="badge">Desicon Group &middot; GenService Platform</div>
             </div></body></html>
             """;
 
