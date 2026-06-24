@@ -668,34 +668,36 @@ var app = builder.Build();
     catch (Exception ex) { log.LogError(ex, "❌ Seed failed: AppUsers"); }
 
     // ── Ensure production Microsoft SSO user always exists ───────────────────
-    // This runs unconditionally so the real production account is always present
-    // even after demo data was seeded first.
+    // Uses raw SQL MERGE so it runs fast on cold start (no BCrypt), is idempotent,
+    // and repairs the row if it was accidentally deactivated or role-changed.
     try
     {
-        const string prodEmail = "best.aihebholoria@desicongroup.com";
-        if (!await db.AppUsers.AnyAsync(u => u.Email == prodEmail))
-        {
-            db.AppUsers.Add(new GenService.API.Domain.AppUser
-            {
-                Email        = prodEmail,
-                FullName     = "Aihe Bholoria",
-                // Password hash is a random guid — production login uses Microsoft SSO only
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString(), 11),
-                Role         = "DepartmentManager",
-                Department   = "General Service",
-                IsActive     = true,
-                CreatedAt    = DateTime.UtcNow,
-                UpdatedAt    = DateTime.UtcNow
-            });
-            await db.SaveChangesAsync();
-            log.LogInformation("✅ Production user created: {Email}", prodEmail);
-        }
-        else
-        {
-            log.LogInformation("ℹ️ Production user already exists: {Email}", prodEmail);
-        }
+        await db.Database.ExecuteSqlRawAsync(@"
+            MERGE AppUsers AS target
+            USING (SELECT 'best.aihebholoria@desicongroup.com' AS Email) AS source
+                ON target.Email = source.Email
+            WHEN MATCHED THEN
+                UPDATE SET
+                    IsActive    = 1,
+                    Role        = 'DepartmentManager',
+                    Department  = 'General Service',
+                    UpdatedAt   = GETUTCDATE()
+            WHEN NOT MATCHED THEN
+                INSERT (Email, FullName, PasswordHash, Role, Department, IsActive, CreatedAt, UpdatedAt)
+                VALUES (
+                    'best.aihebholoria@desicongroup.com',
+                    'Aihe Bholoria',
+                    'SSO_ONLY_NO_PASSWORD',
+                    'DepartmentManager',
+                    'General Service',
+                    1,
+                    GETUTCDATE(),
+                    GETUTCDATE()
+                );
+        ");
+        log.LogInformation("✅ Production user upserted: best.aihebholoria@desicongroup.com");
     }
-    catch (Exception ex) { log.LogError(ex, "❌ Failed to ensure production user"); }
+    catch (Exception ex) { log.LogError(ex, "❌ Failed to upsert production user"); }
 
     // ── Seed store items ─────────────────────────────────────────────────────
     try
