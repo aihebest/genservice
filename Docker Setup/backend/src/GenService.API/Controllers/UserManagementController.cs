@@ -32,7 +32,8 @@ public class UserManagementController(
     private bool HasManagementAccess =>
         CallerRole == "SystemAdmin" || CallerRole == "DepartmentManager";
 
-    private IActionResult ManagementForbidden() =>
+    // ObjectResult is implicitly convertible to ActionResult<T>, IActionResult is not
+    private ObjectResult ManagementForbidden() =>
         StatusCode(StatusCodes.Status403Forbidden,
             new { message = $"Access restricted to SystemAdmin and DepartmentManager. Your role: '{CallerRole}'" });
 
