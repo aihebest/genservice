@@ -12,6 +12,8 @@
 #  Required GitHub Variables (Settings → Variables → Actions):
 #    AZURE_WEBAPP_NAME               — genservice-desicon
 #    VITE_API_URL                    — https://genservice-desicon.azurewebsites.net
+#    VITE_ENTRA_CLIENT_ID            — d1e4eeaa-1fb5-450d-a73f-410ad68f8efa  (App registration Client ID)
+#    VITE_ENTRA_TENANT_ID            — your-tenant-id  (Azure AD Tenant ID)
 # =============================================================================
 
 name: Deploy to Azure
@@ -84,7 +86,9 @@ jobs:
       - name: Build frontend
         working-directory: Docker Setup/frontend
         env:
-          VITE_API_URL: ${{ vars.VITE_API_URL }}
+          VITE_API_URL:          ${{ vars.VITE_API_URL }}
+          VITE_ENTRA_CLIENT_ID:  ${{ vars.VITE_ENTRA_CLIENT_ID }}
+          VITE_ENTRA_TENANT_ID:  ${{ vars.VITE_ENTRA_TENANT_ID }}
         run: npm run build
 
       - name: Deploy to Azure Static Web Apps
