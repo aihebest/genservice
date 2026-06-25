@@ -44,9 +44,10 @@ public class UserManagementController(
         if (!string.IsNullOrWhiteSpace(q.Search))
         {
             var s = q.Search.ToLower();
+            // SQL Server CI_AS collation handles case-insensitive search — no .ToLower() on DB columns
             query = query.Where(u =>
-                u.Email.ToLower().Contains(s) ||
-                u.FullName.ToLower().Contains(s));
+                u.Email.Contains(s) ||
+                u.FullName.Contains(s));
         }
 
         var total = await query.CountAsync();
@@ -101,7 +102,8 @@ public class UserManagementController(
             return BadRequest(new { message = "Password must be at least 8 characters." });
 
         var email = req.Email.Trim().ToLowerInvariant();
-        if (await db.AppUsers.AnyAsync(u => u.Email.ToLower() == email))
+        // SQL Server collation is case-insensitive — no .ToLower() needed on DB side (EF Core 8 can't translate it)
+        if (await db.AppUsers.AnyAsync(u => u.Email == email))
             return Conflict(new { message = $"A user with email '{email}' already exists." });
 
         var user = new AppUser
@@ -218,7 +220,7 @@ public class UserManagementController(
     public async Task<IActionResult> ChangeMyPassword([FromBody] ChangePasswordRequest req)
     {
         var email = CallerEmail;
-        var u     = await db.AppUsers.FirstOrDefaultAsync(x => x.Email.ToLower() == email.ToLower());
+        var u     = await db.AppUsers.FirstOrDefaultAsync(x => x.Email == email);
         if (u is null) return NotFound();
 
         if (!BCrypt.Net.BCrypt.Verify(req.CurrentPassword, u.PasswordHash))
