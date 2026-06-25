@@ -8,7 +8,7 @@ import type {
   ResetPasswordResponse,
 } from '../types';
 
-const BASE = '/api/v1/users';
+const BASE = '/users';
 
 export interface UserListQuery {
   role?:      string;
