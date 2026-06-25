@@ -14,7 +14,7 @@ namespace GenService.API.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/v1/users")]
-[Authorize(Roles = "SystemAdmin")]
+[Authorize(Roles = "SystemAdmin,DepartmentManager")]
 public class UserManagementController(
     GenServiceDbContext db,
     ILogger<UserManagementController> logger) : ControllerBase
