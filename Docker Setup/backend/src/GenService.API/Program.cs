@@ -56,7 +56,8 @@ builder.Services.AddAuthorization();
 // WithOrigins() is simpler and more reliable than SetIsOriginAllowed() on Azure Linux.
 var hardcodedOrigins = new[]
 {
-    "https://nice-meadow-065144b03.7.azurestaticapps.net",  // Azure SWA production
+    "https://genservice.desiconapp.com",                     // Custom domain (primary)
+    "https://nice-meadow-065144b03.7.azurestaticapps.net",  // Azure SWA fallback
     "http://localhost:5173",                                  // Vite dev
     "https://localhost:5173",
     "http://localhost:3000",
