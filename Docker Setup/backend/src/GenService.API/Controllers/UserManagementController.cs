@@ -9,17 +9,32 @@ using System.Security.Claims;
 namespace GenService.API.Controllers;
 
 /// <summary>
-/// User management — SystemAdmin only.
+/// User management — SystemAdmin or DepartmentManager only.
 /// Provides full CRUD over AppUsers plus deactivate/activate and password reset.
 /// </summary>
 [ApiController]
 [Route("api/v1/users")]
-[Authorize(Roles = "SystemAdmin,DepartmentManager")]
+[Authorize]   // [Authorize(Roles=...)] breaks in .NET 8 due to JsonWebTokenHandler claim-type mapping;
+              // role is checked manually via HasManagementAccess below.
 public class UserManagementController(
     GenServiceDbContext db,
     ILogger<UserManagementController> logger) : ControllerBase
 {
     private string CallerEmail => User.FindFirstValue(ClaimTypes.Email) ?? "";
+
+    // .NET 8 JsonWebTokenHandler stores JWT "role" claim with key "role" (short),
+    // whereas ClaimTypes.Role is the long URN. We check both to cover all cases.
+    private string CallerRole =>
+        User.FindFirstValue("role") ??
+        User.FindFirstValue(ClaimTypes.Role) ??
+        "";
+
+    private bool HasManagementAccess =>
+        CallerRole == "SystemAdmin" || CallerRole == "DepartmentManager";
+
+    private IActionResult ManagementForbidden() =>
+        StatusCode(StatusCodes.Status403Forbidden,
+            new { message = $"Access restricted to SystemAdmin and DepartmentManager. Your role: '{CallerRole}'" });
 
     private static AppUserDto ToDto(AppUser u) => new(
         u.Id, u.Email, u.FullName, u.Role, u.Department,
@@ -30,6 +45,7 @@ public class UserManagementController(
     [HttpGet]
     public async Task<ActionResult<UserListResponse>> List([FromQuery] UserListQuery q)
     {
+        if (!HasManagementAccess) return ManagementForbidden();
         var query = db.AppUsers.AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(q.Role))
@@ -65,6 +81,7 @@ public class UserManagementController(
     [HttpGet("summary")]
     public async Task<IActionResult> Summary()
     {
+        if (!HasManagementAccess) return ManagementForbidden();
         var all = await db.AppUsers.AsNoTracking().ToListAsync();
         return Ok(new
         {
@@ -82,6 +99,7 @@ public class UserManagementController(
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<AppUserDto>> GetById(Guid id)
     {
+        if (!HasManagementAccess) return ManagementForbidden();
         var u = await db.AppUsers.FindAsync(id);
         if (u is null) return NotFound();
         return Ok(ToDto(u));
@@ -91,6 +109,7 @@ public class UserManagementController(
     [HttpPost]
     public async Task<ActionResult<AppUserDto>> Create([FromBody] CreateUserRequest req)
     {
+        if (!HasManagementAccess) return ManagementForbidden();
         // Validation
         if (string.IsNullOrWhiteSpace(req.Email))
             return BadRequest(new { message = "Email is required." });
@@ -139,6 +158,7 @@ public class UserManagementController(
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<AppUserDto>> Update(Guid id, [FromBody] UpdateUserRequest req)
     {
+        if (!HasManagementAccess) return ManagementForbidden();
         var u = await db.AppUsers.FindAsync(id);
         if (u is null) return NotFound();
 
@@ -162,6 +182,7 @@ public class UserManagementController(
     [HttpPost("{id:guid}/deactivate")]
     public async Task<ActionResult<AppUserDto>> Deactivate(Guid id)
     {
+        if (!HasManagementAccess) return ManagementForbidden();
         var u = await db.AppUsers.FindAsync(id);
         if (u is null) return NotFound();
 
@@ -181,6 +202,7 @@ public class UserManagementController(
     [HttpPost("{id:guid}/activate")]
     public async Task<ActionResult<AppUserDto>> Activate(Guid id)
     {
+        if (!HasManagementAccess) return ManagementForbidden();
         var u = await db.AppUsers.FindAsync(id);
         if (u is null) return NotFound();
 
@@ -201,6 +223,7 @@ public class UserManagementController(
     [HttpPost("{id:guid}/reset-password")]
     public async Task<ActionResult<ResetPasswordResponse>> ResetPassword(Guid id)
     {
+        if (!HasManagementAccess) return ManagementForbidden();
         var u = await db.AppUsers.FindAsync(id);
         if (u is null) return NotFound();
 
@@ -249,6 +272,7 @@ public class UserManagementController(
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id)
     {
+        if (!HasManagementAccess) return ManagementForbidden();
         var u = await db.AppUsers.FindAsync(id);
         if (u is null) return NotFound();
 
