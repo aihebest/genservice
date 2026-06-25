@@ -106,24 +106,33 @@ public class UserManagementController(
         if (await db.AppUsers.AnyAsync(u => u.Email == email))
             return Conflict(new { message = $"A user with email '{email}' already exists." });
 
-        var user = new AppUser
+        try
         {
-            Email          = email,
-            FullName       = req.FullName.Trim(),
-            PasswordHash   = BCrypt.Net.BCrypt.HashPassword(req.Password, workFactor: 11),
-            Role           = req.Role,
-            Department     = req.Department.Trim(),
-            IsActive       = true,
-            CreatedByEmail = CallerEmail,
-            CreatedAt      = DateTime.UtcNow,
-            UpdatedAt      = DateTime.UtcNow,
-        };
+            var user = new AppUser
+            {
+                Email          = email,
+                FullName       = req.FullName.Trim(),
+                PasswordHash   = BCrypt.Net.BCrypt.HashPassword(req.Password, workFactor: 10),
+                Role           = req.Role,
+                Department     = req.Department?.Trim() ?? "",
+                IsActive       = true,
+                CreatedByEmail = CallerEmail,
+                CreatedAt      = DateTime.UtcNow,
+                UpdatedAt      = DateTime.UtcNow,
+            };
 
-        db.AppUsers.Add(user);
-        await db.SaveChangesAsync();
+            db.AppUsers.Add(user);
+            await db.SaveChangesAsync();
 
-        logger.LogInformation("User {Email} created by {Admin}", user.Email, CallerEmail);
-        return CreatedAtAction(nameof(GetById), new { id = user.Id }, ToDto(user));
+            logger.LogInformation("User {Email} created by {Admin}", user.Email, CallerEmail);
+            return CreatedAtAction(nameof(GetById), new { id = user.Id }, ToDto(user));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to create user {Email}", email);
+            // Diagnostic — expose error type so we can see what's failing
+            return StatusCode(500, new { message = $"Create failed ({ex.GetType().Name}): {ex.Message}" });
+        }
     }
 
     // ── PUT /api/v1/users/{id} ────────────────────────────────────────────────
