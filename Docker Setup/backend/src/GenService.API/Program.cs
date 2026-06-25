@@ -41,7 +41,11 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidIssuer              = jwtIssuer,
             ValidAudience            = jwtAudience,
             IssuerSigningKey         = signingKey,
-            ClockSkew                = TimeSpan.Zero
+            ClockSkew                = TimeSpan.Zero,
+            // .NET 8 uses JsonWebTokenHandler which does NOT remap "role" → ClaimTypes.Role.
+            // Explicitly set RoleClaimType so [Authorize(Roles = "...")] matches the JWT "role" claim.
+            RoleClaimType            = "role",
+            NameClaimType            = "name",
         };
     });
 
