@@ -193,8 +193,7 @@ public class AuthController(
         catch (Exception ex)
         {
             logger.LogError(ex, "Entra login — DB lookup failed for {Email}", email);
-            // Temporarily expose exception type and message for diagnostics — remove before go-live
-            return StatusCode(500, new { message = $"DB error ({ex.GetType().Name}): {ex.Message}" });
+            return StatusCode(500, new { message = "A server error occurred during sign-in. Please try again." });
         }
 
         if (user is null)
@@ -244,7 +243,7 @@ public class AuthController(
             catch (Exception ex)
             {
                 logger.LogError(ex, "❌ Auto-registration failed for {Email}", email);
-                return StatusCode(500, new { message = $"Account setup failed ({ex.GetType().Name}): {ex.Message}" });
+                return StatusCode(500, new { message = "Account setup failed. Please try signing in again or contact your administrator." });
             }
         }
 

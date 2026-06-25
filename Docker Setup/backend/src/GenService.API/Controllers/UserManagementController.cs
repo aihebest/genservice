@@ -35,7 +35,7 @@ public class UserManagementController(
     // ObjectResult is implicitly convertible to ActionResult<T>, IActionResult is not
     private ObjectResult ManagementForbidden() =>
         StatusCode(StatusCodes.Status403Forbidden,
-            new { message = $"Access restricted to SystemAdmin and DepartmentManager. Your role: '{CallerRole}'" });
+            new { message = "You do not have permission to access User Management." });
 
     private static AppUserDto ToDto(AppUser u) => new(
         u.Id, u.Email, u.FullName, u.Role, u.Department,
@@ -150,8 +150,7 @@ public class UserManagementController(
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to create user {Email}", email);
-            // Diagnostic — expose error type so we can see what's failing
-            return StatusCode(500, new { message = $"Create failed ({ex.GetType().Name}): {ex.Message}" });
+            return StatusCode(500, new { message = "An error occurred while creating the user. Please try again." });
         }
     }
 
