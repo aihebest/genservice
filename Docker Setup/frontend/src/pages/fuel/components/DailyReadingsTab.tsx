@@ -271,7 +271,7 @@ export default function DailyReadingsTab() {
               <Input placeholder="Enter location…" />
             </Form.Item>
           )}
-          <Divider orientation="left" orientationMargin={0} style={{ fontSize: 12 }}>
+          <Divider titlePlacement="left" orientationMargin={0} style={{ fontSize: 12 }}>
             Engine Run Hours (24 h)
           </Divider>
           <Row gutter={12}>
@@ -293,7 +293,7 @@ export default function DailyReadingsTab() {
             </Text>
           )}
 
-          <Divider orientation="left" orientationMargin={0} style={{ fontSize: 12 }}>
+          <Divider titlePlacement="left" orientationMargin={0} style={{ fontSize: 12 }}>
             Fuel Consumption
           </Divider>
           <Row gutter={12}>
@@ -315,7 +315,7 @@ export default function DailyReadingsTab() {
             </Text>
           )}
 
-          <Divider orientation="left" orientationMargin={0} style={{ fontSize: 12 }}>
+          <Divider titlePlacement="left" orientationMargin={0} style={{ fontSize: 12 }}>
             Utility (NEPA) Power — hour meter
           </Divider>
           <Row gutter={12}>
@@ -337,7 +337,7 @@ export default function DailyReadingsTab() {
             </Text>
           )}
 
-          <Divider orientation="left" orientationMargin={0} style={{ fontSize: 12 }}>
+          <Divider titlePlacement="left" orientationMargin={0} style={{ fontSize: 12 }}>
             Service Interval (every 250 h)
           </Divider>
           <Row gutter={12} align="middle">
