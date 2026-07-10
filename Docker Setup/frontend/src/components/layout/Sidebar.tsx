@@ -14,6 +14,10 @@ import {
   UserOutlined,
   ShopOutlined,
   BellOutlined,
+  BulbOutlined,
+  PlaySquareOutlined,
+  SafetyCertificateOutlined,
+  DropboxOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '../../store/authStore';
 import type { UserRole } from '../../types';
@@ -32,6 +36,10 @@ const NAV_ITEMS: NavItem[] = [
   { key: '/activities', label: 'Team Activities',             icon: <TeamOutlined />,         roles: ['SystemAdmin', 'DepartmentManager', 'Supervisor', 'Technician'] },
   { key: '/maintenance',label: 'Maintenance',                 icon: <ToolOutlined />,         roles: ['SystemAdmin', 'DepartmentManager', 'Supervisor', 'Technician'] },
   { key: '/fuel',       label: 'Fuel & Power',                icon: <ThunderboltOutlined />,  roles: ['SystemAdmin', 'DepartmentManager', 'Supervisor', 'Driver'] },
+  { key: '/electricity',label: 'Electricity',                 icon: <BulbOutlined />,         roles: ['SystemAdmin', 'DepartmentManager', 'Supervisor'] },
+  { key: '/dstv',       label: 'DStv Subscriptions',          icon: <PlaySquareOutlined />,   roles: ['SystemAdmin', 'DepartmentManager', 'Supervisor'] },
+  { key: '/vehicle-registry', label: 'Vehicle Registry',      icon: <SafetyCertificateOutlined />, roles: ['SystemAdmin', 'DepartmentManager', 'Supervisor'] },
+  { key: '/diesel-supply', label: 'Diesel Supply',            icon: <DropboxOutlined />,      roles: ['SystemAdmin', 'DepartmentManager', 'Supervisor'] },
   { key: '/daily-log',  label: 'Daily Parameter Log',         icon: <FileTextOutlined />,     roles: ['SystemAdmin', 'DepartmentManager', 'Supervisor', 'Technician', 'Driver'] },
   { key: '/store',      label: 'Store Management',            icon: <ShopOutlined />,         roles: ['SystemAdmin', 'DepartmentManager', 'Supervisor', 'StoreOfficer', 'Technician', 'Driver', 'Requester'] },
   { key: '/users',      label: 'User Management',             icon: <UserOutlined />,         roles: ['SystemAdmin', 'DepartmentManager'] },

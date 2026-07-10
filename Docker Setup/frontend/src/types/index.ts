@@ -178,25 +178,32 @@ export const GENERATOR_DAILY_STATUS_META: Record<GeneratorDailyStatus, { label: 
 };
 
 export interface GeneratorDailyReading {
-  id:                   string;
-  assetNo:              string;
-  assetDescription:     string;
-  location:             string;
-  readingDate:          string;
-  cumulativeRunHours:   number;
-  runHoursToday:        number;
-  generatorStatus:      GeneratorDailyStatus;
-  fuelLevelLitres:      number;
-  fuelConsumedLitres?:  number;
-  utilityAvailableHours?:number;
-  serviceIntervalHours: number;
-  lastServicedAtHours?: number;
-  serviceAlertActive:   boolean;
-  hoursUntilNextService:number;
-  notes?:               string;
-  loggedByEmail:        string;
-  loggedByName:         string;
-  createdAt:            string;
+  id:                     string;
+  assetNo:                string;
+  assetDescription:       string;
+  location:               string;
+  readingDate:            string;
+  previousEngineReading:  number;
+  currentEngineReading:   number;
+  cumulativeRunHours:     number;
+  runHoursToday:          number;
+  generatorStatus:        GeneratorDailyStatus;
+  previousFuelLevelLitres:number;
+  fuelLevelLitres:        number;
+  fuelConsumedLitres?:    number;
+  previousUtilityReading?:number;
+  currentUtilityReading?: number;
+  utilityAvailableHours?: number;
+  serviceIntervalHours:   number;
+  remainingServiceHours:  number;
+  serviceCompleted:       boolean;
+  lastServicedAtHours?:   number;
+  serviceAlertActive:     boolean;
+  hoursUntilNextService:  number;
+  notes?:                 string;
+  loggedByEmail:          string;
+  loggedByName:           string;
+  createdAt:              string;
 }
 
 export interface GeneratorSummary {
@@ -1398,4 +1405,223 @@ export interface DispenseDieselPayload {
   tankLevelBeforeLitres:   number;
   unitCostPerLitreNaira:   number;
   notes?:                  string;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Electricity Management (PHED + Prepaid)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export const ELECTRICITY_LOCATIONS = [
+  'WOJI', 'DGS', 'OFFICE', 'DR', 'UYO – Chairman', 'UYO – MD',
+] as const;
+
+export const ELECTRICITY_TYPES = ['PHED', 'Prepaid'] as const;
+export type ElectricityType = typeof ELECTRICITY_TYPES[number];
+
+export type ElectricityStatus = 'Active' | 'LowBalance' | 'Depleted';
+
+export const ELECTRICITY_STATUS_META: Record<ElectricityStatus, { label: string; color: string }> = {
+  Active:     { label: 'Active',      color: 'green'  },
+  LowBalance: { label: 'Low Balance', color: 'orange' },
+  Depleted:   { label: 'Depleted',    color: 'red'    },
+};
+
+export interface ElectricityPurchase {
+  id:                     string;
+  purchaseType:           ElectricityType;
+  location:               string;
+  purchaseDate:           string;
+  vendor?:                string;
+  amountNaira:            number;
+  unitsKwh:               number;
+  paymentReference?:      string;
+  tokenNumber?:           string;
+  meterReadingKwh?:       number;
+  receiptAttachment?:     string;
+  lowBalanceThresholdKwh: number;
+  balanceAfterKwh:        number;
+  status:                 ElectricityStatus;
+  notes?:                 string;
+  loggedByEmail:          string;
+  loggedByName:           string;
+  createdAt:              string;
+}
+
+export interface ElectricityBalance {
+  location:               string;
+  balanceKwh:             number;
+  lowBalanceThresholdKwh: number;
+  status:                 ElectricityStatus;
+  totalSpendNaira:        number;
+  totalUnitsPurchased:    number;
+  lastPurchaseDate?:      string;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  DStv Subscription Management
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export const DSTV_PACKAGES = [
+  'Premium', 'Compact Plus', 'Compact', 'Confam', 'Yanga', 'Padi', 'Great Wall Standalone',
+] as const;
+
+export type DstvStatus = 'Active' | 'ExpiringSoon' | 'Expired';
+
+export const DSTV_STATUS_META: Record<DstvStatus, { label: string; color: string }> = {
+  Active:       { label: 'Active',        color: 'green'  },
+  ExpiringSoon: { label: 'Expiring Soon', color: 'orange' },
+  Expired:      { label: 'Expired',       color: 'red'    },
+};
+
+export interface DstvSubscription {
+  id:                string;
+  decoderNumber:     string;
+  location:          string;
+  package:           string;
+  startDate:         string;
+  durationMonths:    number;
+  expiryDate:        string;
+  daysToExpiry:      number;
+  amountNaira:       number;
+  paymentMethod?:    string;
+  vendor?:           string;
+  receiptAttachment?:string;
+  status:            DstvStatus;
+  notes?:            string;
+  loggedByEmail:     string;
+  loggedByName:      string;
+  createdAt:         string;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Vehicle Registry & Statutory Documents
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export const VEHICLE_OPERATIONAL_STATUSES = ['Active', 'InWorkshop', 'Grounded', 'Disposed'] as const;
+export type VehicleOperationalStatus = typeof VEHICLE_OPERATIONAL_STATUSES[number];
+
+export const VEHICLE_OPERATIONAL_STATUS_META: Record<VehicleOperationalStatus, { label: string; color: string }> = {
+  Active:     { label: 'Active',      color: 'green'  },
+  InWorkshop: { label: 'In Workshop', color: 'blue'   },
+  Grounded:   { label: 'Grounded',    color: 'orange' },
+  Disposed:   { label: 'Disposed',    color: 'default'},
+};
+
+export const VEHICLE_DOCUMENT_TYPES = [
+  'VehicleLicence', 'RoadWorthiness', 'Insurance', 'HackneyPermit', 'HeavyDutyPermit',
+] as const;
+export type VehicleDocumentType = typeof VEHICLE_DOCUMENT_TYPES[number];
+
+export const VEHICLE_DOCUMENT_TYPE_META: Record<VehicleDocumentType, { label: string }> = {
+  VehicleLicence:  { label: 'Vehicle Licence'          },
+  RoadWorthiness:  { label: 'Road Worthiness'          },
+  Insurance:       { label: 'Insurance'                },
+  HackneyPermit:   { label: 'Hackney Carriage Permit'  },
+  HeavyDutyPermit: { label: 'Heavy Duty Permit'        },
+};
+
+export type VehicleDocumentStatus = 'Valid' | 'Expiring' | 'Expired';
+
+export const VEHICLE_DOCUMENT_STATUS_META: Record<VehicleDocumentStatus, { label: string; color: string }> = {
+  Valid:    { label: 'Valid',    color: 'green'  },
+  Expiring: { label: 'Expiring', color: 'orange' },
+  Expired:  { label: 'Expired',  color: 'red'    },
+};
+
+export interface VehicleRegistryRecord {
+  id:                    string;
+  fleetNumber:           string;
+  registrationNumber:    string;
+  vehicleType:           string;
+  makeModel?:            string;
+  yearOfManufacture?:    number;
+  engineNumber?:         string;
+  chassisNumber?:        string;
+  colour?:               string;
+  assignedLocation?:     string;
+  assignedDriver?:       string;
+  acquisitionDate?:      string;
+  operationalStatus:     VehicleOperationalStatus;
+  notes?:                string;
+  documentCount:         number;
+  expiringDocumentCount: number;
+  expiredDocumentCount:  number;
+  loggedByEmail:         string;
+  loggedByName:          string;
+  createdAt:             string;
+}
+
+export interface VehicleDocument {
+  id:                string;
+  vehicleId:         string;
+  vehicleRegNo:      string;
+  documentType:      VehicleDocumentType;
+  issueDate:         string;
+  expiryDate:        string;
+  daysToExpiry:      number;
+  issuingAuthority?: string;
+  renewalCostNaira?: number;
+  receiptAttachment?:string;
+  status:            VehicleDocumentStatus;
+  notes?:            string;
+  loggedByEmail:     string;
+  loggedByName:      string;
+  createdAt:         string;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Diesel Supply & Distribution
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export const DIESEL_DISTRIBUTION_TYPES = ['Vehicle', 'Location'] as const;
+export type DieselDistributionType = typeof DIESEL_DISTRIBUTION_TYPES[number];
+
+export interface DieselSupply {
+  id:                        string;
+  supplyReference:           string;
+  supplyDate:                string;
+  vendor:                    string;
+  invoiceNumber?:            string;
+  quantityLitres:            number;
+  unitPriceNaira:            number;
+  totalCostNaira:            number;
+  storageLocation?:          string;
+  deliveryDocuments?:        string;
+  receivingOfficer?:         string;
+  quantityRemainingLitres:   number;
+  quantityDistributedLitres: number;
+  notes?:                    string;
+  loggedByEmail:             string;
+  loggedByName:              string;
+  createdAt:                 string;
+}
+
+export interface DieselDistribution {
+  id:                    string;
+  distributionReference: string;
+  distributionType:      DieselDistributionType;
+  bulkSupplyId:          string;
+  bulkSupplyReference:   string;
+  distributionDate:      string;
+  quantityLitres:        number;
+  purpose?:              string;
+  vehicleRegNo?:         string;
+  driver?:               string;
+  odometerReading?:      string;
+  destinationLocation?:  string;
+  issuingOfficer?:       string;
+  receivingOfficer?:     string;
+  recipientAcknowledged: boolean;
+  notes?:                string;
+  loggedByEmail:         string;
+  loggedByName:          string;
+  createdAt:             string;
+}
+
+export interface DieselStockSummary {
+  totalSuppliedLitres:     number;
+  totalDistributedLitres:  number;
+  availableBalanceLitres:  number;
+  totalPurchaseValueNaira: number;
+  activeSupplyBatches:     number;
 }

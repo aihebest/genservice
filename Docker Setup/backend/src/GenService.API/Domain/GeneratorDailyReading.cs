@@ -2,8 +2,15 @@ namespace GenService.API.Domain;
 
 /// <summary>
 /// Daily snapshot reading for each generator at each location.
-/// Records cumulative run hours, fuel level, and triggers service alerts.
+/// Records engine-hour meter readings, fuel level, utility (NEPA) availability,
+/// and a running "remaining hours to service" countdown that triggers service alerts.
 /// One record per generator per day.
+///
+/// Henry's spec (July 2026):
+///   • Run Hours (24h)   = CurrentEngineReading − PreviousEngineReading
+///   • Remaining Service = deducts daily run hours from a 250h interval, reset on service
+///   • Fuel Consumed     = PreviousFuelLevel − CurrentFuelLevel
+///   • Utility Available  = CurrentUtilityReading − PreviousUtilityReading (hour meter)
 /// </summary>
 public class GeneratorDailyReading
 {
@@ -17,31 +24,41 @@ public class GeneratorDailyReading
     // ── Reading date ──────────────────────────────────────────────────────────
     public DateTime ReadingDate { get; set; } = DateTime.UtcNow.Date;
 
-    // ── Generator run data ────────────────────────────────────────────────────
-    public double  CumulativeRunHours  { get; set; }     // meter reading at time of log
-    public double  RunHoursToday       { get; set; }     // hours run since last reading
-    public string  GeneratorStatus     { get; set; } = GeneratorDailyStatus.Standby;
+    // ── Generator engine-hour meter (Henry §1) ────────────────────────────────
+    public double  PreviousEngineReading { get; set; }     // previous engine-hour meter reading
+    public double  CurrentEngineReading  { get; set; }     // current engine-hour meter reading
+    public double  RunHoursToday         { get; set; }     // = Current − Previous (auto)
+    public double  CumulativeRunHours    { get; set; }     // = CurrentEngineReading (kept for reports)
+    public string  GeneratorStatus       { get; set; } = GeneratorDailyStatus.Standby;
 
-    // ── Fuel level ────────────────────────────────────────────────────────────
-    public double  FuelLevelLitres    { get; set; }      // current diesel level
-    public double? FuelConsumedLitres { get; set; }      // consumed since last reading
+    // ── Fuel level (Henry §3) ─────────────────────────────────────────────────
+    public double  PreviousFuelLevelLitres { get; set; }   // previous fuel level (L)
+    public double  FuelLevelLitres         { get; set; }   // current fuel level (L)
+    public double? FuelConsumedLitres      { get; set; }   // = Previous − Current (auto)
 
-    // ── Utility power ─────────────────────────────────────────────────────────
-    public double? UtilityAvailableHours { get; set; }   // hours utility (NPA) was available
+    // ── Utility (NEPA) power (Henry §4) ───────────────────────────────────────
+    public double? PreviousUtilityReading  { get; set; }   // previous utility hour-meter reading
+    public double? CurrentUtilityReading   { get; set; }   // current utility hour-meter reading
+    public double? UtilityAvailableHours   { get; set; }   // = Current − Previous (auto)
 
-    // ── Service alert ─────────────────────────────────────────────────────────
+    // ── Service interval & remaining-hours countdown (Henry §2) ───────────────
     public double  ServiceIntervalHours { get; set; } = 250;   // service every N hours
+    public double  RemainingServiceHours{ get; set; } = 250;   // running countdown, reset on service
+    public bool    ServiceCompleted     { get; set; } = false; // a service was recorded with this reading
     public double? LastServicedAtHours  { get; set; }          // cumulative hours at last service
-    public bool    ServiceAlertActive   { get; set; } = false;  // true when approaching threshold
+    public bool    ServiceAlertActive   { get; set; } = false; // true when RemainingServiceHours <= alert threshold
 
-    // ── Computed helper (not persisted) ──────────────────────────────────────
+    /// <summary>Threshold (hours remaining) at or below which a service alert is raised.</summary>
+    public const double ServiceAlertThresholdHours = 150;
+
+    // ── Computed helpers (not persisted) ──────────────────────────────────────
     public double HoursSinceLastService =>
         LastServicedAtHours.HasValue
             ? CumulativeRunHours - LastServicedAtHours.Value
             : CumulativeRunHours;
 
-    public double HoursUntilNextService =>
-        ServiceIntervalHours - (HoursSinceLastService % ServiceIntervalHours);
+    /// <summary>Alias kept for existing UI/reports — mirrors RemainingServiceHours.</summary>
+    public double HoursUntilNextService => RemainingServiceHours;
 
     public string? Notes { get; set; }
 

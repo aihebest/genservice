@@ -27,6 +27,12 @@ public class GenServiceDbContext(DbContextOptions<GenServiceDbContext> options)
     public DbSet<StoreRequisitionItem>         StoreRequisitionItems         => Set<StoreRequisitionItem>();
     public DbSet<StoreMovement>                StoreMovements                => Set<StoreMovement>();
     public DbSet<DieselRequisition>            DieselRequisitions            => Set<DieselRequisition>();
+    public DbSet<ElectricityPurchase>          ElectricityPurchases          => Set<ElectricityPurchase>();
+    public DbSet<DstvSubscription>             DstvSubscriptions             => Set<DstvSubscription>();
+    public DbSet<Vehicle>                      Vehicles                      => Set<Vehicle>();
+    public DbSet<VehicleDocument>              VehicleDocuments              => Set<VehicleDocument>();
+    public DbSet<DieselBulkSupply>             DieselBulkSupplies            => Set<DieselBulkSupply>();
+    public DbSet<DieselDistribution>           DieselDistributions           => Set<DieselDistribution>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -454,6 +460,123 @@ public class GenServiceDbContext(DbContextOptions<GenServiceDbContext> options)
             e.HasIndex(x => x.RequisitionNumber).IsUnique();
             e.HasIndex(x => x.Status);
             e.HasIndex(x => x.RequestedByEmail);
+        });
+
+        // ElectricityPurchase
+        mb.Entity<ElectricityPurchase>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.PurchaseType)     .HasMaxLength(20) .IsRequired();
+            e.Property(x => x.Location)         .HasMaxLength(100).IsRequired();
+            e.Property(x => x.Vendor)           .HasMaxLength(200);
+            e.Property(x => x.AmountNaira)       .HasColumnType("decimal(18,2)");
+            e.Property(x => x.PaymentReference) .HasMaxLength(100);
+            e.Property(x => x.TokenNumber)      .HasMaxLength(100);
+            e.Property(x => x.ReceiptAttachment).HasMaxLength(500);
+            e.Property(x => x.Status)           .HasMaxLength(20) .IsRequired();
+            e.Property(x => x.Notes)            .HasMaxLength(1000);
+            e.Property(x => x.LoggedByEmail)    .HasMaxLength(150).IsRequired();
+            e.Property(x => x.LoggedByName)     .HasMaxLength(100).IsRequired();
+            e.HasIndex(x => new { x.Location, x.PurchaseDate });
+        });
+
+        // DstvSubscription
+        mb.Entity<DstvSubscription>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.DecoderNumber)    .HasMaxLength(60) .IsRequired();
+            e.Property(x => x.Location)         .HasMaxLength(100).IsRequired();
+            e.Property(x => x.Package)          .HasMaxLength(80) .IsRequired();
+            e.Property(x => x.AmountNaira)       .HasColumnType("decimal(18,2)");
+            e.Property(x => x.PaymentMethod)    .HasMaxLength(50);
+            e.Property(x => x.Vendor)           .HasMaxLength(200);
+            e.Property(x => x.ReceiptAttachment).HasMaxLength(500);
+            e.Property(x => x.Status)           .HasMaxLength(20) .IsRequired();
+            e.Property(x => x.Notes)            .HasMaxLength(1000);
+            e.Property(x => x.LoggedByEmail)    .HasMaxLength(150).IsRequired();
+            e.Property(x => x.LoggedByName)     .HasMaxLength(100).IsRequired();
+            e.HasIndex(x => x.ExpiryDate);
+            e.HasIndex(x => new { x.Location, x.Status });
+        });
+
+        // Vehicle (master registry)
+        mb.Entity<Vehicle>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.FleetNumber)       .HasMaxLength(50) .IsRequired();
+            e.Property(x => x.RegistrationNumber).HasMaxLength(30) .IsRequired();
+            e.Property(x => x.VehicleType)       .HasMaxLength(80) .IsRequired();
+            e.Property(x => x.MakeModel)         .HasMaxLength(150);
+            e.Property(x => x.EngineNumber)      .HasMaxLength(80);
+            e.Property(x => x.ChassisNumber)     .HasMaxLength(80);
+            e.Property(x => x.Colour)            .HasMaxLength(50);
+            e.Property(x => x.AssignedLocation)  .HasMaxLength(200);
+            e.Property(x => x.AssignedDriver)    .HasMaxLength(150);
+            e.Property(x => x.OperationalStatus) .HasMaxLength(20) .IsRequired();
+            e.Property(x => x.Notes)             .HasMaxLength(1000);
+            e.Property(x => x.LoggedByEmail)     .HasMaxLength(150).IsRequired();
+            e.Property(x => x.LoggedByName)      .HasMaxLength(100).IsRequired();
+            e.HasIndex(x => x.RegistrationNumber).IsUnique();
+            e.HasIndex(x => x.OperationalStatus);
+        });
+
+        // VehicleDocument
+        mb.Entity<VehicleDocument>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.VehicleRegNo)     .HasMaxLength(30) .IsRequired();
+            e.Property(x => x.DocumentType)     .HasMaxLength(40) .IsRequired();
+            e.Property(x => x.IssuingAuthority) .HasMaxLength(200);
+            e.Property(x => x.RenewalCostNaira) .HasColumnType("decimal(18,2)");
+            e.Property(x => x.ReceiptAttachment).HasMaxLength(500);
+            e.Property(x => x.Status)           .HasMaxLength(20) .IsRequired();
+            e.Property(x => x.Notes)            .HasMaxLength(1000);
+            e.Property(x => x.LoggedByEmail)    .HasMaxLength(150).IsRequired();
+            e.Property(x => x.LoggedByName)     .HasMaxLength(100).IsRequired();
+            e.HasIndex(x => x.VehicleId);
+            e.HasIndex(x => x.ExpiryDate);
+            e.HasIndex(x => new { x.DocumentType, x.Status });
+        });
+
+        // DieselBulkSupply
+        mb.Entity<DieselBulkSupply>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.SupplyReference)  .HasMaxLength(20) .IsRequired();
+            e.Property(x => x.Vendor)           .HasMaxLength(200).IsRequired();
+            e.Property(x => x.InvoiceNumber)    .HasMaxLength(80);
+            e.Property(x => x.UnitPriceNaira)    .HasColumnType("decimal(18,4)");
+            e.Property(x => x.TotalCostNaira)    .HasColumnType("decimal(18,2)");
+            e.Property(x => x.StorageLocation)  .HasMaxLength(200);
+            e.Property(x => x.DeliveryDocuments).HasMaxLength(500);
+            e.Property(x => x.ReceivingOfficer) .HasMaxLength(150);
+            e.Property(x => x.Notes)            .HasMaxLength(1000);
+            e.Property(x => x.LoggedByEmail)    .HasMaxLength(150).IsRequired();
+            e.Property(x => x.LoggedByName)     .HasMaxLength(100).IsRequired();
+            e.HasIndex(x => x.SupplyReference).IsUnique();
+            e.HasIndex(x => x.SupplyDate);
+        });
+
+        // DieselDistribution
+        mb.Entity<DieselDistribution>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.DistributionReference).HasMaxLength(20) .IsRequired();
+            e.Property(x => x.DistributionType)     .HasMaxLength(20) .IsRequired();
+            e.Property(x => x.BulkSupplyReference)  .HasMaxLength(20) .IsRequired();
+            e.Property(x => x.Purpose)              .HasMaxLength(500);
+            e.Property(x => x.VehicleRegNo)         .HasMaxLength(30);
+            e.Property(x => x.Driver)               .HasMaxLength(150);
+            e.Property(x => x.OdometerReading)      .HasMaxLength(100);
+            e.Property(x => x.DestinationLocation)  .HasMaxLength(200);
+            e.Property(x => x.IssuingOfficer)       .HasMaxLength(150);
+            e.Property(x => x.ReceivingOfficer)     .HasMaxLength(150);
+            e.Property(x => x.Notes)                .HasMaxLength(1000);
+            e.Property(x => x.LoggedByEmail)        .HasMaxLength(150).IsRequired();
+            e.Property(x => x.LoggedByName)         .HasMaxLength(100).IsRequired();
+            e.HasIndex(x => x.DistributionReference).IsUnique();
+            e.HasIndex(x => x.BulkSupplyId);
+            e.HasIndex(x => x.DistributionDate);
         });
 
         // AuditEntry — immutable, never updated

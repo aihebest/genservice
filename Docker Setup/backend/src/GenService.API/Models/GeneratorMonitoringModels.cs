@@ -6,15 +6,17 @@ public record CreateGeneratorReadingRequest(
     string  AssetNo,
     string  AssetDescription,
     string  Location,
-    double  CumulativeRunHours,
-    double  RunHoursToday,
+    double  CurrentEngineReading,        // §1 current engine-hour meter reading (required)
     string  GeneratorStatus,
-    double  FuelLevelLitres,
-    double? FuelConsumedLitres,
-    double? UtilityAvailableHours,
-    double  ServiceIntervalHours,
-    double? LastServicedAtHours,
-    string? Notes
+    double  CurrentFuelLevelLitres,      // §3 current fuel level (required)
+    double? PreviousEngineReading  = null, // optional — auto-filled from last reading
+    double? PreviousFuelLevelLitres= null, // optional — auto-filled from last reading
+    double? PreviousUtilityReading = null, // §4 optional — auto-filled from last reading
+    double? CurrentUtilityReading  = null, // §4 current utility hour-meter reading
+    double  ServiceIntervalHours   = 250,
+    bool    ServiceCompleted       = false, // §2 tick when a service was carried out
+    double? LastServicedAtHours    = null,
+    string? Notes                  = null
 );
 
 public record GeneratorReadingDto(
@@ -23,13 +25,20 @@ public record GeneratorReadingDto(
     string    AssetDescription,
     string    Location,
     DateTime  ReadingDate,
+    double    PreviousEngineReading,
+    double    CurrentEngineReading,
     double    CumulativeRunHours,
     double    RunHoursToday,
     string    GeneratorStatus,
+    double    PreviousFuelLevelLitres,
     double    FuelLevelLitres,
     double?   FuelConsumedLitres,
+    double?   PreviousUtilityReading,
+    double?   CurrentUtilityReading,
     double?   UtilityAvailableHours,
     double    ServiceIntervalHours,
+    double    RemainingServiceHours,
+    bool      ServiceCompleted,
     double?   LastServicedAtHours,
     bool      ServiceAlertActive,
     double    HoursUntilNextService,

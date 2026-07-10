@@ -8,6 +8,7 @@ import {
   ReloadOutlined, CheckCircleOutlined, WarningOutlined,
   ClockCircleOutlined, FireOutlined, CarOutlined,
   HomeOutlined, TeamOutlined, BankOutlined,
+  BulbOutlined, PlaySquareOutlined, SafetyCertificateOutlined, DropboxOutlined,
 } from '@ant-design/icons';
 import {
   exportVehicleRegister,
@@ -636,6 +637,26 @@ export default function ReportsPage() {
             label:    <Space><BankOutlined />Accommodation</Space>,
             children: <AccommodationReportTab period={period} />,
           },
+          {
+            key:      'electricity',
+            label:    <Space><BulbOutlined />Electricity</Space>,
+            children: <ElectricityReportTab period={period} />,
+          },
+          {
+            key:      'dstv',
+            label:    <Space><PlaySquareOutlined />DStv</Space>,
+            children: <DstvReportTab />,
+          },
+          {
+            key:      'vehicle-docs',
+            label:    <Space><SafetyCertificateOutlined />Vehicle Documents</Space>,
+            children: <VehicleDocumentsReportTab />,
+          },
+          {
+            key:      'diesel-supply',
+            label:    <Space><DropboxOutlined />Diesel Supply</Space>,
+            children: <DieselSupplyReportTab period={period} />,
+          },
         ]}
         style={{ background: 'white', padding: '0 16px 16px', borderRadius: 8 }}
       />
@@ -1228,6 +1249,223 @@ function AccommodationReportTab({ period }: { period: ReportPeriod }) {
           <Text type="secondary">No accommodation requests in this period.</Text>
         )}
       </Card>
+    </div>
+  );
+}
+
+// ── Electricity Report (Obinna) ────────────────────────────────────────────────
+type ElecLocRow = { location: string; balanceKwh: number; status: string; spendNaira: number; unitsKwh: number };
+const elecStatusColor = (s: string) => s === 'Depleted' ? '#f5222d' : s === 'LowBalance' ? '#fa8c16' : '#52c41a';
+
+function ElectricityReportTab({ period }: { period: ReportPeriod }) {
+  const { data, isFetching } = useQuery({
+    queryKey: ['reports', 'electricity', period],
+    queryFn: () => reportsApi.electricity(period),
+  });
+  if (isFetching || !data) return <div style={{ padding: 32, textAlign: 'center' }}>Loading…</div>;
+  const r = data as Record<string, unknown>;
+  const byLocation = (r.byLocation as ElecLocRow[]) ?? [];
+
+  return (
+    <div>
+      <Row gutter={12} style={{ marginBottom: 16 }}>
+        {[
+          { label: `Purchases (${r.periodLabel})`, value: r.purchaseCount as number, color: '#1677ff', suffix: '' },
+          { label: 'Total Spend', value: `₦${Number(r.totalSpendNaira ?? 0).toLocaleString()}`, color: '#eb2f96', suffix: '' },
+          { label: 'Units Purchased', value: Number(r.totalUnitsPurchased ?? 0).toLocaleString(), color: '#52c41a', suffix: ' kWh' },
+          { label: 'Low-Balance Locations', value: r.lowBalanceCount as number, color: (r.lowBalanceCount as number) > 0 ? '#fa8c16' : '#52c41a', suffix: '' },
+        ].map(k => (
+          <Col key={k.label} style={{ flex: '1 1 160px', minWidth: 150, marginBottom: 8 }}>
+            <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
+              <Statistic title={<Text style={{ fontSize: 11 }}>{k.label}</Text>} value={k.value} suffix={k.suffix}
+                valueStyle={{ color: k.color, fontSize: 20, fontWeight: 700 }} />
+            </Card>
+          </Col>
+        ))}
+      </Row>
+      <Row gutter={16}>
+        <Col xs={24} md={10}>
+          <ChartCard title="Purchases by Type" height={200}>
+            <BreakdownList items={(r.byType as PeriodBreakdownItem[]) ?? []}
+              total={((r.byType as PeriodBreakdownItem[]) ?? []).reduce((s, x) => s + x.count, 0)} />
+          </ChartCard>
+        </Col>
+        <Col xs={24} md={14}>
+          <Card size="small" title={<Text strong style={{ fontSize: 13 }}>Balance by Location</Text>}>
+            {byLocation.map(l => (
+              <div key={l.location} style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr 1fr 1fr', gap: 8,
+                padding: '6px 0', borderBottom: '1px solid #f5f5f5', alignItems: 'center' }}>
+                <Text strong style={{ fontSize: 12 }}>{l.location}</Text>
+                <Text style={{ fontSize: 12 }}>{l.balanceKwh.toLocaleString()} kWh</Text>
+                <Tag color={elecStatusColor(l.status)}>{l.status}</Tag>
+                <Text type="secondary" style={{ fontSize: 12 }}>₦{l.spendNaira.toLocaleString()}</Text>
+              </div>
+            ))}
+            {byLocation.length === 0 && <Text type="secondary">No electricity data yet.</Text>}
+          </Card>
+        </Col>
+      </Row>
+    </div>
+  );
+}
+
+// ── DStv Report (Obinna) ───────────────────────────────────────────────────────
+type DstvUpcomingRow = { decoderNumber: string; location: string; package: string; expiryDate: string; daysToExpiry: number; amountNaira: number };
+
+function DstvReportTab() {
+  const { data, isFetching } = useQuery({ queryKey: ['reports', 'dstv'], queryFn: () => reportsApi.dstv() });
+  if (isFetching || !data) return <div style={{ padding: 32, textAlign: 'center' }}>Loading…</div>;
+  const r = data as Record<string, unknown>;
+  const upcoming = (r.upcoming as DstvUpcomingRow[]) ?? [];
+
+  return (
+    <div>
+      <Row gutter={12} style={{ marginBottom: 16 }}>
+        {[
+          { label: 'Total Subscriptions', value: r.totalSubscriptions as number, color: '#1677ff' },
+          { label: 'Active', value: r.active as number, color: '#52c41a' },
+          { label: 'Expiring ≤7d', value: r.expiringSoon as number, color: '#fa8c16' },
+          { label: 'Expired', value: r.expired as number, color: (r.expired as number) > 0 ? '#f5222d' : '#52c41a' },
+          { label: 'Total Spend', value: `₦${Number(r.totalSpendNaira ?? 0).toLocaleString()}`, color: '#eb2f96' },
+        ].map(k => (
+          <Col key={k.label} style={{ flex: '1 1 150px', minWidth: 140, marginBottom: 8 }}>
+            <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
+              <Statistic title={<Text style={{ fontSize: 11 }}>{k.label}</Text>} value={k.value}
+                valueStyle={{ color: k.color, fontSize: 20, fontWeight: 700 }} />
+            </Card>
+          </Col>
+        ))}
+      </Row>
+      <Card size="small" title={<Text strong style={{ fontSize: 13 }}>Renewals Due (next 30 days)</Text>}>
+        {upcoming.map(u => (
+          <div key={u.decoderNumber} style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr 1fr 0.8fr', gap: 8,
+            padding: '6px 0', borderBottom: '1px solid #f5f5f5', alignItems: 'center' }}>
+            <Text strong style={{ fontSize: 12 }}>{u.decoderNumber}</Text>
+            <Text style={{ fontSize: 12 }}>{u.location}</Text>
+            <Text style={{ fontSize: 12 }}>{u.package}</Text>
+            <Text type={u.daysToExpiry < 0 ? 'danger' : u.daysToExpiry <= 7 ? 'warning' : undefined} style={{ fontSize: 12 }}>
+              {dayjs(u.expiryDate).format('D MMM YY')} · {u.daysToExpiry < 0 ? `${Math.abs(u.daysToExpiry)}d ago` : `${u.daysToExpiry}d`}
+            </Text>
+            <Text type="secondary" style={{ fontSize: 12 }}>₦{u.amountNaira.toLocaleString()}</Text>
+          </div>
+        ))}
+        {upcoming.length === 0 && <Text type="secondary">No subscriptions due within 30 days.</Text>}
+      </Card>
+    </div>
+  );
+}
+
+// ── Vehicle Documents Report (Obinna) ──────────────────────────────────────────
+type VehDocRow = { vehicleRegNo: string; documentType: string; expiryDate: string; daysToExpiry: number; status: string; renewalCostNaira?: number };
+const VEH_DOC_LABEL: Record<string, string> = {
+  VehicleLicence: 'Vehicle Licence', RoadWorthiness: 'Road Worthiness', Insurance: 'Insurance',
+  HackneyPermit: 'Hackney Permit', HeavyDutyPermit: 'Heavy Duty Permit',
+};
+
+function VehicleDocumentsReportTab() {
+  const { data, isFetching } = useQuery({ queryKey: ['reports', 'vehicle-documents'], queryFn: () => reportsApi.vehicleDocuments() });
+  if (isFetching || !data) return <div style={{ padding: 32, textAlign: 'center' }}>Loading…</div>;
+  const r = data as Record<string, unknown>;
+  const expiring = (r.expiringNext30 as VehDocRow[]) ?? [];
+
+  return (
+    <div>
+      <Row gutter={12} style={{ marginBottom: 16 }}>
+        {[
+          { label: 'Vehicles', value: r.totalVehicles as number, color: '#1677ff' },
+          { label: 'Documents', value: r.totalDocuments as number, color: '#722ed1' },
+          { label: 'Valid', value: r.valid as number, color: '#52c41a' },
+          { label: 'Expiring ≤14d', value: r.expiring as number, color: '#fa8c16' },
+          { label: 'Expired', value: r.expired as number, color: (r.expired as number) > 0 ? '#f5222d' : '#52c41a' },
+        ].map(k => (
+          <Col key={k.label} style={{ flex: '1 1 140px', minWidth: 130, marginBottom: 8 }}>
+            <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
+              <Statistic title={<Text style={{ fontSize: 11 }}>{k.label}</Text>} value={k.value}
+                valueStyle={{ color: k.color, fontSize: 20, fontWeight: 700 }} />
+            </Card>
+          </Col>
+        ))}
+      </Row>
+      <Row gutter={16}>
+        <Col xs={24} md={9}>
+          <ChartCard title="Documents by Type" height={220}>
+            <BreakdownList items={((r.byType as PeriodBreakdownItem[]) ?? []).map(x => ({ label: VEH_DOC_LABEL[x.label] ?? x.label, count: x.count }))}
+              total={((r.byType as PeriodBreakdownItem[]) ?? []).reduce((s, x) => s + x.count, 0)} />
+          </ChartCard>
+        </Col>
+        <Col xs={24} md={15}>
+          <Card size="small" title={<Text strong style={{ fontSize: 13 }}>Documents Expiring (next 30 days)</Text>}>
+            {expiring.map((d, i) => (
+              <div key={`${d.vehicleRegNo}-${d.documentType}-${i}`} style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr 1.2fr 0.8fr', gap: 8,
+                padding: '6px 0', borderBottom: '1px solid #f5f5f5', alignItems: 'center' }}>
+                <Text strong style={{ fontSize: 12 }}>{d.vehicleRegNo}</Text>
+                <Text style={{ fontSize: 12 }}>{VEH_DOC_LABEL[d.documentType] ?? d.documentType}</Text>
+                <Text type={d.daysToExpiry < 0 ? 'danger' : d.daysToExpiry <= 14 ? 'warning' : undefined} style={{ fontSize: 12 }}>
+                  {dayjs(d.expiryDate).format('D MMM YY')} · {d.daysToExpiry < 0 ? `${Math.abs(d.daysToExpiry)}d ago` : `${d.daysToExpiry}d`}
+                </Text>
+                <Tag color={d.status === 'Expired' ? 'red' : d.status === 'Expiring' ? 'orange' : 'green'}>{d.status}</Tag>
+              </div>
+            ))}
+            {expiring.length === 0 && <Text type="secondary">No documents expiring within 30 days.</Text>}
+          </Card>
+        </Col>
+      </Row>
+    </div>
+  );
+}
+
+// ── Diesel Supply Report (Obinna) ──────────────────────────────────────────────
+type DieselDistRow = { distributionReference: string; distributionDate: string; distributionType: string; recipient?: string; quantityLitres: number; bulkSupplyReference: string; issuingOfficer?: string };
+
+function DieselSupplyReportTab({ period }: { period: ReportPeriod }) {
+  const { data, isFetching } = useQuery({
+    queryKey: ['reports', 'diesel-supply', period],
+    queryFn: () => reportsApi.dieselSupply(period),
+  });
+  if (isFetching || !data) return <div style={{ padding: 32, textAlign: 'center' }}>Loading…</div>;
+  const r = data as Record<string, unknown>;
+  const recent = (r.recentDistributions as DieselDistRow[]) ?? [];
+
+  return (
+    <div>
+      <Row gutter={12} style={{ marginBottom: 16 }}>
+        {[
+          { label: 'Available Balance', value: Number(r.availableBalanceLitres ?? 0).toLocaleString(), color: '#1677ff', suffix: ' L' },
+          { label: 'Total Supplied', value: Number(r.totalSuppliedLitres ?? 0).toLocaleString(), color: '#52c41a', suffix: ' L' },
+          { label: `Distributed (${r.periodLabel})`, value: Number(r.distributedInPeriod ?? 0).toLocaleString(), color: '#fa8c16', suffix: ' L' },
+          { label: 'Purchase Value', value: `₦${Number(r.totalPurchaseValueNaira ?? 0).toLocaleString()}`, color: '#eb2f96', suffix: '' },
+        ].map(k => (
+          <Col key={k.label} style={{ flex: '1 1 160px', minWidth: 150, marginBottom: 8 }}>
+            <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
+              <Statistic title={<Text style={{ fontSize: 11 }}>{k.label}</Text>} value={k.value} suffix={k.suffix}
+                valueStyle={{ color: k.color, fontSize: 20, fontWeight: 700 }} />
+            </Card>
+          </Col>
+        ))}
+      </Row>
+      <Row gutter={16} style={{ marginBottom: 16 }}>
+        <Col xs={24} md={10}>
+          <ChartCard title="Top Vehicles by Consumption (L)" height={220}>
+            <BreakdownList items={(r.topVehicles as PeriodBreakdownItem[]) ?? []}
+              total={((r.topVehicles as PeriodBreakdownItem[]) ?? []).reduce((s, x) => s + x.count, 0)} />
+          </ChartCard>
+        </Col>
+        <Col xs={24} md={14}>
+          <Card size="small" title={<Text strong style={{ fontSize: 13 }}>Recent Distributions</Text>}>
+            {recent.map(d => (
+              <div key={d.distributionReference} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.3fr 0.8fr 1fr', gap: 8,
+                padding: '6px 0', borderBottom: '1px solid #f5f5f5', alignItems: 'center' }}>
+                <Text strong style={{ fontSize: 12 }}>{d.distributionReference}</Text>
+                <Text style={{ fontSize: 12 }}>{dayjs(d.distributionDate).format('D MMM YY')}</Text>
+                <Text style={{ fontSize: 12 }}><Tag color={d.distributionType === 'Vehicle' ? 'blue' : 'green'}>{d.distributionType}</Tag>{d.recipient}</Text>
+                <Text style={{ fontSize: 12 }}>{d.quantityLitres.toLocaleString()} L</Text>
+                <Text type="secondary" style={{ fontSize: 12 }}>{d.bulkSupplyReference}</Text>
+              </div>
+            ))}
+            {recent.length === 0 && <Text type="secondary">No distributions in this period.</Text>}
+          </Card>
+        </Col>
+      </Row>
     </div>
   );
 }

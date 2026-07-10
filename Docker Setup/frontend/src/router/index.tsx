@@ -14,6 +14,10 @@ import DailyLogPage from '../pages/daily-log/DailyLogPage';
 import UserManagementPage from '../pages/users/UserManagementPage';
 import StoreManagementPage from '../pages/store/StoreManagementPage';
 import NotificationsPage from '../pages/notifications/NotificationsPage';
+import ElectricityPage from '../pages/electricity/ElectricityPage';
+import DstvPage from '../pages/dstv/DstvPage';
+import VehicleRegistryPage from '../pages/vehicle-registry/VehicleRegistryPage';
+import DieselSupplyPage from '../pages/diesel-supply/DieselSupplyPage';
 
 // ── Auth guard ────────────────────────────────────────────────────────────────
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -43,6 +47,10 @@ export const router = createBrowserRouter([
       { path: 'activities',    element: <ActivitiesPage /> },
       { path: 'maintenance',   element: <MaintenancePage /> },
       { path: 'fuel',          element: <FuelPage /> },
+      { path: 'electricity',   element: <ElectricityPage /> },
+      { path: 'dstv',          element: <DstvPage /> },
+      { path: 'vehicle-registry', element: <VehicleRegistryPage /> },
+      { path: 'diesel-supply', element: <DieselSupplyPage /> },
       { path: 'daily-log',     element: <DailyLogPage /> },
       { path: 'users',         element: <UserManagementPage /> },
       { path: 'store',         element: <StoreManagementPage /> },

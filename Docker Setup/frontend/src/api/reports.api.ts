@@ -93,4 +93,16 @@ export const reportsApi = {
 
   accommodation: (period: ReportPeriod = '30d') =>
     apiClient.get<Record<string, unknown>>('/reports/accommodation', { params: { period } }).then(r => r.data),
+
+  electricity:   (period: ReportPeriod = '30d') =>
+    apiClient.get<Record<string, unknown>>('/reports/electricity', { params: { period } }).then(r => r.data),
+
+  dstv:          () =>
+    apiClient.get<Record<string, unknown>>('/reports/dstv').then(r => r.data),
+
+  vehicleDocuments: () =>
+    apiClient.get<Record<string, unknown>>('/reports/vehicle-documents').then(r => r.data),
+
+  dieselSupply:  (period: ReportPeriod = '30d') =>
+    apiClient.get<Record<string, unknown>>('/reports/diesel-supply', { params: { period } }).then(r => r.data),
 };

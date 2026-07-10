@@ -553,4 +553,143 @@ public class ReportsController(GenServiceDbContext db) : ControllerBase
             periodLabel = label,
         });
     }
+
+    private static int DaysToExpiry(DateTime expiry) =>
+        (int)Math.Ceiling((expiry.Date - DateTime.UtcNow.Date).TotalDays);
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GET /api/v1/reports/electricity?period=30d   (Obinna — Electricity)
+    // ══════════════════════════════════════════════════════════════════════════
+    [HttpGet("electricity")]
+    public async Task<IActionResult> ElectricityReport([FromQuery] string period = "30d")
+    {
+        var (from, label) = ResolvePeriod(period);
+        var all = await db.ElectricityPurchases.AsNoTracking().ToListAsync();
+        var inPeriod = all.Where(p => p.PurchaseDate >= from).ToList();
+
+        var byLocation = all
+            .GroupBy(p => p.Location)
+            .Select(g =>
+            {
+                var latest = g.OrderByDescending(p => p.PurchaseDate).ThenByDescending(p => p.CreatedAt).First();
+                return new
+                {
+                    location    = g.Key,
+                    balanceKwh  = latest.BalanceAfterKwh,
+                    status      = latest.Status,
+                    spendNaira  = g.Where(p => p.PurchaseDate >= from).Sum(p => p.AmountNaira),
+                    unitsKwh    = g.Where(p => p.PurchaseDate >= from).Sum(p => p.UnitsKwh),
+                };
+            })
+            .OrderBy(x => x.balanceKwh)
+            .ToList();
+
+        return Ok(new
+        {
+            periodLabel         = label,
+            purchaseCount       = inPeriod.Count,
+            totalSpendNaira     = inPeriod.Sum(p => p.AmountNaira),
+            totalUnitsPurchased = inPeriod.Sum(p => p.UnitsKwh),
+            lowBalanceCount     = byLocation.Count(x => x.status != ElectricityStatus.Active),
+            byType              = inPeriod.GroupBy(p => p.PurchaseType)
+                                          .Select(g => new { label = g.Key, count = g.Count(),
+                                                             spend = g.Sum(p => p.AmountNaira),
+                                                             units = g.Sum(p => p.UnitsKwh) }).ToList(),
+            byLocation,
+            recentPurchases     = inPeriod.OrderByDescending(p => p.PurchaseDate).Take(50).Select(p => new {
+                p.PurchaseDate, p.PurchaseType, p.Location, p.Vendor,
+                p.AmountNaira, p.UnitsKwh, p.BalanceAfterKwh, p.Status, p.LoggedByName
+            }).ToList(),
+        });
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GET /api/v1/reports/dstv   (Obinna — DStv subscriptions)
+    // ══════════════════════════════════════════════════════════════════════════
+    [HttpGet("dstv")]
+    public async Task<IActionResult> DstvReport()
+    {
+        var all = await db.DstvSubscriptions.AsNoTracking().ToListAsync();
+
+        return Ok(new
+        {
+            totalSubscriptions = all.Count,
+            active             = all.Count(s => DaysToExpiry(s.ExpiryDate) > 7),
+            expiringSoon       = all.Count(s => { var d = DaysToExpiry(s.ExpiryDate); return d >= 0 && d <= 7; }),
+            expired            = all.Count(s => DaysToExpiry(s.ExpiryDate) < 0),
+            totalSpendNaira    = all.Sum(s => s.AmountNaira),
+            byLocation         = all.GroupBy(s => s.Location)
+                                    .Select(g => new PeriodBreakdownItem(g.Key, g.Count())).ToList(),
+            upcoming           = all.Where(s => DaysToExpiry(s.ExpiryDate) <= 30)
+                                    .OrderBy(s => s.ExpiryDate)
+                                    .Select(s => new {
+                                        s.DecoderNumber, s.Location, s.Package, s.ExpiryDate,
+                                        daysToExpiry = DaysToExpiry(s.ExpiryDate), s.AmountNaira
+                                    }).ToList(),
+        });
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GET /api/v1/reports/vehicle-documents   (Obinna — statutory documents)
+    // ══════════════════════════════════════════════════════════════════════════
+    [HttpGet("vehicle-documents")]
+    public async Task<IActionResult> VehicleDocumentsReport()
+    {
+        var docs     = await db.VehicleDocuments.AsNoTracking().ToListAsync();
+        var vehicles = await db.Vehicles.AsNoTracking().CountAsync();
+
+        string DocStatus(DateTime e) { var d = DaysToExpiry(e); return d < 0 ? "Expired" : d <= 14 ? "Expiring" : "Valid"; }
+
+        return Ok(new
+        {
+            totalDocuments   = docs.Count,
+            totalVehicles    = vehicles,
+            valid            = docs.Count(d => DocStatus(d.ExpiryDate) == "Valid"),
+            expiring         = docs.Count(d => DocStatus(d.ExpiryDate) == "Expiring"),
+            expired          = docs.Count(d => DocStatus(d.ExpiryDate) == "Expired"),
+            renewalSpendNaira= docs.Sum(d => d.RenewalCostNaira ?? 0),
+            byType           = docs.GroupBy(d => d.DocumentType)
+                                   .Select(g => new PeriodBreakdownItem(g.Key, g.Count())).ToList(),
+            expiringNext30   = docs.Where(d => DaysToExpiry(d.ExpiryDate) <= 30)
+                                   .OrderBy(d => d.ExpiryDate)
+                                   .Select(d => new {
+                                       d.VehicleRegNo, d.DocumentType, d.ExpiryDate,
+                                       daysToExpiry = DaysToExpiry(d.ExpiryDate),
+                                       status = DocStatus(d.ExpiryDate), d.RenewalCostNaira
+                                   }).ToList(),
+        });
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GET /api/v1/reports/diesel-supply?period=30d   (Obinna — diesel supply)
+    // ══════════════════════════════════════════════════════════════════════════
+    [HttpGet("diesel-supply")]
+    public async Task<IActionResult> DieselSupplyReport([FromQuery] string period = "30d")
+    {
+        var (from, label) = ResolvePeriod(period);
+        var supplies = await db.DieselBulkSupplies.AsNoTracking().ToListAsync();
+        var dists    = await db.DieselDistributions.AsNoTracking()
+                                .Where(d => d.DistributionDate >= from).ToListAsync();
+
+        return Ok(new
+        {
+            periodLabel             = label,
+            totalSuppliedLitres     = supplies.Sum(s => s.QuantityLitres),
+            availableBalanceLitres  = supplies.Sum(s => s.QuantityRemainingLitres),
+            totalPurchaseValueNaira = supplies.Sum(s => s.TotalCostNaira),
+            distributedInPeriod     = dists.Sum(d => d.QuantityLitres),
+            distributionByType      = dists.GroupBy(d => d.DistributionType)
+                                           .Select(g => new { label = g.Key, count = g.Count(),
+                                                              litres = g.Sum(d => d.QuantityLitres) }).ToList(),
+            topVehicles             = dists.Where(d => d.VehicleRegNo != null)
+                                           .GroupBy(d => d.VehicleRegNo!)
+                                           .Select(g => new PeriodBreakdownItem(g.Key, (int)g.Sum(d => d.QuantityLitres)))
+                                           .OrderByDescending(x => x.Count).Take(10).ToList(),
+            recentDistributions     = dists.OrderByDescending(d => d.DistributionDate).Take(50).Select(d => new {
+                d.DistributionReference, d.DistributionDate, d.DistributionType,
+                recipient = d.VehicleRegNo ?? d.DestinationLocation,
+                d.QuantityLitres, d.BulkSupplyReference, d.IssuingOfficer
+            }).ToList(),
+        });
+    }
 }

@@ -1,6 +1,7 @@
 using GenService.API.Data;
 using GenService.API.Domain;
 using GenService.API.Models;
+using GenService.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -13,6 +14,7 @@ namespace GenService.API.Controllers;
 [Authorize]
 public class GeneratorMonitoringController(
     GenServiceDbContext db,
+    NotificationService notify,
     ILogger<GeneratorMonitoringController> logger) : ControllerBase
 {
     private string CallerEmail => User.FindFirstValue(ClaimTypes.Email) ?? "";
@@ -20,10 +22,14 @@ public class GeneratorMonitoringController(
 
     private static GeneratorReadingDto ToDto(GeneratorDailyReading r) => new(
         r.Id, r.AssetNo, r.AssetDescription, r.Location,
-        r.ReadingDate, r.CumulativeRunHours, r.RunHoursToday,
-        r.GeneratorStatus, r.FuelLevelLitres, r.FuelConsumedLitres,
-        r.UtilityAvailableHours,
-        r.ServiceIntervalHours, r.LastServicedAtHours,
+        r.ReadingDate,
+        r.PreviousEngineReading, r.CurrentEngineReading,
+        r.CumulativeRunHours, r.RunHoursToday,
+        r.GeneratorStatus,
+        r.PreviousFuelLevelLitres, r.FuelLevelLitres, r.FuelConsumedLitres,
+        r.PreviousUtilityReading, r.CurrentUtilityReading, r.UtilityAvailableHours,
+        r.ServiceIntervalHours, r.RemainingServiceHours,
+        r.ServiceCompleted, r.LastServicedAtHours,
         r.ServiceAlertActive, r.HoursUntilNextService,
         r.Notes, r.LoggedByEmail, r.LoggedByName, r.CreatedAt
     );
@@ -97,44 +103,114 @@ public class GeneratorMonitoringController(
     public async Task<ActionResult<GeneratorReadingDto>> Create(
         [FromBody] CreateGeneratorReadingRequest req)
     {
-        // Service alert: trigger if within 20 hours of next service
-        var hoursSinceLast  = req.LastServicedAtHours.HasValue
-            ? req.CumulativeRunHours - req.LastServicedAtHours.Value
-            : req.CumulativeRunHours;
-        var hoursUntilNext  = req.ServiceIntervalHours - (hoursSinceLast % req.ServiceIntervalHours);
-        var alertActive     = hoursUntilNext <= 20;
+        var interval = req.ServiceIntervalHours > 0 ? req.ServiceIntervalHours : 250;
+
+        // Pull the last reading for this generator to auto-fill previous values &
+        // carry forward the remaining-service countdown.
+        var last = await db.GeneratorDailyReadings.AsNoTracking()
+            .Where(r => r.AssetNo == req.AssetNo.Trim())
+            .OrderByDescending(r => r.ReadingDate)
+            .ThenByDescending(r => r.CreatedAt)
+            .FirstOrDefaultAsync();
+
+        // ── §1 Run hours (24h) = Current − Previous ─────────────────────────────
+        var previousEngine = req.PreviousEngineReading
+                             ?? last?.CurrentEngineReading
+                             ?? req.CurrentEngineReading;
+        var runHoursToday  = Math.Max(0, req.CurrentEngineReading - previousEngine);
+
+        // ── §3 Fuel consumed = Previous − Current ───────────────────────────────
+        var previousFuel   = req.PreviousFuelLevelLitres
+                             ?? last?.FuelLevelLitres
+                             ?? req.CurrentFuelLevelLitres;
+        var fuelDelta      = previousFuel - req.CurrentFuelLevelLitres;
+        double? fuelConsumed = fuelDelta >= 0 ? fuelDelta : null;   // negative ⇒ refill, not consumption
+
+        // ── §4 Utility (NEPA) available = Current − Previous (hour meter) ───────
+        var previousUtil   = req.PreviousUtilityReading ?? last?.CurrentUtilityReading;
+        double? utilAvailable = null;
+        if (req.CurrentUtilityReading.HasValue && previousUtil.HasValue)
+            utilAvailable = Math.Max(0, req.CurrentUtilityReading.Value - previousUtil.Value);
+
+        // ── §2 Remaining service hours countdown ───────────────────────────────
+        // Deduct today's run hours from the carried-forward remaining balance.
+        // Reset to a full interval when a service is recorded.
+        var prevRemaining  = last?.RemainingServiceHours ?? interval;
+        double remaining;
+        double? lastServicedAt;
+        if (req.ServiceCompleted)
+        {
+            remaining      = interval;
+            lastServicedAt = req.CurrentEngineReading;
+        }
+        else
+        {
+            remaining      = Math.Max(0, prevRemaining - runHoursToday);
+            lastServicedAt = req.LastServicedAtHours ?? last?.LastServicedAtHours;
+        }
+
+        // Alert when the generator is at/under the 150-hour service threshold.
+        var alertActive = !req.ServiceCompleted &&
+                          remaining <= GeneratorDailyReading.ServiceAlertThresholdHours;
 
         var reading = new GeneratorDailyReading
         {
-            AssetNo              = req.AssetNo.Trim(),
-            AssetDescription     = req.AssetDescription.Trim(),
-            Location             = req.Location.Trim(),
-            ReadingDate          = DateTime.UtcNow.Date,
-            CumulativeRunHours   = req.CumulativeRunHours,
-            RunHoursToday        = req.RunHoursToday,
-            GeneratorStatus      = req.GeneratorStatus,
-            FuelLevelLitres      = req.FuelLevelLitres,
-            FuelConsumedLitres   = req.FuelConsumedLitres,
-            UtilityAvailableHours= req.UtilityAvailableHours,
-            ServiceIntervalHours = req.ServiceIntervalHours,
-            LastServicedAtHours  = req.LastServicedAtHours,
-            ServiceAlertActive   = alertActive,
-            Notes                = req.Notes?.Trim(),
-            LoggedByEmail        = CallerEmail,
-            LoggedByName         = CallerName,
-            CreatedAt            = DateTime.UtcNow,
-            UpdatedAt            = DateTime.UtcNow,
+            AssetNo                 = req.AssetNo.Trim(),
+            AssetDescription        = req.AssetDescription.Trim(),
+            Location                = req.Location.Trim(),
+            ReadingDate             = DateTime.UtcNow.Date,
+            PreviousEngineReading   = previousEngine,
+            CurrentEngineReading    = req.CurrentEngineReading,
+            RunHoursToday           = runHoursToday,
+            CumulativeRunHours      = req.CurrentEngineReading,
+            GeneratorStatus         = req.GeneratorStatus,
+            PreviousFuelLevelLitres = previousFuel,
+            FuelLevelLitres         = req.CurrentFuelLevelLitres,
+            FuelConsumedLitres      = fuelConsumed,
+            PreviousUtilityReading  = previousUtil,
+            CurrentUtilityReading   = req.CurrentUtilityReading,
+            UtilityAvailableHours   = utilAvailable,
+            ServiceIntervalHours    = interval,
+            RemainingServiceHours   = remaining,
+            ServiceCompleted        = req.ServiceCompleted,
+            LastServicedAtHours     = lastServicedAt,
+            ServiceAlertActive      = alertActive,
+            Notes                   = req.Notes?.Trim(),
+            LoggedByEmail           = CallerEmail,
+            LoggedByName            = CallerName,
+            CreatedAt               = DateTime.UtcNow,
+            UpdatedAt               = DateTime.UtcNow,
         };
 
         db.GeneratorDailyReadings.Add(reading);
         await db.SaveChangesAsync();
 
+        // Raise an in-app maintenance notification when approaching the service interval.
         if (alertActive)
-            logger.LogWarning("⚠️ SERVICE ALERT: {Asset} at {Location} — only {Hours:0.0}h until next service",
-                req.AssetDescription, req.Location, hoursUntilNext);
+        {
+            await notify.CreateAsync(
+                title:      $"⚠️ Generator service due soon: {reading.AssetDescription}",
+                message:    $"{reading.AssetDescription} ({reading.AssetNo}) at {reading.Location} has "
+                          + $"{remaining:0} h remaining until its next {interval:0}-hour service.",
+                type:       NotificationType.MaintenanceDueSoon,
+                module:     "Generator",
+                entityId:   reading.Id.ToString(),
+                refNumber:  reading.AssetNo,
+                targetRole: NotificationTarget.Management);
+
+            logger.LogWarning("⚠️ SERVICE ALERT: {Asset} at {Location} — only {Hours:0.0}h remaining until service",
+                reading.AssetDescription, reading.Location, remaining);
+        }
+        else if (req.ServiceCompleted)
+        {
+            logger.LogInformation("🔧 Service recorded: {Asset} {Location} — countdown reset to {Interval}h",
+                reading.AssetNo, reading.Location, interval);
+        }
         else
-            logger.LogInformation("Generator reading logged: {Asset} {Location} — {Hours}h cumulative",
-                req.AssetNo, req.Location, req.CumulativeRunHours);
+        {
+            logger.LogInformation("Generator reading logged: {Asset} {Location} — ran {Run}h today, {Rem}h to service",
+                reading.AssetNo, reading.Location, runHoursToday, remaining);
+        }
 
         return CreatedAtAction(nameof(Summary), ToDto(reading));
     }

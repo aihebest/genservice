@@ -939,6 +939,106 @@ var app = builder.Build();
     }
     catch (Exception ex) { log.LogError(ex, "❌ Seed failed: DieselRequisitions"); }
 
+    // ── Seed electricity purchases ───────────────────────────────────────────
+    try
+    {
+        if (!await db.ElectricityPurchases.AnyAsync())
+        {
+            var now = DateTime.UtcNow.Date;
+            db.ElectricityPurchases.AddRange(
+                new GenService.API.Domain.ElectricityPurchase { PurchaseType="PHED",    Location="OFFICE",         PurchaseDate=now.AddDays(-18), Vendor="PHED",          AmountNaira=150000, UnitsKwh=750, PaymentReference="PO-2026-041", LowBalanceThresholdKwh=100, BalanceAfterKwh=430, Status="Active",     LoggedByEmail="supervisor@demo.local", LoggedByName="Emeka Okonkwo", CreatedAt=now.AddDays(-18) },
+                new GenService.API.Domain.ElectricityPurchase { PurchaseType="PHED",    Location="DR",             PurchaseDate=now.AddDays(-12), Vendor="PHED",          AmountNaira=90000,  UnitsKwh=450, PaymentReference="PO-2026-052", LowBalanceThresholdKwh=80,  BalanceAfterKwh=260, Status="Active",     LoggedByEmail="supervisor@demo.local", LoggedByName="Emeka Okonkwo", CreatedAt=now.AddDays(-12) },
+                new GenService.API.Domain.ElectricityPurchase { PurchaseType="Prepaid", Location="WOJI",           PurchaseDate=now.AddDays(-6),  Vendor="Kingsley Agent",AmountNaira=50000,  UnitsKwh=250, TokenNumber="1234-5678-9012-3456-7890", MeterReadingKwh=65, LowBalanceThresholdKwh=80, BalanceAfterKwh=65, Status="LowBalance", LoggedByEmail="technician@demo.local", LoggedByName="Chukwudi Nwosu", CreatedAt=now.AddDays(-6) },
+                new GenService.API.Domain.ElectricityPurchase { PurchaseType="Prepaid", Location="DGS",            PurchaseDate=now.AddDays(-9),  Vendor="Kingsley Agent",AmountNaira=40000,  UnitsKwh=200, TokenNumber="9876-5432-1098-7654-3210", MeterReadingKwh=0,  LowBalanceThresholdKwh=60, BalanceAfterKwh=0,  Status="Depleted",   LoggedByEmail="technician@demo.local", LoggedByName="Chukwudi Nwosu", CreatedAt=now.AddDays(-9) },
+                new GenService.API.Domain.ElectricityPurchase { PurchaseType="Prepaid", Location="UYO – Chairman", PurchaseDate=now.AddDays(-3),  Vendor="Uyo Agent",     AmountNaira=60000,  UnitsKwh=300, TokenNumber="1111-2222-3333-4444-5555", MeterReadingKwh=280,LowBalanceThresholdKwh=70, BalanceAfterKwh=280,Status="Active",     LoggedByEmail="supervisor@demo.local", LoggedByName="Emeka Okonkwo", CreatedAt=now.AddDays(-3) },
+                new GenService.API.Domain.ElectricityPurchase { PurchaseType="PHED",    Location="UYO – MD",       PurchaseDate=now.AddDays(-5),  Vendor="PHED",          AmountNaira=120000, UnitsKwh=600, PaymentReference="PO-2026-060", LowBalanceThresholdKwh=100, BalanceAfterKwh=540, Status="Active",     LoggedByEmail="supervisor@demo.local", LoggedByName="Emeka Okonkwo", CreatedAt=now.AddDays(-5) }
+            );
+            await db.SaveChangesAsync();
+            log.LogInformation("✅ Seeded 6 electricity purchases.");
+        }
+    }
+    catch (Exception ex) { log.LogError(ex, "❌ Seed failed: ElectricityPurchases"); }
+
+    // ── Seed DStv subscriptions ──────────────────────────────────────────────
+    try
+    {
+        if (!await db.DstvSubscriptions.AnyAsync())
+        {
+            var now = DateTime.UtcNow.Date;
+            var aStart = now.AddMonths(-1); var aExp = aStart.AddMonths(6);   // Active
+            var bStart = now.AddDays(-25);  var bExp = bStart.AddMonths(1);   // ExpiringSoon (~5d)
+            var cStart = now.AddMonths(-2); var cExp = cStart.AddMonths(1);   // Expired (~1 month ago)
+            var dStart = now.AddDays(-10);  var dExp = dStart.AddMonths(3);   // Active
+            db.DstvSubscriptions.AddRange(
+                new GenService.API.Domain.DstvSubscription { DecoderNumber="4021 5566 778", Location="OFFICE",         Package="Premium",      StartDate=aStart, DurationMonths=6, ExpiryDate=aExp, AmountNaira=44500, PaymentMethod="Transfer", Vendor="DStv Agent PHC", Status="Active",       LoggedByEmail="supervisor@demo.local", LoggedByName="Emeka Okonkwo", CreatedAt=aStart },
+                new GenService.API.Domain.DstvSubscription { DecoderNumber="4033 1290 551", Location="DR",             Package="Compact Plus", StartDate=bStart, DurationMonths=1, ExpiryDate=bExp, AmountNaira=25000, PaymentMethod="POS",      Vendor="DStv Agent PHC", Status="ExpiringSoon", LoggedByEmail="supervisor@demo.local", LoggedByName="Emeka Okonkwo", CreatedAt=bStart },
+                new GenService.API.Domain.DstvSubscription { DecoderNumber="4055 8842 903", Location="UYO – Chairman", Package="Premium",      StartDate=cStart, DurationMonths=1, ExpiryDate=cExp, AmountNaira=44500, PaymentMethod="Transfer", Vendor="Uyo Agent",      Status="Expired",      LoggedByEmail="technician@demo.local", LoggedByName="Chukwudi Nwosu", CreatedAt=cStart },
+                new GenService.API.Domain.DstvSubscription { DecoderNumber="4077 3321 118", Location="WOJI",           Package="Compact",      StartDate=dStart, DurationMonths=3, ExpiryDate=dExp, AmountNaira=19000, PaymentMethod="Cash",     Vendor="DStv Agent PHC", Status="Active",       LoggedByEmail="technician@demo.local", LoggedByName="Chukwudi Nwosu", CreatedAt=dStart }
+            );
+            await db.SaveChangesAsync();
+            log.LogInformation("✅ Seeded 4 DStv subscriptions.");
+        }
+    }
+    catch (Exception ex) { log.LogError(ex, "❌ Seed failed: DstvSubscriptions"); }
+
+    // ── Seed vehicles + statutory documents ──────────────────────────────────
+    try
+    {
+        if (!await db.Vehicles.AnyAsync())
+        {
+            var now = DateTime.UtcNow.Date;
+            var v1 = new GenService.API.Domain.Vehicle { FleetNumber="FL-001", RegistrationNumber="PHC 185 AM", VehicleType="Pickup", MakeModel="Nissan Pickup",     YearOfManufacture=2018, Colour="White",  AssignedLocation="Port Harcourt Office", AssignedDriver="Bola Adeyemi",   OperationalStatus="Active",     LoggedByEmail="supervisor@demo.local", LoggedByName="Emeka Okonkwo", CreatedAt=now };
+            var v2 = new GenService.API.Domain.Vehicle { FleetNumber="FL-002", RegistrationNumber="GGU 693 TX", VehicleType="Pickup", MakeModel="Toyota Hilux",      YearOfManufacture=2020, Colour="Silver", AssignedLocation="DR",                   AssignedDriver="Sunday Etim",    OperationalStatus="Active",     LoggedByEmail="supervisor@demo.local", LoggedByName="Emeka Okonkwo", CreatedAt=now };
+            var v3 = new GenService.API.Domain.Vehicle { FleetNumber="FL-003", RegistrationNumber="CX 211 RBC", VehicleType="Car",    MakeModel="Toyota Camry",      YearOfManufacture=2019, Colour="Black",  AssignedLocation="Lagos Office",         AssignedDriver="Musa Ibrahim",   OperationalStatus="Active",     LoggedByEmail="supervisor@demo.local", LoggedByName="Emeka Okonkwo", CreatedAt=now };
+            var v4 = new GenService.API.Domain.Vehicle { FleetNumber="FL-004", RegistrationNumber="AGL 105 BU", VehicleType="Bus",    MakeModel="Toyota Hiace Bus",  YearOfManufacture=2017, Colour="White",  AssignedLocation="Port Harcourt Office", AssignedDriver="Peter Okoro",    OperationalStatus="InWorkshop", LoggedByEmail="supervisor@demo.local", LoggedByName="Emeka Okonkwo", CreatedAt=now };
+            db.Vehicles.AddRange(v1, v2, v3, v4);
+            await db.SaveChangesAsync();
+
+            string DocStatus(DateTime e) { var d = (int)Math.Ceiling((e.Date - now).TotalDays); return d < 0 ? "Expired" : d <= 14 ? "Expiring" : "Valid"; }
+            GenService.API.Domain.VehicleDocument Doc(GenService.API.Domain.Vehicle v, string type, DateTime issue, DateTime expiry, string authority, decimal cost) => new()
+            {
+                VehicleId=v.Id, VehicleRegNo=v.RegistrationNumber, DocumentType=type, IssueDate=issue, ExpiryDate=expiry,
+                IssuingAuthority=authority, RenewalCostNaira=cost, Status=DocStatus(expiry),
+                LoggedByEmail="supervisor@demo.local", LoggedByName="Emeka Okonkwo", CreatedAt=now
+            };
+            db.VehicleDocuments.AddRange(
+                Doc(v1, "VehicleLicence",  now.AddMonths(-11), now.AddDays(10),  "Rivers State VIO",       25000),  // Expiring
+                Doc(v1, "Insurance",       now.AddMonths(-4),  now.AddMonths(8), "AIICO Insurance",        85000),  // Valid
+                Doc(v2, "RoadWorthiness",  now.AddMonths(-12), now.AddDays(-5),  "FRSC",                    15000),  // Expired
+                Doc(v2, "VehicleLicence",  now.AddMonths(-2),  now.AddMonths(10),"Rivers State VIO",        25000),  // Valid
+                Doc(v3, "Insurance",       now.AddMonths(-11), now.AddDays(12),  "Leadway Assurance",       70000),  // Expiring
+                Doc(v4, "HackneyPermit",   now.AddMonths(-6),  now.AddMonths(6), "Rivers State Ministry",   30000),  // Valid
+                Doc(v4, "VehicleLicence",  now.AddMonths(-11), now.AddDays(3),   "Rivers State VIO",        25000)   // Expiring (urgent)
+            );
+            await db.SaveChangesAsync();
+            log.LogInformation("✅ Seeded 4 vehicles + 7 statutory documents.");
+        }
+    }
+    catch (Exception ex) { log.LogError(ex, "❌ Seed failed: Vehicles/VehicleDocuments"); }
+
+    // ── Seed diesel bulk supplies + distributions ────────────────────────────
+    try
+    {
+        if (!await db.DieselBulkSupplies.AnyAsync())
+        {
+            var now = DateTime.UtcNow.Date;
+            var s1 = new GenService.API.Domain.DieselBulkSupply { SupplyReference="DSL/26/001", SupplyDate=now.AddDays(-15), Vendor="Total Energies", InvoiceNumber="WB-88213", QuantityLitres=5000, UnitPriceNaira=1200, TotalCostNaira=6000000, StorageLocation="Port Harcourt Office", ReceivingOfficer="Emeka Okonkwo", QuantityRemainingLitres=5000, LoggedByEmail="supervisor@demo.local", LoggedByName="Emeka Okonkwo", CreatedAt=now.AddDays(-15) };
+            var s2 = new GenService.API.Domain.DieselBulkSupply { SupplyReference="DSL/26/002", SupplyDate=now.AddDays(-5),  Vendor="Ardova Plc",     InvoiceNumber="WB-90551", QuantityLitres=3000, UnitPriceNaira=1250, TotalCostNaira=3750000, StorageLocation="DR",                   ReceivingOfficer="Chukwudi Nwosu", QuantityRemainingLitres=3000, LoggedByEmail="technician@demo.local", LoggedByName="Chukwudi Nwosu", CreatedAt=now.AddDays(-5) };
+            db.DieselBulkSupplies.AddRange(s1, s2);
+            await db.SaveChangesAsync();
+
+            var d1 = new GenService.API.Domain.DieselDistribution { DistributionReference="DDT/26/001", DistributionType="Location", BulkSupplyId=s1.Id, BulkSupplyReference=s1.SupplyReference, DistributionDate=now.AddDays(-12), QuantityLitres=800, Purpose="Generator refuelling", DestinationLocation="DR", IssuingOfficer="Emeka Okonkwo", ReceivingOfficer="Chukwudi Nwosu", RecipientAcknowledged=true, LoggedByEmail="supervisor@demo.local", LoggedByName="Emeka Okonkwo", CreatedAt=now.AddDays(-12) };
+            var d2 = new GenService.API.Domain.DieselDistribution { DistributionReference="DDT/26/002", DistributionType="Vehicle",  BulkSupplyId=s1.Id, BulkSupplyReference=s1.SupplyReference, DistributionDate=now.AddDays(-8),  QuantityLitres=120, Purpose="Field trip to Bonny", VehicleRegNo="PHC 185 AM", Driver="Bola Adeyemi", OdometerReading="84210", IssuingOfficer="Emeka Okonkwo", ReceivingOfficer="Bola Adeyemi", RecipientAcknowledged=true, LoggedByEmail="supervisor@demo.local", LoggedByName="Emeka Okonkwo", CreatedAt=now.AddDays(-8) };
+            var d3 = new GenService.API.Domain.DieselDistribution { DistributionReference="DDT/26/003", DistributionType="Vehicle",  BulkSupplyId=s2.Id, BulkSupplyReference=s2.SupplyReference, DistributionDate=now.AddDays(-3),  QuantityLitres=90,  Purpose="Staff transport", VehicleRegNo="GGU 693 TX", Driver="Sunday Etim", OdometerReading="45120", IssuingOfficer="Chukwudi Nwosu", ReceivingOfficer="Sunday Etim", RecipientAcknowledged=false, LoggedByEmail="technician@demo.local", LoggedByName="Chukwudi Nwosu", CreatedAt=now.AddDays(-3) };
+            db.DieselDistributions.AddRange(d1, d2, d3);
+            s1.QuantityRemainingLitres -= (d1.QuantityLitres + d2.QuantityLitres);   // 5000 - 920 = 4080
+            s2.QuantityRemainingLitres -= d3.QuantityLitres;                          // 3000 - 90  = 2910
+            await db.SaveChangesAsync();
+            log.LogInformation("✅ Seeded 2 diesel supplies + 3 distributions.");
+        }
+    }
+    catch (Exception ex) { log.LogError(ex, "❌ Seed failed: DieselSupply/Distributions"); }
+
     } // end if (!IsProduction) seed block
 
     log.LogInformation("🚀 Database bootstrap complete.");
@@ -999,6 +1099,15 @@ static async Task ApplySchemaUpdatesAsync(
                 ALTER TABLE {table} ADD {col} bit NOT NULL DEFAULT 0;
                 """;
 
+        // Helper: add a NOT NULL float column with a numeric default (protects existing rows)
+        static string AddFloatColIfMissing(string table, string col, string @default)
+            => $"""
+                IF NOT EXISTS (
+                    SELECT 1 FROM sys.columns
+                    WHERE object_id = OBJECT_ID(N'{table}') AND name = N'{col}')
+                ALTER TABLE {table} ADD {col} float NOT NULL DEFAULT {@default};
+                """;
+
         var statements = new List<string>
         {
             // ── VehicleMaintenanceRequests ──────────────────────────────────
@@ -1056,6 +1165,15 @@ static async Task ApplySchemaUpdatesAsync(
             AddColIfMissing("MaintenanceSchedules", "LastReminderSentAt",   "datetime2"),
             AddColIfMissing("MaintenanceSchedules", "LastEscalationSentAt", "datetime2"),
 
+            // ── GeneratorDailyReadings — Henry's Previous/Current + service countdown ──
+            AddFloatColIfMissing("GeneratorDailyReadings", "PreviousEngineReading",   "0"),
+            AddFloatColIfMissing("GeneratorDailyReadings", "CurrentEngineReading",    "0"),
+            AddFloatColIfMissing("GeneratorDailyReadings", "PreviousFuelLevelLitres", "0"),
+            AddColIfMissing     ("GeneratorDailyReadings", "PreviousUtilityReading",  "float"),
+            AddColIfMissing     ("GeneratorDailyReadings", "CurrentUtilityReading",   "float"),
+            AddFloatColIfMissing("GeneratorDailyReadings", "RemainingServiceHours",   "250"),
+            AddBitColIfMissing  ("GeneratorDailyReadings", "ServiceCompleted"),
+
             // ── DailyParameterLogs (new table — create if missing) ──────────
             // EnsureCreated will create it on fresh DBs; on existing DBs we
             // use IF NOT EXISTS to create the table only if it doesn't exist yet.
@@ -1091,6 +1209,166 @@ static async Task ApplySchemaUpdatesAsync(
             );
             IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_DailyParameterLogs_Location_LogDate')
                 CREATE UNIQUE INDEX IX_DailyParameterLogs_Location_LogDate ON DailyParameterLogs (Location, LogDate);
+            """,
+
+            // ── ElectricityPurchases (new table) ────────────────────────────
+            """
+            IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = N'ElectricityPurchases')
+            CREATE TABLE ElectricityPurchases (
+                Id                     uniqueidentifier NOT NULL PRIMARY KEY DEFAULT NEWID(),
+                PurchaseType           nvarchar(20)     NOT NULL,
+                Location               nvarchar(100)    NOT NULL,
+                PurchaseDate           datetime2        NOT NULL,
+                Vendor                 nvarchar(200)    NULL,
+                AmountNaira            decimal(18,2)    NOT NULL DEFAULT 0,
+                UnitsKwh               float            NOT NULL DEFAULT 0,
+                PaymentReference       nvarchar(100)    NULL,
+                TokenNumber            nvarchar(100)    NULL,
+                MeterReadingKwh        float            NULL,
+                ReceiptAttachment      nvarchar(500)    NULL,
+                LowBalanceThresholdKwh float            NOT NULL DEFAULT 50,
+                BalanceAfterKwh        float            NOT NULL DEFAULT 0,
+                Status                 nvarchar(20)     NOT NULL DEFAULT 'Active',
+                Notes                  nvarchar(1000)   NULL,
+                LoggedByEmail          nvarchar(150)    NOT NULL,
+                LoggedByName           nvarchar(100)    NOT NULL,
+                CreatedAt              datetime2        NOT NULL DEFAULT GETUTCDATE(),
+                UpdatedAt              datetime2        NOT NULL DEFAULT GETUTCDATE()
+            );
+            """,
+
+            // ── DstvSubscriptions (new table) ───────────────────────────────
+            """
+            IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = N'DstvSubscriptions')
+            CREATE TABLE DstvSubscriptions (
+                Id                  uniqueidentifier NOT NULL PRIMARY KEY DEFAULT NEWID(),
+                DecoderNumber       nvarchar(60)     NOT NULL,
+                Location            nvarchar(100)    NOT NULL,
+                Package             nvarchar(80)     NOT NULL,
+                StartDate           datetime2        NOT NULL,
+                DurationMonths      int              NOT NULL DEFAULT 1,
+                ExpiryDate          datetime2        NOT NULL,
+                AmountNaira         decimal(18,2)    NOT NULL DEFAULT 0,
+                PaymentMethod       nvarchar(50)     NULL,
+                Vendor              nvarchar(200)    NULL,
+                ReceiptAttachment   nvarchar(500)    NULL,
+                Status              nvarchar(20)     NOT NULL DEFAULT 'Active',
+                LastReminderDaysOut int              NULL,
+                ExpiredNotified     bit              NOT NULL DEFAULT 0,
+                Notes               nvarchar(1000)   NULL,
+                LoggedByEmail       nvarchar(150)    NOT NULL,
+                LoggedByName        nvarchar(100)    NOT NULL,
+                CreatedAt           datetime2        NOT NULL DEFAULT GETUTCDATE(),
+                UpdatedAt           datetime2        NOT NULL DEFAULT GETUTCDATE()
+            );
+            """,
+
+            // ── Vehicles (master registry — new table) ──────────────────────
+            """
+            IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = N'Vehicles')
+            CREATE TABLE Vehicles (
+                Id                 uniqueidentifier NOT NULL PRIMARY KEY DEFAULT NEWID(),
+                FleetNumber        nvarchar(50)     NOT NULL,
+                RegistrationNumber nvarchar(30)     NOT NULL,
+                VehicleType        nvarchar(80)     NOT NULL,
+                MakeModel          nvarchar(150)    NULL,
+                YearOfManufacture  int              NULL,
+                EngineNumber       nvarchar(80)     NULL,
+                ChassisNumber      nvarchar(80)     NULL,
+                Colour             nvarchar(50)     NULL,
+                AssignedLocation   nvarchar(200)    NULL,
+                AssignedDriver     nvarchar(150)    NULL,
+                AcquisitionDate    datetime2        NULL,
+                OperationalStatus  nvarchar(20)     NOT NULL DEFAULT 'Active',
+                Notes              nvarchar(1000)   NULL,
+                LoggedByEmail      nvarchar(150)    NOT NULL,
+                LoggedByName       nvarchar(100)    NOT NULL,
+                CreatedAt          datetime2        NOT NULL DEFAULT GETUTCDATE(),
+                UpdatedAt          datetime2        NOT NULL DEFAULT GETUTCDATE()
+            );
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_Vehicles_RegistrationNumber')
+                CREATE UNIQUE INDEX IX_Vehicles_RegistrationNumber ON Vehicles (RegistrationNumber);
+            """,
+
+            // ── VehicleDocuments (new table) ────────────────────────────────
+            """
+            IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = N'VehicleDocuments')
+            CREATE TABLE VehicleDocuments (
+                Id                  uniqueidentifier NOT NULL PRIMARY KEY DEFAULT NEWID(),
+                VehicleId           uniqueidentifier NOT NULL,
+                VehicleRegNo        nvarchar(30)     NOT NULL,
+                DocumentType        nvarchar(40)     NOT NULL,
+                IssueDate           datetime2        NOT NULL,
+                ExpiryDate          datetime2        NOT NULL,
+                IssuingAuthority    nvarchar(200)    NULL,
+                RenewalCostNaira    decimal(18,2)    NULL,
+                ReceiptAttachment   nvarchar(500)    NULL,
+                Status              nvarchar(20)     NOT NULL DEFAULT 'Valid',
+                LastReminderDaysOut int              NULL,
+                ExpiredNotified     bit              NOT NULL DEFAULT 0,
+                Notes               nvarchar(1000)   NULL,
+                LoggedByEmail       nvarchar(150)    NOT NULL,
+                LoggedByName        nvarchar(100)    NOT NULL,
+                CreatedAt           datetime2        NOT NULL DEFAULT GETUTCDATE(),
+                UpdatedAt           datetime2        NOT NULL DEFAULT GETUTCDATE()
+            );
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_VehicleDocuments_VehicleId')
+                CREATE INDEX IX_VehicleDocuments_VehicleId ON VehicleDocuments (VehicleId);
+            """,
+
+            // ── DieselBulkSupplies (new table) ──────────────────────────────
+            """
+            IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = N'DieselBulkSupplies')
+            CREATE TABLE DieselBulkSupplies (
+                Id                      uniqueidentifier NOT NULL PRIMARY KEY DEFAULT NEWID(),
+                SupplyReference         nvarchar(20)     NOT NULL,
+                SupplyDate              datetime2        NOT NULL,
+                Vendor                  nvarchar(200)    NOT NULL,
+                InvoiceNumber           nvarchar(80)     NULL,
+                QuantityLitres          float            NOT NULL DEFAULT 0,
+                UnitPriceNaira          decimal(18,4)    NOT NULL DEFAULT 0,
+                TotalCostNaira          decimal(18,2)    NOT NULL DEFAULT 0,
+                StorageLocation         nvarchar(200)    NULL,
+                DeliveryDocuments       nvarchar(500)    NULL,
+                ReceivingOfficer        nvarchar(150)    NULL,
+                QuantityRemainingLitres float            NOT NULL DEFAULT 0,
+                Notes                   nvarchar(1000)   NULL,
+                LoggedByEmail           nvarchar(150)    NOT NULL,
+                LoggedByName            nvarchar(100)    NOT NULL,
+                CreatedAt               datetime2        NOT NULL DEFAULT GETUTCDATE(),
+                UpdatedAt               datetime2        NOT NULL DEFAULT GETUTCDATE()
+            );
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_DieselBulkSupplies_SupplyReference')
+                CREATE UNIQUE INDEX IX_DieselBulkSupplies_SupplyReference ON DieselBulkSupplies (SupplyReference);
+            """,
+
+            // ── DieselDistributions (new table) ─────────────────────────────
+            """
+            IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = N'DieselDistributions')
+            CREATE TABLE DieselDistributions (
+                Id                    uniqueidentifier NOT NULL PRIMARY KEY DEFAULT NEWID(),
+                DistributionReference nvarchar(20)     NOT NULL,
+                DistributionType      nvarchar(20)     NOT NULL,
+                BulkSupplyId          uniqueidentifier NOT NULL,
+                BulkSupplyReference   nvarchar(20)     NOT NULL,
+                DistributionDate      datetime2        NOT NULL,
+                QuantityLitres        float            NOT NULL DEFAULT 0,
+                Purpose               nvarchar(500)    NULL,
+                VehicleRegNo          nvarchar(30)     NULL,
+                Driver                nvarchar(150)    NULL,
+                OdometerReading       nvarchar(100)    NULL,
+                DestinationLocation   nvarchar(200)    NULL,
+                IssuingOfficer        nvarchar(150)    NULL,
+                ReceivingOfficer      nvarchar(150)    NULL,
+                RecipientAcknowledged bit              NOT NULL DEFAULT 0,
+                Notes                 nvarchar(1000)   NULL,
+                LoggedByEmail         nvarchar(150)    NOT NULL,
+                LoggedByName          nvarchar(100)    NOT NULL,
+                CreatedAt             datetime2        NOT NULL DEFAULT GETUTCDATE(),
+                UpdatedAt             datetime2        NOT NULL DEFAULT GETUTCDATE()
+            );
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_DieselDistributions_DistributionReference')
+                CREATE UNIQUE INDEX IX_DieselDistributions_DistributionReference ON DieselDistributions (DistributionReference);
             """,
 
             // ── AppUsers — ensure nullable columns added after initial create ──

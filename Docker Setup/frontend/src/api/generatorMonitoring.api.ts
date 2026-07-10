@@ -13,18 +13,20 @@ export const generatorMonitoringApi = {
     apiClient.get<GeneratorDailyReading[]>('/generator-monitoring/alerts').then(r => r.data),
 
   createReading: (data: {
-    assetNo:              string;
-    assetDescription:     string;
-    location:             string;
-    cumulativeRunHours:   number;
-    runHoursToday:        number;
-    generatorStatus:      string;
-    fuelLevelLitres:      number;
-    fuelConsumedLitres?:  number;
-    utilityAvailableHours?:number;
-    serviceIntervalHours: number;
-    lastServicedAtHours?: number;
-    notes?:               string;
+    assetNo:                 string;
+    assetDescription:        string;
+    location:                string;
+    currentEngineReading:    number;
+    generatorStatus:         string;
+    currentFuelLevelLitres:  number;
+    previousEngineReading?:  number;
+    previousFuelLevelLitres?:number;
+    previousUtilityReading?: number;
+    currentUtilityReading?:  number;
+    serviceIntervalHours:    number;
+    serviceCompleted?:       boolean;
+    lastServicedAtHours?:    number;
+    notes?:                  string;
   }) => apiClient.post<GeneratorDailyReading>('/generator-monitoring/readings', data).then(r => r.data),
 
   deleteReading: (id: string) =>

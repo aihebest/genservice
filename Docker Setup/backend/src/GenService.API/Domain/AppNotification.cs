@@ -41,6 +41,14 @@ public static class NotificationType
     public const string MaintenanceOverdue             = "MaintenanceOverdue";             // just became overdue
     public const string MaintenanceEscalationSupervisor = "MaintenanceEscalationSupervisor"; // 1+ days overdue
     public const string MaintenanceEscalationManager   = "MaintenanceEscalationManager";  // 3+ days overdue
+
+    // ── Utilities / Assets (Obinna's modules) ─────────────────────────────────
+    public const string ElectricityLowBalance    = "ElectricityLowBalance";   // location balance at/below threshold
+    public const string SubscriptionExpiring      = "SubscriptionExpiring";    // DStv 7/3/1 day reminders
+    public const string SubscriptionExpired       = "SubscriptionExpired";     // DStv lapsed
+    public const string VehicleDocExpiring        = "VehicleDocExpiring";      // statutory doc 14/7/1 day reminders
+    public const string VehicleDocExpired         = "VehicleDocExpired";       // statutory doc lapsed
+    public const string DieselLowStock            = "DieselLowStock";          // bulk diesel balance low
 }
 
 public static class NotificationTarget

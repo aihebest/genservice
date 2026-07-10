@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import {
   Alert, Badge, Button, Col, Descriptions, Divider, Drawer, Form,
   Input, InputNumber, Modal, Progress, Row, Select, Space,
-  Statistic, Table, Tag, Typography,
+  Statistic, Switch, Table, Tag, Typography,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { PlusOutlined, WarningOutlined, ThunderboltOutlined } from '@ant-design/icons';
@@ -76,6 +76,20 @@ export default function DailyReadingsTab() {
   const [form]           = Form.useForm();
   const [locationSel,    setLocationSel]    = useState<string | null>(null);
 
+  // Live-computed previews for the create modal (mirror the server-side calculations)
+  const wPrevEngine = Form.useWatch('previousEngineReading',   form) as number | undefined;
+  const wCurrEngine = Form.useWatch('currentEngineReading',    form) as number | undefined;
+  const wPrevFuel   = Form.useWatch('previousFuelLevelLitres', form) as number | undefined;
+  const wCurrFuel   = Form.useWatch('currentFuelLevelLitres',  form) as number | undefined;
+  const wPrevUtil   = Form.useWatch('previousUtilityReading',  form) as number | undefined;
+  const wCurrUtil   = Form.useWatch('currentUtilityReading',   form) as number | undefined;
+  const runHoursPreview =
+    wCurrEngine != null && wPrevEngine != null ? Math.max(0, wCurrEngine - wPrevEngine) : null;
+  const fuelConsumedPreview =
+    wCurrFuel != null && wPrevFuel != null ? wPrevFuel - wCurrFuel : null;
+  const utilityPreview =
+    wCurrUtil != null && wPrevUtil != null ? Math.max(0, wCurrUtil - wPrevUtil) : null;
+
   const refresh = useCallback(() => qc.invalidateQueries({ queryKey: ['gen-readings'] }), [qc]);
 
   const { data, isFetching } = useQuery({
@@ -103,13 +117,15 @@ export default function DailyReadingsTab() {
         assetNo: (values.assetNo as string).trim(),
         assetDescription: (values.assetDescription as string).trim(),
         location,
-        cumulativeRunHours: values.cumulativeRunHours as number,
-        runHoursToday: values.runHoursToday as number,
+        previousEngineReading: values.previousEngineReading as number | undefined,
+        currentEngineReading: values.currentEngineReading as number,
         generatorStatus: values.generatorStatus as string,
-        fuelLevelLitres: values.fuelLevelLitres as number,
-        fuelConsumedLitres: values.fuelConsumedLitres as number | undefined,
-        utilityAvailableHours: values.utilityAvailableHours as number | undefined,
+        previousFuelLevelLitres: values.previousFuelLevelLitres as number | undefined,
+        currentFuelLevelLitres: values.currentFuelLevelLitres as number,
+        previousUtilityReading: values.previousUtilityReading as number | undefined,
+        currentUtilityReading: values.currentUtilityReading as number | undefined,
         serviceIntervalHours: (values.serviceIntervalHours as number) ?? 250,
+        serviceCompleted: (values.serviceCompleted as boolean) ?? false,
         lastServicedAtHours: values.lastServicedAtHours as number | undefined,
         notes: values.notes as string | undefined,
       });
@@ -255,36 +271,76 @@ export default function DailyReadingsTab() {
               <Input placeholder="Enter location…" />
             </Form.Item>
           )}
+          <Divider orientation="left" orientationMargin={0} style={{ fontSize: 12 }}>
+            Engine Run Hours (24 h)
+          </Divider>
           <Row gutter={12}>
             <Col span={12}>
-              <Form.Item name="cumulativeRunHours" label="Cumulative Run Hours (meter)" rules={[{ required: true }]}>
-                <InputNumber style={{ width: '100%' }} placeholder="e.g. 16245" min={0} step={0.5} />
+              <Form.Item name="previousEngineReading" label="Previous Engine Reading (hrs)"
+                tooltip="Leave blank to auto-fill from the last recorded reading for this generator.">
+                <InputNumber style={{ width: '100%' }} placeholder="e.g. 12450" min={0} step={0.5} />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="runHoursToday" label="Hours Run Today" rules={[{ required: true }]}>
-                <InputNumber style={{ width: '100%' }} placeholder="e.g. 6.5" min={0} max={24} step={0.5} />
+              <Form.Item name="currentEngineReading" label="Current Engine Reading (hrs)" rules={[{ required: true }]}>
+                <InputNumber style={{ width: '100%' }} placeholder="e.g. 12462" min={0} step={0.5} />
               </Form.Item>
             </Col>
           </Row>
+          {runHoursPreview != null && (
+            <Text type="secondary" style={{ display: 'block', marginTop: -6, marginBottom: 10, fontSize: 12 }}>
+              Run Hours (24 h) = <strong>{runHoursPreview.toFixed(1)} h</strong>
+            </Text>
+          )}
+
+          <Divider orientation="left" orientationMargin={0} style={{ fontSize: 12 }}>
+            Fuel Consumption
+          </Divider>
           <Row gutter={12}>
-            <Col span={8}>
-              <Form.Item name="fuelLevelLitres" label="Current Fuel Level (L)" rules={[{ required: true }]}>
-                <InputNumber style={{ width: '100%' }} placeholder="e.g. 380" min={0} />
+            <Col span={12}>
+              <Form.Item name="previousFuelLevelLitres" label="Previous Fuel Level (L)"
+                tooltip="Leave blank to auto-fill from the last recorded reading.">
+                <InputNumber style={{ width: '100%' }} placeholder="e.g. 800" min={0} />
               </Form.Item>
             </Col>
-            <Col span={8}>
-              <Form.Item name="fuelConsumedLitres" label="Fuel Consumed Today (L)">
-                <InputNumber style={{ width: '100%' }} placeholder="e.g. 65" min={0} />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item name="utilityAvailableHours" label="Utility Power Hours">
-                <InputNumber style={{ width: '100%' }} placeholder="e.g. 8" min={0} max={24} step={0.5} />
+            <Col span={12}>
+              <Form.Item name="currentFuelLevelLitres" label="Current Fuel Level (L)" rules={[{ required: true }]}>
+                <InputNumber style={{ width: '100%' }} placeholder="e.g. 650" min={0} />
               </Form.Item>
             </Col>
           </Row>
+          {fuelConsumedPreview != null && fuelConsumedPreview >= 0 && (
+            <Text type="secondary" style={{ display: 'block', marginTop: -6, marginBottom: 10, fontSize: 12 }}>
+              Fuel Consumed = <strong>{fuelConsumedPreview.toFixed(0)} L</strong>
+            </Text>
+          )}
+
+          <Divider orientation="left" orientationMargin={0} style={{ fontSize: 12 }}>
+            Utility (NEPA) Power — hour meter
+          </Divider>
           <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="previousUtilityReading" label="Previous Utility Reading (hrs)"
+                tooltip="Leave blank to auto-fill from the last recorded reading.">
+                <InputNumber style={{ width: '100%' }} placeholder="e.g. 5420" min={0} step={0.5} />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="currentUtilityReading" label="Current Utility Reading (hrs)">
+                <InputNumber style={{ width: '100%' }} placeholder="e.g. 5438" min={0} step={0.5} />
+              </Form.Item>
+            </Col>
+          </Row>
+          {utilityPreview != null && utilityPreview >= 0 && (
+            <Text type="secondary" style={{ display: 'block', marginTop: -6, marginBottom: 10, fontSize: 12 }}>
+              Utility Power Available (24 h) = <strong>{utilityPreview.toFixed(1)} h</strong>
+            </Text>
+          )}
+
+          <Divider orientation="left" orientationMargin={0} style={{ fontSize: 12 }}>
+            Service Interval (every 250 h)
+          </Divider>
+          <Row gutter={12} align="middle">
             <Col span={8}>
               <Form.Item name="serviceIntervalHours" label="Service Interval (hrs)" initialValue={250}>
                 <InputNumber style={{ width: '100%' }} min={50} step={50} />
@@ -292,10 +348,21 @@ export default function DailyReadingsTab() {
             </Col>
             <Col span={8}>
               <Form.Item name="lastServicedAtHours" label="Last Serviced At (hrs)">
-                <InputNumber style={{ width: '100%' }} placeholder="e.g. 16010" min={0} />
+                <InputNumber style={{ width: '100%' }} placeholder="e.g. 12210" min={0} />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="serviceCompleted" label="Service Done Today?" valuePropName="checked"
+                initialValue={false}
+                tooltip="Tick if a service was carried out with this reading. Resets the remaining-hours countdown to a full interval.">
+                <Switch checkedChildren="Yes" unCheckedChildren="No" />
               </Form.Item>
             </Col>
           </Row>
+          <Text type="secondary" style={{ display: 'block', marginTop: -6, marginBottom: 10, fontSize: 12 }}>
+            The remaining service hours carry forward automatically and a maintenance alert is raised at 150 h or below.
+          </Text>
+
           <Form.Item name="notes" label="Notes (optional)">
             <TextArea rows={2} placeholder="Any observations, faults, or remarks…" maxLength={2000} />
           </Form.Item>

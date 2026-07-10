@@ -236,5 +236,130 @@ public class MaintenanceReminderService(
                 "🔔 Reminder run complete — {R} reminders, {E} escalations sent.",
                 reminders, escalations);
         }
+
+        // ── Obinna's modules: expiry reminders ────────────────────────────────
+        await RunDstvRemindersAsync(db, notif, now, ct);
+        await RunVehicleDocumentRemindersAsync(db, notif, now, ct);
     }
+
+    // ── DStv subscription renewal reminders (7 / 3 / 1 days) ───────────────────
+    private static readonly int[] DstvMilestones = [7, 3, 1];
+
+    private async Task RunDstvRemindersAsync(
+        GenServiceDbContext db, NotificationService notif, DateTime now, CancellationToken ct)
+    {
+        var subs    = await db.DstvSubscriptions.ToListAsync(ct);
+        var changed = false;
+
+        foreach (var s in subs)
+        {
+            var days = (int)Math.Ceiling((s.ExpiryDate.Date - now.Date).TotalDays);
+
+            if (days < 0)
+            {
+                s.Status = DstvStatus.Expired;
+                if (!s.ExpiredNotified)
+                {
+                    await notif.CreateAsync(
+                        title:      $"📺 DStv expired: {s.Location}",
+                        message:    $"DStv decoder {s.DecoderNumber} at {s.Location} expired on {s.ExpiryDate:d MMM yyyy}. Renew to restore service.",
+                        type:       NotificationType.SubscriptionExpired,
+                        module:     "DStv",
+                        entityId:   s.Id.ToString(),
+                        refNumber:  s.DecoderNumber,
+                        targetRole: NotificationTarget.Management);
+                    s.ExpiredNotified = true;
+                    s.UpdatedAt = now;
+                    changed = true;
+                }
+                continue;
+            }
+
+            s.Status = days <= 7 ? DstvStatus.ExpiringSoon : DstvStatus.Active;
+
+            // Fire once per milestone as we cross 7 → 3 → 1 days.
+            var milestone = DstvMilestones.Where(m => days <= m).DefaultIfEmpty(0).Max();
+            if (milestone > 0 && s.LastReminderDaysOut != milestone)
+            {
+                await notif.CreateAsync(
+                    title:      $"📺 DStv renewal due in {milestone} day{(milestone == 1 ? "" : "s")}: {s.Location}",
+                    message:    $"DStv decoder {s.DecoderNumber} ({s.Package}) at {s.Location} expires on {s.ExpiryDate:d MMM yyyy}.",
+                    type:       NotificationType.SubscriptionExpiring,
+                    module:     "DStv",
+                    entityId:   s.Id.ToString(),
+                    refNumber:  s.DecoderNumber,
+                    targetRole: NotificationTarget.Management);
+                s.LastReminderDaysOut = milestone;
+                s.UpdatedAt = now;
+                changed = true;
+            }
+        }
+
+        if (changed) await db.SaveChangesAsync(ct);
+    }
+
+    // ── Vehicle statutory-document renewal reminders (14 / 7 / 1 days) ─────────
+    private static readonly int[] VehicleDocMilestones = [14, 7, 1];
+
+    private async Task RunVehicleDocumentRemindersAsync(
+        GenServiceDbContext db, NotificationService notif, DateTime now, CancellationToken ct)
+    {
+        var docs    = await db.VehicleDocuments.ToListAsync(ct);
+        var changed = false;
+
+        foreach (var d in docs)
+        {
+            var days = (int)Math.Ceiling((d.ExpiryDate.Date - now.Date).TotalDays);
+
+            if (days < 0)
+            {
+                d.Status = VehicleDocumentStatus.Expired;
+                if (!d.ExpiredNotified)
+                {
+                    await notif.CreateAsync(
+                        title:      $"🚗 {DocLabel(d.DocumentType)} EXPIRED: {d.VehicleRegNo}",
+                        message:    $"{DocLabel(d.DocumentType)} for {d.VehicleRegNo} expired on {d.ExpiryDate:d MMM yyyy}. Renew immediately.",
+                        type:       NotificationType.VehicleDocExpired,
+                        module:     "Vehicle",
+                        entityId:   d.Id.ToString(),
+                        refNumber:  d.VehicleRegNo,
+                        targetRole: NotificationTarget.Management);
+                    d.ExpiredNotified = true;
+                    d.UpdatedAt = now;
+                    changed = true;
+                }
+                continue;
+            }
+
+            d.Status = days <= 14 ? VehicleDocumentStatus.Expiring : VehicleDocumentStatus.Valid;
+
+            var milestone = VehicleDocMilestones.Where(m => days <= m).DefaultIfEmpty(0).Max();
+            if (milestone > 0 && d.LastReminderDaysOut != milestone)
+            {
+                await notif.CreateAsync(
+                    title:      $"🚗 {DocLabel(d.DocumentType)} renewal due in {milestone} day{(milestone == 1 ? "" : "s")}: {d.VehicleRegNo}",
+                    message:    $"{DocLabel(d.DocumentType)} for {d.VehicleRegNo} expires on {d.ExpiryDate:d MMM yyyy}.",
+                    type:       NotificationType.VehicleDocExpiring,
+                    module:     "Vehicle",
+                    entityId:   d.Id.ToString(),
+                    refNumber:  d.VehicleRegNo,
+                    targetRole: NotificationTarget.Management);
+                d.LastReminderDaysOut = milestone;
+                d.UpdatedAt = now;
+                changed = true;
+            }
+        }
+
+        if (changed) await db.SaveChangesAsync(ct);
+    }
+
+    private static string DocLabel(string type) => type switch
+    {
+        VehicleDocumentType.VehicleLicence  => "Vehicle Licence",
+        VehicleDocumentType.RoadWorthiness  => "Road Worthiness",
+        VehicleDocumentType.Insurance       => "Insurance",
+        VehicleDocumentType.HackneyPermit   => "Hackney Carriage Permit",
+        VehicleDocumentType.HeavyDutyPermit => "Heavy Duty Permit",
+        _                                    => type,
+    };
 }
