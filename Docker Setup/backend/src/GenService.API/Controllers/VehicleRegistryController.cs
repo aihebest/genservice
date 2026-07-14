@@ -222,13 +222,17 @@ public class VehicleRegistryController(
     [HttpPost("documents")]
     public async Task<ActionResult<VehicleDocumentDto>> CreateDocument([FromBody] CreateVehicleDocumentRequest req)
     {
-        var vehicle = await db.Vehicles.FindAsync(req.VehicleId);
-        if (vehicle is null) return BadRequest(new { message = "Vehicle not found." });
+        var regNo = req.VehicleRegNo.Trim();
+        if (string.IsNullOrWhiteSpace(regNo))
+            return BadRequest(new { message = "Vehicle registration is required." });
+
+        // Link to a registered vehicle if the registration matches; otherwise stand alone.
+        var vehicle = await db.Vehicles.FirstOrDefaultAsync(v => v.RegistrationNumber == regNo);
 
         var doc = new VehicleDocument
         {
-            VehicleId         = req.VehicleId,
-            VehicleRegNo      = vehicle.RegistrationNumber,
+            VehicleId         = vehicle?.Id ?? Guid.Empty,
+            VehicleRegNo      = regNo,
             DocumentType      = req.DocumentType.Trim(),
             IssueDate         = req.IssueDate?.Date ?? DateTime.UtcNow.Date,
             ExpiryDate        = req.ExpiryDate.Date,

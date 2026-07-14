@@ -14,9 +14,10 @@ export const dstvApi = {
     decoderNumber:      string;
     location:           string;
     package:            string;
-    durationMonths:     number;
     amountNaira:        number;
     startDate?:         string;
+    endDate?:           string;
+    durationMonths?:    number;
     paymentMethod?:     string;
     vendor?:            string;
     receiptAttachment?: string;

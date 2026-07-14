@@ -52,7 +52,7 @@ public record VehicleQuery(
 // ── Vehicle statutory documents ────────────────────────────────────────────────
 
 public record CreateVehicleDocumentRequest(
-    Guid      VehicleId,
+    string    VehicleRegNo,          // free-text vehicle registration (linked to registry if it matches)
     string    DocumentType,
     DateTime  ExpiryDate,
     DateTime? IssueDate         = null,

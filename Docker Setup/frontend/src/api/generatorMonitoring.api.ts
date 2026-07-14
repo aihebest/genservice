@@ -27,6 +27,7 @@ export const generatorMonitoringApi = {
     serviceCompleted?:       boolean;
     lastServicedAtHours?:    number;
     notes?:                  string;
+    readingDate?:            string;
   }) => apiClient.post<GeneratorDailyReading>('/generator-monitoring/readings', data).then(r => r.data),
 
   deleteReading: (id: string) =>
@@ -39,9 +40,10 @@ export const generatorMonitoringApi = {
   createPowerReading: (data: {
     location:              string;
     meterNumber:           string;
-    meterReadingKwh:       number;
+    previousMeterReading:  number;
+    currentMeterReading:   number;
+    readingDate?:          string;
     utilityAvailableHours?:number;
-    costPerKwhNaira?:      number;
     notes?:                string;
   }) => apiClient.post<PowerMeterReading>('/power-meter', data).then(r => r.data),
 };

@@ -14,8 +14,10 @@ public class PowerMeterReading
 
     // ── Reading ───────────────────────────────────────────────────────────────
     public DateTime ReadingDate          { get; set; } = DateTime.UtcNow.Date;
-    public double   MeterReadingKwh      { get; set; }     // cumulative kWh on meter
-    public double?  UnitsConsumedToday   { get; set; }     // calculated vs previous reading
+    public double   PreviousMeterReading { get; set; }     // previous meter reading (user input)
+    public double   CurrentMeterReading  { get; set; }     // current meter reading (user input)
+    public double   MeterReadingKwh      { get; set; }     // = CurrentMeterReading (kept for reports)
+    public double?  UnitsConsumedToday   { get; set; }     // = Current − Previous (auto, 24h)
     public double?  UtilityAvailableHours{ get; set; }     // hours NPA power was on
 
     // ── Cost calculation ──────────────────────────────────────────────────────

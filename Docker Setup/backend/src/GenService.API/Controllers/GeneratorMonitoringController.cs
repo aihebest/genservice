@@ -158,7 +158,7 @@ public class GeneratorMonitoringController(
             AssetNo                 = req.AssetNo.Trim(),
             AssetDescription        = req.AssetDescription.Trim(),
             Location                = req.Location.Trim(),
-            ReadingDate             = DateTime.UtcNow.Date,
+            ReadingDate             = req.ReadingDate?.Date ?? DateTime.UtcNow.Date,
             PreviousEngineReading   = previousEngine,
             CurrentEngineReading    = req.CurrentEngineReading,
             RunHoursToday           = runHoursToday,
@@ -239,8 +239,12 @@ public class PowerMeterController(
     private string CallerEmail => User.FindFirstValue(ClaimTypes.Email) ?? "";
     private string CallerName  => User.FindFirstValue(ClaimTypes.Name)  ?? "";
 
+    /// <summary>Fixed NPA electricity tariff (₦ per kWh).</summary>
+    private const decimal ElectricityRateNaira = 209m;
+
     private static PowerMeterReadingDto ToDto(PowerMeterReading r) => new(
         r.Id, r.Location, r.MeterNumber, r.ReadingDate,
+        r.PreviousMeterReading, r.CurrentMeterReading,
         r.MeterReadingKwh, r.UnitsConsumedToday, r.UtilityAvailableHours,
         r.CostPerKwhNaira, r.TotalElectricityCostNaira,
         r.Notes, r.LoggedByEmail, r.LoggedByName, r.CreatedAt
@@ -273,30 +277,23 @@ public class PowerMeterController(
     public async Task<ActionResult<PowerMeterReadingDto>> Create(
         [FromBody] CreatePowerMeterReadingRequest req)
     {
-        // Auto-calculate units consumed by comparing with previous reading for this location
-        var prev = await db.PowerMeterReadings
-            .Where(r => r.Location == req.Location && r.MeterNumber == req.MeterNumber)
-            .OrderByDescending(r => r.ReadingDate)
-            .FirstOrDefaultAsync();
+        // Consumed (24h) = Current − Previous (user-entered readings)
+        var consumed = Math.Max(0, req.CurrentMeterReading - req.PreviousMeterReading);
 
-        double? consumed = prev != null
-            ? req.MeterReadingKwh - prev.MeterReadingKwh
-            : null;
-
-        // Auto-calculate electricity cost if rate is provided
-        decimal? totalCost = null;
-        if (req.CostPerKwhNaira.HasValue && consumed > 0)
-            totalCost = req.CostPerKwhNaira.Value * (decimal)consumed.Value;
+        // Total cost = consumed × fixed ₦209/kWh tariff
+        var totalCost = ElectricityRateNaira * (decimal)consumed;
 
         var reading = new PowerMeterReading
         {
             Location                 = req.Location.Trim(),
             MeterNumber              = req.MeterNumber.Trim(),
-            ReadingDate              = DateTime.UtcNow.Date,
-            MeterReadingKwh          = req.MeterReadingKwh,
-            UnitsConsumedToday       = consumed > 0 ? consumed : null,
+            ReadingDate              = req.ReadingDate?.Date ?? DateTime.UtcNow.Date,
+            PreviousMeterReading     = req.PreviousMeterReading,
+            CurrentMeterReading      = req.CurrentMeterReading,
+            MeterReadingKwh          = req.CurrentMeterReading,
+            UnitsConsumedToday       = consumed,
             UtilityAvailableHours    = req.UtilityAvailableHours,
-            CostPerKwhNaira          = req.CostPerKwhNaira,
+            CostPerKwhNaira          = ElectricityRateNaira,
             TotalElectricityCostNaira= totalCost,
             Notes                    = req.Notes?.Trim(),
             LoggedByEmail            = CallerEmail,
@@ -307,8 +304,8 @@ public class PowerMeterController(
         db.PowerMeterReadings.Add(reading);
         await db.SaveChangesAsync();
 
-        logger.LogInformation("Power meter reading: {Location} {Meter} — {Reading} kWh",
-            req.Location, req.MeterNumber, req.MeterReadingKwh);
+        logger.LogInformation("Power meter reading: {Location} {Meter} — {Consumed} kWh consumed, ₦{Cost}",
+            req.Location, req.MeterNumber, consumed, totalCost);
 
         return CreatedAtAction(nameof(List), ToDto(reading));
     }

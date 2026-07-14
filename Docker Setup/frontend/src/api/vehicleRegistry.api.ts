@@ -41,7 +41,7 @@ export const vehicleRegistryApi = {
     apiClient.get<VehicleDocument[]>('/vehicle-registry/documents/expiring', { params: { days } }).then(r => r.data),
 
   createDocument: (data: {
-    vehicleId:          string;
+    vehicleRegNo:       string;
     documentType:       string;
     expiryDate:         string;
     issueDate?:         string;

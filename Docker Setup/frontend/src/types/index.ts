@@ -223,6 +223,8 @@ export interface PowerMeterReading {
   location:                     string;
   meterNumber:                  string;
   readingDate:                  string;
+  previousMeterReading:         number;
+  currentMeterReading:          number;
   meterReadingKwh:              number;
   unitsConsumedToday?:          number;
   utilityAvailableHours?:       number;

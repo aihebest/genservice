@@ -8,7 +8,7 @@ import { PlusOutlined, ReloadOutlined, PlayCircleOutlined } from '@ant-design/ic
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { dstvApi } from '../../api/dstv.api';
-import { DSTV_PACKAGES, DSTV_STATUS_META, ELECTRICITY_LOCATIONS } from '../../types';
+import { DSTV_PACKAGES, DSTV_STATUS_META } from '../../types';
 import type { DstvSubscription, DstvStatus } from '../../types';
 
 const { Title, Text } = Typography;
@@ -40,9 +40,9 @@ export default function DstvPage() {
         decoderNumber:  v.decoderNumber as string,
         location:       v.location as string,
         package:        v.package as string,
-        durationMonths: v.durationMonths as number,
         amountNaira:    v.amountNaira as number,
-        startDate:      v.startDate ? (v.startDate as dayjs.Dayjs).toISOString() : undefined,
+        startDate:      v.startDate ? (v.startDate as dayjs.Dayjs).format('YYYY-MM-DD') : undefined,
+        endDate:        v.endDate ? (v.endDate as dayjs.Dayjs).format('YYYY-MM-DD') : undefined,
         paymentMethod:  v.paymentMethod as string | undefined,
         vendor:         v.vendor as string | undefined,
         notes:          v.notes as string | undefined,
@@ -125,7 +125,7 @@ export default function DstvPage() {
       {/* Add modal */}
       <Modal title="Add DStv Subscription" open={open} onOk={() => form.submit()}
         onCancel={() => { setOpen(false); form.resetFields(); }} confirmLoading={saving} okText="Save" width={540} destroyOnClose>
-        <Form form={form} layout="vertical" onFinish={handleSave} initialValues={{ durationMonths: 1 }}>
+        <Form form={form} layout="vertical" onFinish={handleSave}>
           <Row gutter={12}>
             <Col span={12}>
               <Form.Item name="decoderNumber" label="Decoder / Smartcard No." rules={[{ required: true }]}>
@@ -134,7 +134,7 @@ export default function DstvPage() {
             </Col>
             <Col span={12}>
               <Form.Item name="location" label="Location" rules={[{ required: true }]}>
-                <Select showSearch options={ELECTRICITY_LOCATIONS.map(l => ({ value: l, label: l }))} />
+                <Input placeholder="Enter location manually" />
               </Form.Item>
             </Col>
           </Row>
@@ -145,20 +145,21 @@ export default function DstvPage() {
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="durationMonths" label="Duration (months)" rules={[{ required: true }]}>
-                <InputNumber style={{ width: '100%' }} min={1} max={24} />
+              <Form.Item name="amountNaira" label="Amount Paid (₦)" rules={[{ required: true }]}>
+                <InputNumber style={{ width: '100%' }} min={0} />
               </Form.Item>
             </Col>
           </Row>
           <Row gutter={12}>
             <Col span={12}>
-              <Form.Item name="startDate" label="Start Date">
-                <DatePicker style={{ width: '100%' }} />
+              <Form.Item name="startDate" label="Start Date" rules={[{ required: true }]}>
+                <DatePicker style={{ width: '100%' }} format="DD MMM YYYY" />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="amountNaira" label="Amount Paid (₦)" rules={[{ required: true }]}>
-                <InputNumber style={{ width: '100%' }} min={0} />
+              <Form.Item name="endDate" label="End Date" rules={[{ required: true }]}
+                tooltip="Subscription expiry date — reminders fire 7/3/1 days before this.">
+                <DatePicker style={{ width: '100%' }} format="DD MMM YYYY" />
               </Form.Item>
             </Col>
           </Row>

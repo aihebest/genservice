@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import {
-  Alert, Badge, Button, Col, Descriptions, Divider, Drawer, Form,
+  Alert, Badge, Button, Col, DatePicker, Descriptions, Divider, Drawer, Form,
   Input, InputNumber, Modal, Progress, Row, Select, Space,
   Statistic, Switch, Table, Tag, Typography,
 } from 'antd';
@@ -128,6 +128,7 @@ export default function DailyReadingsTab() {
         serviceCompleted: (values.serviceCompleted as boolean) ?? false,
         lastServicedAtHours: values.lastServicedAtHours as number | undefined,
         notes: values.notes as string | undefined,
+        readingDate: values.readingDate ? (values.readingDate as dayjs.Dayjs).format('YYYY-MM-DD') : undefined,
       });
       form.resetFields(); setLocationSel(null); setCreateOpen(false); refresh();
     } catch(e: unknown) {
@@ -271,6 +272,14 @@ export default function DailyReadingsTab() {
               <Input placeholder="Enter location…" />
             </Form.Item>
           )}
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="readingDate" label="Reading Date"
+                tooltip="Defaults to today. Pick a past date to enter an earlier record.">
+                <DatePicker style={{ width: '100%' }} format="DD MMM YYYY" />
+              </Form.Item>
+            </Col>
+          </Row>
           <Divider titlePlacement="left" orientationMargin={0} style={{ fontSize: 12 }}>
             Engine Run Hours (24 h)
           </Divider>

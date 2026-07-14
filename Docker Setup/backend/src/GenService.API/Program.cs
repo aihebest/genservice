@@ -1174,6 +1174,10 @@ static async Task ApplySchemaUpdatesAsync(
             AddFloatColIfMissing("GeneratorDailyReadings", "RemainingServiceHours",   "250"),
             AddBitColIfMissing  ("GeneratorDailyReadings", "ServiceCompleted"),
 
+            // ── PowerMeterReadings — Previous/Current meter reading columns ──
+            AddFloatColIfMissing("PowerMeterReadings", "PreviousMeterReading", "0"),
+            AddFloatColIfMissing("PowerMeterReadings", "CurrentMeterReading",  "0"),
+
             // ── DailyParameterLogs (new table — create if missing) ──────────
             // EnsureCreated will create it on fresh DBs; on existing DBs we
             // use IF NOT EXISTS to create the table only if it doesn't exist yet.

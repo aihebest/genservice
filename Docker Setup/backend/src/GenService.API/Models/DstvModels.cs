@@ -6,9 +6,10 @@ public record CreateDstvSubscriptionRequest(
     string    DecoderNumber,
     string    Location,
     string    Package,
-    int       DurationMonths,
     decimal   AmountNaira,
     DateTime? StartDate         = null,
+    DateTime? EndDate           = null,   // explicit expiry/end date
+    int       DurationMonths    = 0,      // optional fallback if EndDate not given
     string?   PaymentMethod     = null,
     string?   Vendor            = null,
     string?   ReceiptAttachment = null,

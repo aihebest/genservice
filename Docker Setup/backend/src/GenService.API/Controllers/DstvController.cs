@@ -80,9 +80,21 @@ public class DstvController(
     public async Task<ActionResult<DstvSubscriptionDto>> Create(
         [FromBody] CreateDstvSubscriptionRequest req)
     {
-        var start  = req.StartDate?.Date ?? DateTime.UtcNow.Date;
-        var months = req.DurationMonths > 0 ? req.DurationMonths : 1;
-        var expiry = start.AddMonths(months);
+        var start = req.StartDate?.Date ?? DateTime.UtcNow.Date;
+
+        // Prefer the explicit End Date; otherwise fall back to duration months.
+        DateTime expiry;
+        int months;
+        if (req.EndDate.HasValue)
+        {
+            expiry = req.EndDate.Value.Date;
+            months = Math.Max(1, (int)Math.Round((expiry - start).TotalDays / 30.0));
+        }
+        else
+        {
+            months = req.DurationMonths > 0 ? req.DurationMonths : 1;
+            expiry = start.AddMonths(months);
+        }
 
         var sub = new DstvSubscription
         {

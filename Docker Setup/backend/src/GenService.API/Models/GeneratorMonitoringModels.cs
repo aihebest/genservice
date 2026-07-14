@@ -16,7 +16,8 @@ public record CreateGeneratorReadingRequest(
     double  ServiceIntervalHours   = 250,
     bool    ServiceCompleted       = false, // §2 tick when a service was carried out
     double? LastServicedAtHours    = null,
-    string? Notes                  = null
+    string?   Notes                = null,
+    DateTime? ReadingDate          = null   // optional — allows backdating a reading
 );
 
 public record GeneratorReadingDto(
@@ -71,12 +72,13 @@ public record GeneratorSummaryByLocation(
 // ── Power Meter Reading ───────────────────────────────────────────────────────
 
 public record CreatePowerMeterReadingRequest(
-    string   Location,
-    string   MeterNumber,
-    double   MeterReadingKwh,
-    double?  UtilityAvailableHours,
-    decimal? CostPerKwhNaira,
-    string?  Notes
+    string    Location,
+    string    MeterNumber,
+    double    PreviousMeterReading,
+    double    CurrentMeterReading,
+    DateTime? ReadingDate           = null,
+    double?   UtilityAvailableHours = null,
+    string?   Notes                 = null
 );
 
 public record PowerMeterReadingDto(
@@ -84,6 +86,8 @@ public record PowerMeterReadingDto(
     string    Location,
     string    MeterNumber,
     DateTime  ReadingDate,
+    double    PreviousMeterReading,
+    double    CurrentMeterReading,
     double    MeterReadingKwh,
     double?   UnitsConsumedToday,
     double?   UtilityAvailableHours,

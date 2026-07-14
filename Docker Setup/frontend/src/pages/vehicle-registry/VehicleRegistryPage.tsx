@@ -45,10 +45,6 @@ export default function VehicleRegistryPage() {
     queryFn: () => vehicleRegistryApi.listDocuments({ status: docStatus, page: dPage }),
     enabled: tab === 'documents',
   });
-  const { data: allVehicles } = useQuery({
-    queryKey: ['vreg', 'vehicles', 'all'],
-    queryFn: () => vehicleRegistryApi.listVehicles({ page: 1 }),
-  });
 
   const refresh = () => qc.invalidateQueries({ queryKey: ['vreg'] });
 
@@ -66,7 +62,7 @@ export default function VehicleRegistryPage() {
         colour:             v.colour,
         assignedLocation:   v.assignedLocation,
         assignedDriver:     v.assignedDriver,
-        acquisitionDate:    v.acquisitionDate ? (v.acquisitionDate as dayjs.Dayjs).toISOString() : undefined,
+        acquisitionDate:    v.acquisitionDate ? (v.acquisitionDate as dayjs.Dayjs).format('YYYY-MM-DD') : undefined,
         operationalStatus:  v.operationalStatus,
         notes:              v.notes,
       });
@@ -81,10 +77,10 @@ export default function VehicleRegistryPage() {
     setSaving(true);
     try {
       await vehicleRegistryApi.createDocument({
-        vehicleId:        v.vehicleId as string,
+        vehicleRegNo:     (v.vehicleRegNo as string).trim(),
         documentType:     v.documentType as string,
-        expiryDate:       (v.expiryDate as dayjs.Dayjs).toISOString(),
-        issueDate:        v.issueDate ? (v.issueDate as dayjs.Dayjs).toISOString() : undefined,
+        expiryDate:       (v.expiryDate as dayjs.Dayjs).format('YYYY-MM-DD'),
+        issueDate:        v.issueDate ? (v.issueDate as dayjs.Dayjs).format('YYYY-MM-DD') : undefined,
         issuingAuthority: v.issuingAuthority as string | undefined,
         renewalCostNaira: v.renewalCostNaira as number | undefined,
         notes:            v.notes as string | undefined,
@@ -101,8 +97,8 @@ export default function VehicleRegistryPage() {
     setSaving(true);
     try {
       await vehicleRegistryApi.renewDocument(renewDoc.id, {
-        expiryDate:       (v.expiryDate as dayjs.Dayjs).toISOString(),
-        issueDate:        v.issueDate ? (v.issueDate as dayjs.Dayjs).toISOString() : undefined,
+        expiryDate:       (v.expiryDate as dayjs.Dayjs).format('YYYY-MM-DD'),
+        issueDate:        v.issueDate ? (v.issueDate as dayjs.Dayjs).format('YYYY-MM-DD') : undefined,
         renewalCostNaira: v.renewalCostNaira as number | undefined,
         issuingAuthority: v.issuingAuthority as string | undefined,
       });
@@ -254,9 +250,9 @@ export default function VehicleRegistryPage() {
       <Modal title="Add Statutory Document" open={docModal} onOk={() => dForm.submit()}
         onCancel={() => { setDocModal(false); dForm.resetFields(); }} confirmLoading={saving} okText="Save" width={520} destroyOnClose>
         <Form form={dForm} layout="vertical" onFinish={saveDoc}>
-          <Form.Item name="vehicleId" label="Vehicle" rules={[{ required: true }]}>
-            <Select showSearch optionFilterProp="label"
-              options={(allVehicles?.items ?? []).map(v => ({ value: v.id, label: `${v.registrationNumber} — ${v.fleetNumber}` }))} />
+          <Form.Item name="vehicleRegNo" label="Vehicle Registration" rules={[{ required: true }]}
+            tooltip="Type the vehicle registration number. It links to the registry automatically if it matches a registered vehicle.">
+            <Input placeholder="e.g. PHC 185 AM" />
           </Form.Item>
           <Form.Item name="documentType" label="Document Type" rules={[{ required: true }]}>
             <Select options={VEHICLE_DOCUMENT_TYPES.map(t => ({ value: t, label: VEHICLE_DOCUMENT_TYPE_META[t].label }))} />

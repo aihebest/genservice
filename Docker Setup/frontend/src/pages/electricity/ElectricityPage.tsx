@@ -47,7 +47,7 @@ export default function ElectricityPage() {
         location:               v.location as string,
         amountNaira:            v.amountNaira as number,
         unitsKwh:               v.unitsKwh as number,
-        purchaseDate:           v.purchaseDate ? (v.purchaseDate as dayjs.Dayjs).toISOString() : undefined,
+        purchaseDate:           v.purchaseDate ? (v.purchaseDate as dayjs.Dayjs).format('YYYY-MM-DD') : undefined,
         vendor:                 v.vendor as string | undefined,
         paymentReference:       v.paymentReference as string | undefined,
         tokenNumber:            v.tokenNumber as string | undefined,
