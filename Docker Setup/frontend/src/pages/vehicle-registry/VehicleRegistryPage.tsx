@@ -4,7 +4,7 @@ import {
   Select, Space, Table, Tag, Tabs, Typography, DatePicker, message,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { PlusOutlined, ReloadOutlined, CarOutlined, FileProtectOutlined } from '@ant-design/icons';
+import { PlusOutlined, ReloadOutlined, CarOutlined, FileProtectOutlined, EditOutlined } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { vehicleRegistryApi } from '../../api/vehicleRegistry.api';
@@ -33,6 +33,7 @@ export default function VehicleRegistryPage() {
   const [vForm]     = Form.useForm();
   const [dForm]     = Form.useForm();
   const [renewForm] = Form.useForm();
+  const [editVehicleId, setEditVehicleId] = useState<string | null>(null);
 
   const { data: summary } = useQuery({ queryKey: ['vreg', 'summary'], queryFn: vehicleRegistryApi.summary, refetchInterval: 60_000 });
   const { data: vehicles, isFetching: vFetch } = useQuery({
@@ -48,10 +49,29 @@ export default function VehicleRegistryPage() {
 
   const refresh = () => qc.invalidateQueries({ queryKey: ['vreg'] });
 
+  const openAddVehicle = () => {
+    setEditVehicleId(null);
+    vForm.resetFields();
+    vForm.setFieldsValue({ operationalStatus: 'Active' });
+    setVehicleModal(true);
+  };
+
+  const openEditVehicle = (rec: VehicleRegistryRecord) => {
+    setEditVehicleId(rec.id);
+    vForm.setFieldsValue({
+      fleetNumber: rec.fleetNumber, registrationNumber: rec.registrationNumber, vehicleType: rec.vehicleType,
+      makeModel: rec.makeModel, yearOfManufacture: rec.yearOfManufacture, engineNumber: rec.engineNumber,
+      chassisNumber: rec.chassisNumber, colour: rec.colour, assignedLocation: rec.assignedLocation,
+      assignedDriver: rec.assignedDriver, operationalStatus: rec.operationalStatus, notes: rec.notes,
+      acquisitionDate: rec.acquisitionDate ? dayjs(rec.acquisitionDate) : undefined,
+    });
+    setVehicleModal(true);
+  };
+
   const saveVehicle = async (v: Record<string, unknown>) => {
     setSaving(true);
     try {
-      await vehicleRegistryApi.createVehicle({
+      const payload = {
         fleetNumber:        v.fleetNumber,
         registrationNumber: v.registrationNumber,
         vehicleType:        v.vehicleType,
@@ -65,9 +85,15 @@ export default function VehicleRegistryPage() {
         acquisitionDate:    v.acquisitionDate ? (v.acquisitionDate as dayjs.Dayjs).format('YYYY-MM-DD') : undefined,
         operationalStatus:  v.operationalStatus,
         notes:              v.notes,
-      });
-      message.success('Vehicle registered');
-      vForm.resetFields(); setVehicleModal(false); refresh();
+      };
+      if (editVehicleId) {
+        await vehicleRegistryApi.updateVehicle(editVehicleId, payload);
+        message.success('Vehicle updated');
+      } else {
+        await vehicleRegistryApi.createVehicle(payload);
+        message.success('Vehicle registered');
+      }
+      vForm.resetFields(); setEditVehicleId(null); setVehicleModal(false); refresh();
     } catch (e: unknown) {
       message.error((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Failed to save');
     } finally { setSaving(false); }
@@ -125,6 +151,10 @@ export default function VehicleRegistryPage() {
           {r.expiredDocumentCount > 0 && <Tag color="red">{r.expiredDocumentCount} overdue</Tag>}
         </Space>
       ) },
+    { title: '', key: 'act', width: 70,
+      render: (_: unknown, r: VehicleRegistryRecord) => (
+        <Button size="small" icon={<EditOutlined />} onClick={() => openEditVehicle(r)}>Edit</Button>
+      ) },
   ];
 
   const docColumns: ColumnsType<VehicleDocument> = [
@@ -156,7 +186,7 @@ export default function VehicleRegistryPage() {
           <Space>
             <Button icon={<ReloadOutlined />} onClick={refresh} />
             {tab === 'vehicles'
-              ? <Button type="primary" icon={<PlusOutlined />} onClick={() => setVehicleModal(true)}>Add Vehicle</Button>
+              ? <Button type="primary" icon={<PlusOutlined />} onClick={openAddVehicle}>Add Vehicle</Button>
               : <Button type="primary" icon={<PlusOutlined />} onClick={() => setDocModal(true)}>Add Document</Button>}
           </Space>
         </Col>
@@ -216,10 +246,11 @@ export default function VehicleRegistryPage() {
         )}
       </Card>
 
-      {/* Add Vehicle modal */}
-      <Modal title="Register Vehicle" open={vehicleModal} onOk={() => vForm.submit()}
-        onCancel={() => { setVehicleModal(false); vForm.resetFields(); }} confirmLoading={saving} okText="Save" width={640} destroyOnClose>
-        <Form form={vForm} layout="vertical" onFinish={saveVehicle} initialValues={{ operationalStatus: 'Active' }}>
+      {/* Add / Edit Vehicle modal */}
+      <Modal title={editVehicleId ? 'Edit Vehicle' : 'Register Vehicle'} open={vehicleModal} onOk={() => vForm.submit()}
+        onCancel={() => { setVehicleModal(false); vForm.resetFields(); setEditVehicleId(null); }}
+        confirmLoading={saving} okText="Save" width={640}>
+        <Form form={vForm} layout="vertical" onFinish={saveVehicle}>
           <Row gutter={12}>
             <Col span={8}><Form.Item name="fleetNumber" label="Fleet No." rules={[{ required: true }]}><Input /></Form.Item></Col>
             <Col span={8}><Form.Item name="registrationNumber" label="Registration No." rules={[{ required: true }]}><Input /></Form.Item></Col>

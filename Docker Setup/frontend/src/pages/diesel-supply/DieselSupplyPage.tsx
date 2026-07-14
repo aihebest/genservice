@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  Alert, Button, Card, Col, Form, Input, InputNumber, Modal, Row,
+  Alert, AutoComplete, Button, Card, Col, Form, Input, InputNumber, Modal, Row,
   Select, Space, Table, Tag, Tabs, Typography, DatePicker, message, Switch,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
@@ -62,7 +62,7 @@ export default function DieselSupplyPage() {
     try {
       await dieselSupplyApi.createDistribution({
         distributionType:      v.distributionType as string,
-        bulkSupplyId:          v.bulkSupplyId as string,
+        bulkSupplyReference:   (v.bulkSupplyReference as string).trim(),
         quantityLitres:        v.quantityLitres as number,
         distributionDate:      v.distributionDate ? (v.distributionDate as dayjs.Dayjs).format('YYYY-MM-DD') : undefined,
         purpose:               v.purpose as string | undefined,
@@ -201,9 +201,16 @@ export default function DieselSupplyPage() {
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="bulkSupplyId" label="From Supply Batch" rules={[{ required: true }]}>
-                <Select showSearch optionFilterProp="label"
-                  options={(available ?? []).map(s => ({ value: s.id, label: `${s.supplyReference} — ${s.quantityRemainingLitres.toLocaleString()} L left` }))} />
+              <Form.Item name="bulkSupplyReference" label="From Supply Batch" rules={[{ required: true }]}
+                tooltip="Type a batch reference, or pick one. Matching a real batch draws down its balance.">
+                <AutoComplete
+                  placeholder="e.g. DSL/26/001"
+                  filterOption={(input, option) =>
+                    String(option?.value ?? '').toLowerCase().includes(input.toLowerCase())}
+                  options={(available ?? []).map(s => ({
+                    value: s.supplyReference,
+                    label: `${s.supplyReference} — ${s.quantityRemainingLitres.toLocaleString()} L left`,
+                  }))} />
               </Form.Item>
             </Col>
           </Row>
@@ -215,8 +222,12 @@ export default function DieselSupplyPage() {
           {distType === 'Vehicle' ? (
             <Row gutter={12}>
               <Col span={12}>
-                <Form.Item name="vehicleRegNo" label="Vehicle" rules={[{ required: true }]}>
-                  <Select showSearch optionFilterProp="label"
+                <Form.Item name="vehicleRegNo" label="Vehicle" rules={[{ required: true }]}
+                  tooltip="Pick from the list or type the vehicle registration manually.">
+                  <AutoComplete
+                    placeholder="e.g. PHC 185 AM"
+                    filterOption={(input, option) =>
+                      String(option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
                     options={VEHICLE_LIST.map(v => ({ value: v.regNo, label: `${v.regNo} — ${v.description}` }))} />
                 </Form.Item>
               </Col>

@@ -31,7 +31,7 @@ export const dieselSupplyApi = {
 
   createDistribution: (data: {
     distributionType:      string;
-    bulkSupplyId:          string;
+    bulkSupplyReference:   string;
     quantityLitres:        number;
     distributionDate?:     string;
     purpose?:              string;

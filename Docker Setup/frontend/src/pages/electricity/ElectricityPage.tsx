@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import {
-  Alert, Button, Card, Col, Form, Input, InputNumber, Modal, Row,
+  Alert, Button, Card, Col, Form, Input, InputNumber, Modal, Popconfirm, Row,
   Select, Space, Table, Tag, Typography, DatePicker, message,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { PlusOutlined, ReloadOutlined, ThunderboltOutlined } from '@ant-design/icons';
+import { PlusOutlined, ReloadOutlined, ThunderboltOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { electricityApi } from '../../api/electricity.api';
@@ -62,6 +62,16 @@ export default function ElectricityPage() {
     } finally { setSaving(false); }
   };
 
+  const handleDelete = async (id: string) => {
+    try {
+      await electricityApi.remove(id);
+      message.success('Record deleted');
+      refresh();
+    } catch {
+      message.error('Failed to delete');
+    }
+  };
+
   const columns: ColumnsType<ElectricityPurchase> = [
     { title: 'Date', dataIndex: 'purchaseDate', width: 110,
       render: (v: string) => dayjs(v).format('D MMM YY') },
@@ -83,6 +93,13 @@ export default function ElectricityPage() {
     { title: 'Ref / Token', key: 'ref', ellipsis: true,
       render: (_: unknown, r: ElectricityPurchase) => r.paymentReference ?? r.tokenNumber ?? '—' },
     { title: 'Logged By', dataIndex: 'loggedByName', width: 130, ellipsis: true },
+    { title: '', key: 'act', width: 60,
+      render: (_: unknown, r: ElectricityPurchase) => (
+        <Popconfirm title="Delete this record?" okText="Delete" okButtonProps={{ danger: true }}
+          onConfirm={() => handleDelete(r.id)}>
+          <Button size="small" danger icon={<DeleteOutlined />} />
+        </Popconfirm>
+      ) },
   ];
 
   return (
