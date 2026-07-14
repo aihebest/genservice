@@ -159,6 +159,40 @@ var app = builder.Build();
         // continue; auth still works without DB
     }
 
+    // ── Seed company fleet into the Vehicle Registry (ALL environments, idempotent) ──
+    // Adds any of the authoritative fleet vehicles that aren't already registered
+    // (matched by registration number). Safe to run on every startup.
+    try
+    {
+        var existingRegs = await db.Vehicles.Select(v => v.RegistrationNumber).ToListAsync();
+        var existing = new HashSet<string>(existingRegs, StringComparer.OrdinalIgnoreCase);
+        var toAdd = new List<GenService.API.Domain.Vehicle>();
+        foreach (var (tag, reg, make) in GenService.API.Data.FleetSeedData.Vehicles)
+        {
+            if (existing.Contains(reg)) continue;
+            toAdd.Add(new GenService.API.Domain.Vehicle
+            {
+                FleetNumber       = tag,
+                RegistrationNumber= reg,
+                VehicleType       = make,
+                MakeModel         = make,
+                OperationalStatus = "Active",
+                LoggedByEmail     = "system@genservice",
+                LoggedByName      = "System (Fleet Register)",
+                CreatedAt         = DateTime.UtcNow,
+                UpdatedAt         = DateTime.UtcNow,
+            });
+            existing.Add(reg);
+        }
+        if (toAdd.Count > 0)
+        {
+            db.Vehicles.AddRange(toAdd);
+            await db.SaveChangesAsync();
+            log.LogInformation("✅ Vehicle Registry: added {N} fleet vehicles.", toAdd.Count);
+        }
+    }
+    catch (Exception ex) { log.LogError(ex, "❌ Seed failed: FleetVehicles"); }
+
     // ── Demo data seeding — skipped in Production ────────────────────────────
     if (!app.Environment.IsProduction())
     {

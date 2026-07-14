@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import {
-  Alert, Badge, Button, Card, Col, Descriptions, Divider, Drawer,
+  Alert, AutoComplete, Badge, Button, Card, Col, Descriptions, Divider, Drawer,
   Form, Input, Modal, Row, Select, Space, Statistic, Table, Tag, Tooltip, Typography,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
@@ -13,7 +13,7 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { vehicleMaintenanceApi } from '../../api/vehicleMaintenance.api';
 import ProgressLogSection from '../../components/shared/ProgressLogSection';
-import { VM_STATUS_META, VM_TYPE_META, PRIORITY_META, OFFICE_LOCATIONS } from '../../types';
+import { VM_STATUS_META, VM_TYPE_META, PRIORITY_META, OFFICE_LOCATIONS, VEHICLE_LIST } from '../../types';
 import type { VehicleMaintenance, VehicleMaintenanceStatus } from '../../types';
 import { useAuthStore } from '../../store/authStore';
 
@@ -249,8 +249,17 @@ export default function FleetPage() {
           <Row gutter={12}>
             <Col span={12}>
               <Form.Item name="vehicleRegNo" label="Vehicle Reg Number"
-                rules={[{ required: true, message: 'Enter registration number' }]}>
-                <Input placeholder="e.g. LAG-342-TE" />
+                rules={[{ required: true, message: 'Enter registration number' }]}
+                tooltip="Pick a vehicle to auto-fill the type, or type the registration manually.">
+                <AutoComplete
+                  placeholder="Select or type e.g. PHC 185 AM"
+                  onSelect={(val: string) => {
+                    const v = VEHICLE_LIST.find(x => x.regNo === val);
+                    if (v) createForm.setFieldsValue({ vehicleType: v.description });
+                  }}
+                  filterOption={(input, option) =>
+                    String(option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
+                  options={VEHICLE_LIST.map(v => ({ value: v.regNo, label: `${v.regNo} - ${v.description}` }))} />
               </Form.Item>
             </Col>
             <Col span={12}>
