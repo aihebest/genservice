@@ -44,13 +44,21 @@ function buildColumns(onView: (r: EquipmentMaintenance) => void): ColumnsType<Eq
   return [
     { title: 'Ref #', dataIndex: 'requestNumber', key: 'ref', width: 110,
       render: (v: string) => <Text code style={{ fontSize: 12 }}>{v}</Text> },
-    { title: 'Asset', dataIndex: 'assetDescription', key: 'asset', ellipsis: true,
+    { title: 'Date of Request', dataIndex: 'dateOfRequest', key: 'dor', width: 120,
+      render: (v?: string) => <Text style={{ fontSize: 12 }}>{v ? dayjs(v).format('D MMM YY') : '—'}</Text> },
+    { title: 'Requestor', dataIndex: 'requestor', key: 'requestor', width: 130, ellipsis: true,
+      render: (v?: string) => <Text style={{ fontSize: 12 }}>{v ?? '—'}</Text> },
+    { title: 'Notification', dataIndex: 'notificationStatus', key: 'notif', width: 105,
+      render: (v?: string) => v ? <Tag>{v}</Tag> : <Text type="secondary" style={{ fontSize: 12 }}>—</Text> },
+    { title: 'Asset', dataIndex: 'assetDescription', key: 'asset', ellipsis: true, width: 220,
       render: (v: string, r) => (
         <div>
           <div style={{ fontSize: 13, fontWeight: 500 }}>{v}</div>
           <Text type="secondary" style={{ fontSize: 11 }}>{r.assetNo}</Text>
         </div>
       ) },
+    { title: 'Odometer', dataIndex: 'odometerReading', key: 'odo', width: 100, ellipsis: true,
+      render: (v?: string) => <Text style={{ fontSize: 12 }}>{v ?? '—'}</Text> },
     { title: 'Type', dataIndex: 'maintenanceType', key: 'type', width: 155,
       render: (v: string) => { const m = EQUIPMENT_TYPE_META[v as keyof typeof EQUIPMENT_TYPE_META]; return <Tag color={m?.color}>{m?.label ?? v}</Tag>; } },
     { title: 'Status', dataIndex: 'status', key: 'status', width: 145,
@@ -58,10 +66,26 @@ function buildColumns(onView: (r: EquipmentMaintenance) => void): ColumnsType<Eq
     { title: 'Priority', dataIndex: 'priority', key: 'priority', width: 90,
       render: (v: RequestPriority) => { const m = PRIORITY_META[v]; return <Tag color={m?.color}>{m?.label ?? v}</Tag>; } },
     { title: 'Location', dataIndex: 'location', key: 'location', width: 150, ellipsis: true },
-    { title: 'Fault ID', dataIndex: 'faultIdentified', key: 'fault', width: 180, ellipsis: true,
+    { title: 'Fault ID', dataIndex: 'faultIdentified', key: 'fault', width: 160, ellipsis: true,
       render: (v?: string) => v
         ? <Tooltip title={v}><Text style={{ fontSize: 12 }}>{v}</Text></Tooltip>
         : <Text type="secondary" style={{ fontSize: 12 }}>Pending</Text> },
+    { title: 'Work Done', dataIndex: 'workDone', key: 'workdone', width: 180, ellipsis: true,
+      render: (v?: string) => v
+        ? <Tooltip title={v}><Text style={{ fontSize: 12 }}>{v}</Text></Tooltip>
+        : <Text type="secondary" style={{ fontSize: 12 }}>—</Text> },
+    { title: 'Parts Supplied By', dataIndex: 'partsSuppliedBy', key: 'partsby', width: 130, ellipsis: true,
+      render: (v?: string) => <Text style={{ fontSize: 12 }}>{v ?? '—'}</Text> },
+    { title: 'To Workshop', dataIndex: 'dateTakenToWorkshop', key: 'toworkshop', width: 115,
+      render: (v?: string) => <Text style={{ fontSize: 12 }}>{v ? dayjs(v).format('D MMM YY') : '—'}</Text> },
+    { title: 'Date Completed', dataIndex: 'completedAt', key: 'completed', width: 120,
+      render: (v?: string) => <Text style={{ fontSize: 12 }}>{v ? dayjs(v).format('D MMM YY') : '—'}</Text> },
+    { title: 'Days to Complete', dataIndex: 'daysTakenToComplete', key: 'dtc', width: 120,
+      render: (v?: number) => <Text style={{ fontSize: 12 }}>{v != null ? `${v}d` : '—'}</Text> },
+    { title: 'Justification / Evaluation', dataIndex: 'justificationEvaluation', key: 'just', width: 200, ellipsis: true,
+      render: (v?: string) => v
+        ? <Tooltip title={v}><Text style={{ fontSize: 12 }}>{v}</Text></Tooltip>
+        : <Text type="secondary" style={{ fontSize: 12 }}>—</Text> },
     { title: 'Handover', dataIndex: 'handoverConfirmed', key: 'ho', width: 85,
       render: (v: boolean) => v ? <Tag color="green" icon={<CheckOutlined />}>Done</Tag> : <Text type="secondary">—</Text> },
     { title: 'Days', dataIndex: 'daysOpen', key: 'days', width: 65,
@@ -243,7 +267,7 @@ export default function EquipmentTab() {
         pagination={{ current: page, pageSize: 15, total: data?.totalCount ?? 0, onChange: p => setPage(p),
           showTotal: (t, [f, to]) => `${f}–${to} of ${t}`, showSizeChanger: false }}
         onRow={r => ({ onClick: () => openDetail(r), style: { cursor: 'pointer' } })}
-        size="middle" scroll={{ x: 1050 }} />
+        size="middle" scroll={{ x: 2400 }} />
 
       {/* Create modal */}
       <Modal title={<><ToolOutlined /> New Equipment Maintenance Request</>}
