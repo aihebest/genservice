@@ -1436,6 +1436,12 @@ static async Task ApplySchemaUpdatesAsync(
                 WHERE object_id = OBJECT_ID(N'DieselDistributions') AND name = N'BulkSupplyReference' AND max_length < 200)
             ALTER TABLE DieselDistributions ALTER COLUMN BulkSupplyReference nvarchar(100) NOT NULL;
             """,
+            // Supply Type (Regular | Extra) on distributions
+            """
+            IF NOT EXISTS (SELECT 1 FROM sys.columns
+                WHERE object_id = OBJECT_ID(N'DieselDistributions') AND name = N'SupplyType')
+            ALTER TABLE DieselDistributions ADD SupplyType nvarchar(30) NOT NULL DEFAULT 'Regular';
+            """,
 
             // ── AppUsers — ensure nullable columns added after initial create ──
             AddColIfMissing("AppUsers", "LastLoginAt",    "datetime2"),

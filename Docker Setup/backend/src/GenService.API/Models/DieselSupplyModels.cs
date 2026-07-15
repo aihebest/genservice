@@ -46,6 +46,7 @@ public record CreateDieselDistributionRequest(
     string    DistributionType,      // Vehicle | Location
     string    BulkSupplyReference,   // free-text; matched to a batch to decrement/enforce balance
     double    QuantityLitres,
+    string?   SupplyType         = null,   // Regular | Extra (extra/top-up supply)
     DateTime? DistributionDate    = null,
     string?   Purpose             = null,
     string?   VehicleRegNo        = null,
@@ -62,6 +63,7 @@ public record DieselDistributionDto(
     Guid     Id,
     string   DistributionReference,
     string   DistributionType,
+    string   SupplyType,
     Guid     BulkSupplyId,
     string   BulkSupplyReference,
     DateTime DistributionDate,

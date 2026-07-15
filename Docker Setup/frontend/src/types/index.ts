@@ -1666,6 +1666,7 @@ export interface DieselDistribution {
   id:                    string;
   distributionReference: string;
   distributionType:      DieselDistributionType;
+  supplyType:            string;
   bulkSupplyId:          string;
   bulkSupplyReference:   string;
   distributionDate:      string;

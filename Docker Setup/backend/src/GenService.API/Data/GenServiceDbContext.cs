@@ -582,6 +582,7 @@ public class GenServiceDbContext(DbContextOptions<GenServiceDbContext> options)
             e.HasKey(x => x.Id);
             e.Property(x => x.DistributionReference).HasMaxLength(20) .IsRequired();
             e.Property(x => x.DistributionType)     .HasMaxLength(20) .IsRequired();
+            e.Property(x => x.SupplyType)           .HasMaxLength(30) .IsRequired();
             e.Property(x => x.BulkSupplyReference)  .HasMaxLength(100).IsRequired();
             e.Property(x => x.Purpose)              .HasMaxLength(500);
             e.Property(x => x.VehicleRegNo)         .HasMaxLength(30);

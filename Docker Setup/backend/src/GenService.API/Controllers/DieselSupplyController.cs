@@ -50,7 +50,7 @@ public class DieselSupplyController(
         s.Notes, s.LoggedByEmail, s.LoggedByName, s.CreatedAt);
 
     private static DieselDistributionDto ToDto(DieselDistribution d) => new(
-        d.Id, d.DistributionReference, d.DistributionType, d.BulkSupplyId, d.BulkSupplyReference,
+        d.Id, d.DistributionReference, d.DistributionType, d.SupplyType, d.BulkSupplyId, d.BulkSupplyReference,
         d.DistributionDate, d.QuantityLitres, d.Purpose, d.VehicleRegNo, d.Driver,
         d.OdometerReading, d.DestinationLocation, d.IssuingOfficer, d.ReceivingOfficer,
         d.RecipientAcknowledged, d.Notes, d.LoggedByEmail, d.LoggedByName, d.CreatedAt);
@@ -175,6 +175,7 @@ public class DieselSupplyController(
         {
             DistributionReference = await NextDistributionRefAsync(),
             DistributionType      = req.DistributionType.Trim(),
+            SupplyType            = string.IsNullOrWhiteSpace(req.SupplyType) ? "Regular" : req.SupplyType.Trim(),
             BulkSupplyId          = supply?.Id ?? Guid.Empty,
             BulkSupplyReference   = supply?.SupplyReference ?? reference,
             DistributionDate      = req.DistributionDate?.Date ?? DateTime.UtcNow.Date,

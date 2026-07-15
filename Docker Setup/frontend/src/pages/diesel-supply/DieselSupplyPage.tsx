@@ -62,6 +62,7 @@ export default function DieselSupplyPage() {
     try {
       await dieselSupplyApi.createDistribution({
         distributionType:      v.distributionType as string,
+        supplyType:            v.supplyType as string | undefined,
         bulkSupplyReference:   (v.bulkSupplyReference as string).trim(),
         quantityLitres:        v.quantityLitres as number,
         distributionDate:      v.distributionDate ? (v.distributionDate as dayjs.Dayjs).format('YYYY-MM-DD') : undefined,
@@ -103,6 +104,10 @@ export default function DieselSupplyPage() {
     { title: 'Ref', dataIndex: 'distributionReference', width: 110, render: (v: string) => <Text strong>{v}</Text> },
     { title: 'Date', dataIndex: 'distributionDate', width: 110, render: (v: string) => dayjs(v).format('D MMM YY') },
     { title: 'Type', dataIndex: 'distributionType', width: 100, render: (v: string) => <Tag color={v === 'Vehicle' ? 'blue' : 'green'}>{v}</Tag> },
+    { title: 'Supply Type', dataIndex: 'supplyType', key: 'supplyType', width: 115,
+      render: (v?: string) => v === 'Extra'
+        ? <Tag color="orange">Extra / Top-up</Tag>
+        : <Tag>Regular</Tag> },
     { title: 'Recipient', key: 'recipient', ellipsis: true,
       render: (_: unknown, r: DieselDistribution) => r.vehicleRegNo ?? r.destinationLocation ?? '—' },
     { title: 'Qty', dataIndex: 'quantityLitres', width: 90, render: (v: number) => `${v.toLocaleString()} L` },
@@ -169,7 +174,7 @@ export default function DieselSupplyPage() {
         {tab === 'distributions' && (
           <Table<DieselDistribution> columns={distColumns} dataSource={dists?.items ?? []} rowKey="id" loading={dFetch}
             pagination={{ current: dPage, pageSize: 20, total: dists?.totalCount ?? 0, onChange: setDPage, showSizeChanger: false }}
-            size="middle" scroll={{ x: 1150 }} style={{ padding: '0 8px' }} />
+            size="middle" scroll={{ x: 1300 }} style={{ padding: '0 8px' }} />
         )}
       </Card>
 
@@ -219,8 +224,17 @@ export default function DieselSupplyPage() {
             </Col>
           </Row>
           <Row gutter={12}>
-            <Col span={12}><Form.Item name="quantityLitres" label="Quantity (L)" rules={[{ required: true }]}><InputNumber style={{ width: '100%' }} min={0} /></Form.Item></Col>
-            <Col span={12}><Form.Item name="distributionDate" label="Date"><DatePicker style={{ width: '100%' }} /></Form.Item></Col>
+            <Col span={8}><Form.Item name="quantityLitres" label="Quantity (L)" rules={[{ required: true }]}><InputNumber style={{ width: '100%' }} min={0} /></Form.Item></Col>
+            <Col span={8}><Form.Item name="distributionDate" label="Date"><DatePicker style={{ width: '100%' }} /></Form.Item></Col>
+            <Col span={8}>
+              <Form.Item name="supplyType" label="Supply Type" initialValue="Regular"
+                tooltip="Mark whether this is a regular distribution or an extra / top-up supply.">
+                <Select options={[
+                  { value: 'Regular', label: 'Regular' },
+                  { value: 'Extra',   label: 'Extra / Top-up' },
+                ]} />
+              </Form.Item>
+            </Col>
           </Row>
 
           {distType === 'Vehicle' ? (

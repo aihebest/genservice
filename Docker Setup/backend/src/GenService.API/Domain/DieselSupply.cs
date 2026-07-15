@@ -47,6 +47,7 @@ public class DieselDistribution
     public string   DistributionReference { get; set; } = "";
 
     public string   DistributionType { get; set; } = DieselDistributionType.Vehicle;  // Vehicle | Location
+    public string   SupplyType       { get; set; } = "Regular";   // Regular | Extra (extra/top-up supply)
 
     // ── Source ────────────────────────────────────────────────────────────────
     public Guid     BulkSupplyId        { get; set; }
