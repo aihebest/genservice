@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import {
   Alert, AutoComplete, Badge, Button, Card, Col, Descriptions, Divider, Drawer,
-  Form, Input, Modal, Row, Select, Space, Statistic, Table, Tag, Tooltip, Typography,
+  Form, Input, InputNumber, Modal, Row, Select, Space, Statistic, Table, Tag, Tooltip, Typography,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
@@ -49,6 +49,10 @@ function buildColumns(onView: (r: VehicleMaintenance) => void): ColumnsType<Vehi
       title: 'Vehicle Type', dataIndex: 'vehicleType', key: 'vehicleType', width: 150, ellipsis: true,
     },
     {
+      title: 'Asset No.', dataIndex: 'assetNo', key: 'assetNo', width: 110, ellipsis: true,
+      render: (v?: string) => <Text style={{ fontSize: 12 }}>{v ?? '—'}</Text>,
+    },
+    {
       title: 'Maintenance', dataIndex: 'maintenanceType', key: 'maintenanceType', width: 130,
       render: (v: string) => {
         const m = VM_TYPE_META[v as keyof typeof VM_TYPE_META];
@@ -71,6 +75,12 @@ function buildColumns(onView: (r: VehicleMaintenance) => void): ColumnsType<Vehi
     },
     {
       title: 'Location', dataIndex: 'currentLocation', key: 'currentLocation', width: 150, ellipsis: true,
+    },
+    {
+      title: 'Amount (₦)', dataIndex: 'amountNaira', key: 'amountNaira', width: 120,
+      render: (v?: number) => v != null
+        ? <Text style={{ fontSize: 12 }}>₦{Number(v).toLocaleString()}</Text>
+        : <Text type="secondary" style={{ fontSize: 12 }}>—</Text>,
     },
     {
       title: 'Days Open', dataIndex: 'daysOpen', key: 'daysOpen', width: 95,
@@ -164,6 +174,8 @@ export default function FleetPage() {
         vehicleRegNo: values.vehicleRegNo.toUpperCase(), vehicleType: values.vehicleType,
         maintenanceType: values.maintenanceType, description: values.description,
         priority: values.priority, currentLocation: location,
+        assetNo: values.assetNo?.trim() || undefined,
+        amountNaira: values.amountNaira ? Number(values.amountNaira) : undefined,
       });
       createForm.resetFields(); setLocationSel(null); setCreateOpen(false); refresh();
     } catch (e: unknown) {
@@ -234,7 +246,7 @@ export default function FleetPage() {
           pagination={{ current: page, pageSize: 15, total: data?.totalCount ?? 0, onChange: p => setPage(p),
             showTotal: (t, [f, to]) => `${f}–${to} of ${t} requests`, showSizeChanger: false }}
           onRow={r => ({ onClick: () => openDetail(r), style: { cursor: 'pointer' } })}
-          size="middle" style={{ padding: '0 8px' }} scroll={{ x: 1100 }}
+          size="middle" style={{ padding: '0 8px' }} scroll={{ x: 1350 }}
         />
       </Card>
 
@@ -280,6 +292,20 @@ export default function FleetPage() {
               <Form.Item name="priority" label="Priority" initialValue="Normal">
                 <Select options={Object.entries(PRIORITY_META).map(([k, m]) => ({
                   value: k, label: <Tag color={m.color}>{m.label}</Tag> }))} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="assetNo" label="Asset No.">
+                <Input placeholder="Asset / fleet number" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="amountNaira" label="Amount (₦)">
+                <InputNumber style={{ width: '100%' }} min={0} placeholder="e.g. 50000"
+                  formatter={v => `₦ ${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                  parser={(v: string | undefined) => parseFloat(v?.replace(/₦\s?|(,*)/g, '') ?? '0') as 0} />
               </Form.Item>
             </Col>
           </Row>
@@ -346,6 +372,10 @@ export default function FleetPage() {
             <Descriptions.Item label="Request #">{selected.requestNumber}</Descriptions.Item>
             <Descriptions.Item label="Vehicle Reg">{selected.vehicleRegNo}</Descriptions.Item>
             <Descriptions.Item label="Vehicle Type">{selected.vehicleType}</Descriptions.Item>
+            {selected.assetNo && <Descriptions.Item label="Asset No.">{selected.assetNo}</Descriptions.Item>}
+            {selected.amountNaira != null && (
+              <Descriptions.Item label="Amount">₦{Number(selected.amountNaira).toLocaleString()}</Descriptions.Item>
+            )}
             <Descriptions.Item label="Description">
               <Text style={{ whiteSpace: 'pre-wrap' }}>{selected.description}</Text>
             </Descriptions.Item>

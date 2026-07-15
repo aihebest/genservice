@@ -13,7 +13,8 @@ public record CreateFacilityMaintenanceRequest(
     string?   Requestor          = null,
     string?   NotificationStatus = null,
     string?   AssetNo            = null,
-    string?   OdometerReading    = null
+    string?   OdometerReading    = null,
+    decimal?  AmountNaira        = null
 );
 
 public record ApproveFacilityRequest(string? Notes);
@@ -103,7 +104,8 @@ public record FacilityMaintenanceDto(
     string?   PartsSuppliedBy,
     DateTime? DateTakenToWorkshop,
     string?   JustificationEvaluation,
-    int?      DaysTakenToComplete
+    int?      DaysTakenToComplete,
+    decimal?  AmountNaira
 );
 
 public record FacilityMaintenanceStatsDto(

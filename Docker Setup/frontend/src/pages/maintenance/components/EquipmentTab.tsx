@@ -50,6 +50,8 @@ function buildColumns(onView: (r: EquipmentMaintenance) => void): ColumnsType<Eq
       render: (v?: string) => <Text style={{ fontSize: 12 }}>{v ?? '—'}</Text> },
     { title: 'Notification', dataIndex: 'notificationStatus', key: 'notif', width: 105,
       render: (v?: string) => v ? <Tag>{v}</Tag> : <Text type="secondary" style={{ fontSize: 12 }}>—</Text> },
+    { title: 'Asset No.', dataIndex: 'assetNo', key: 'assetno', width: 110, ellipsis: true,
+      render: (v?: string) => <Text style={{ fontSize: 12 }}>{v ?? '—'}</Text> },
     { title: 'Asset', dataIndex: 'assetDescription', key: 'asset', ellipsis: true, width: 220,
       render: (v: string, r) => (
         <div>
@@ -66,6 +68,10 @@ function buildColumns(onView: (r: EquipmentMaintenance) => void): ColumnsType<Eq
     { title: 'Priority', dataIndex: 'priority', key: 'priority', width: 90,
       render: (v: RequestPriority) => { const m = PRIORITY_META[v]; return <Tag color={m?.color}>{m?.label ?? v}</Tag>; } },
     { title: 'Location', dataIndex: 'location', key: 'location', width: 150, ellipsis: true },
+    { title: 'Amount (₦)', dataIndex: 'amountNaira', key: 'amount', width: 120,
+      render: (v?: number) => v != null
+        ? <Text style={{ fontSize: 12 }}>₦{Number(v).toLocaleString()}</Text>
+        : <Text type="secondary" style={{ fontSize: 12 }}>—</Text> },
     { title: 'Fault ID', dataIndex: 'faultIdentified', key: 'fault', width: 160, ellipsis: true,
       render: (v?: string) => v
         ? <Tooltip title={v}><Text style={{ fontSize: 12 }}>{v}</Text></Tooltip>
@@ -173,6 +179,7 @@ export default function EquipmentTab() {
         requestor:          (values.requestor as string | undefined)?.trim(),
         notificationStatus: values.notificationStatus as string | undefined,
         odometerReading:    (values.odometerReading as string | undefined)?.trim(),
+        amountNaira:        values.amountNaira as number | undefined,
       });
       createForm.resetFields();
       setLocationSel(null); setSelectedGen(null); setSelectedType(null);
@@ -267,7 +274,7 @@ export default function EquipmentTab() {
         pagination={{ current: page, pageSize: 15, total: data?.totalCount ?? 0, onChange: p => setPage(p),
           showTotal: (t, [f, to]) => `${f}–${to} of ${t}`, showSizeChanger: false }}
         onRow={r => ({ onClick: () => openDetail(r), style: { cursor: 'pointer' } })}
-        size="middle" scroll={{ x: 2400 }} />
+        size="middle" scroll={{ x: 2650 }} />
 
       {/* Create modal */}
       <Modal title={<><ToolOutlined /> New Equipment Maintenance Request</>}
@@ -375,9 +382,20 @@ export default function EquipmentTab() {
               </Form.Item>
             </Col>
           </Row>
-          <Form.Item name="odometerReading" label="Odometer / Hour Reading">
-            <Input placeholder="Reading at time of request (optional)" />
-          </Form.Item>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="odometerReading" label="Odometer / Hour Reading">
+                <Input placeholder="Reading at time of request (optional)" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="amountNaira" label="Amount (₦)">
+                <InputNumber style={{ width: '100%' }} min={0} placeholder="e.g. 50000"
+                  formatter={v => `₦ ${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                  parser={(v: string | undefined) => parseFloat(v?.replace(/₦\s?|(,*)/g, '') ?? '0') as 0} />
+              </Form.Item>
+            </Col>
+          </Row>
         </Form>
       </Modal>
 
@@ -581,6 +599,9 @@ export default function EquipmentTab() {
             )}
             {selected.odometerReading && (
               <Descriptions.Item label="Odometer / Hour Reading">{selected.odometerReading}</Descriptions.Item>
+            )}
+            {selected.amountNaira != null && (
+              <Descriptions.Item label="Amount">₦{Number(selected.amountNaira).toLocaleString()}</Descriptions.Item>
             )}
             {selected.runningHours != null && (
               <Descriptions.Item label="Running Hours">{selected.runningHours.toLocaleString()} h</Descriptions.Item>

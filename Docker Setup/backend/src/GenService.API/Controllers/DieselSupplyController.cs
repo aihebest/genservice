@@ -209,17 +209,22 @@ public class DieselSupplyController(
             req.DistributionType == DieselDistributionType.Vehicle ? req.VehicleRegNo : req.DestinationLocation,
             dist.BulkSupplyReference);
 
-        // Low-stock alert across all batches.
-        var available = await db.DieselBulkSupplies.SumAsync(s => s.QuantityRemainingLitres);
-        if (available <= LowStockThresholdLitres)
+        // Low-stock alert — only when supply batches actually exist (avoids a null
+        // reference and spurious alerts on a system with no bulk supplies yet).
+        var supplyCount = await db.DieselBulkSupplies.CountAsync();
+        if (supplyCount > 0)
         {
-            await notify.CreateAsync(
-                title:      "⛽ Low diesel stock",
-                message:    $"Total available diesel is {available:0.#} L (threshold {LowStockThresholdLitres:0} L). Arrange resupply.",
-                type:       NotificationType.DieselLowStock,
-                module:     "Diesel",
-                entityId:   supply.Id.ToString(),
-                targetRole: NotificationTarget.Management);
+            var available = await db.DieselBulkSupplies.SumAsync(s => s.QuantityRemainingLitres);
+            if (available <= LowStockThresholdLitres)
+            {
+                await notify.CreateAsync(
+                    title:      "⛽ Low diesel stock",
+                    message:    $"Total available diesel is {available:0.#} L (threshold {LowStockThresholdLitres:0} L). Arrange resupply.",
+                    type:       NotificationType.DieselLowStock,
+                    module:     "Diesel",
+                    entityId:   supply?.Id.ToString(),
+                    targetRole: NotificationTarget.Management);
+            }
         }
 
         return CreatedAtAction(nameof(ListDistributions), ToDto(dist));

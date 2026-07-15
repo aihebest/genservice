@@ -37,6 +37,7 @@ export const equipmentMaintenanceApi = {
     requestor?:         string;
     notificationStatus?:string;
     odometerReading?:   string;
+    amountNaira?:       number;
   }) => apiClient.post<EquipmentMaintenance>('/equipment-maintenance', data).then(r => r.data),
 
   approve: (id: string, notes?: string) =>

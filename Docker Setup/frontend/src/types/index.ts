@@ -793,6 +793,8 @@ export interface VehicleMaintenance {
   updatedAt:         string;
   daysOpen:          number;
   daysInWorkshop?:   number;
+  assetNo?:          string;
+  amountNaira?:      number;
 }
 
 export interface VehicleMaintenanceStats {
@@ -912,6 +914,7 @@ export interface EquipmentMaintenance {
   dateTakenToWorkshop?:    string;
   justificationEvaluation?:string;
   daysTakenToComplete?:    number;
+  amountNaira?:            number;
 }
 
 export interface EquipmentMaintenanceStats {
@@ -999,6 +1002,7 @@ export interface FacilityMaintenance {
   dateTakenToWorkshop?:    string;
   justificationEvaluation?:string;
   daysTakenToComplete?:    number;
+  amountNaira?:            number;
 }
 
 export interface FacilityMaintenanceStats {
@@ -1492,7 +1496,7 @@ export interface ElectricityBalance {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export const DSTV_PACKAGES = [
-  'Premium', 'Compact Plus', 'Compact', 'Confam', 'Yanga', 'Padi', 'Great Wall Standalone',
+  'Premium', 'Premium + Extraview', 'Compact Plus', 'Compact', 'Confam', 'Yanga', 'Padi', 'Great Wall Standalone',
 ] as const;
 
 export type DstvStatus = 'Active' | 'ExpiringSoon' | 'Expired';

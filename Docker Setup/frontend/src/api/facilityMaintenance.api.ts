@@ -35,6 +35,7 @@ export const facilityMaintenanceApi = {
     notificationStatus?:string;
     assetNo?:           string;
     odometerReading?:   string;
+    amountNaira?:       number;
   }) => apiClient.post<FacilityMaintenance>('/facility-maintenance', data).then(r => r.data),
 
   approve: (id: string, notes?: string) =>

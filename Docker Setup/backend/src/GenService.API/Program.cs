@@ -1162,6 +1162,8 @@ static async Task ApplySchemaUpdatesAsync(
             AddBitColIfMissing("VehicleMaintenanceRequests", "HandoverConfirmed"),
             AddColIfMissing ("VehicleMaintenanceRequests", "DateHandedOver",            "datetime2"),
             AddColIfMissing ("VehicleMaintenanceRequests", "HandedOverBy",              "nvarchar(100)"),
+            AddColIfMissing ("VehicleMaintenanceRequests", "AssetNo",                   "nvarchar(50)"),
+            AddColIfMissing ("VehicleMaintenanceRequests", "AmountNaira",               "decimal(18,2)"),
 
             // ── EquipmentMaintenanceRequests ────────────────────────────────
             AddColIfMissing ("EquipmentMaintenanceRequests", "FaultIdentified",         "nvarchar(2000)"),
@@ -1183,6 +1185,7 @@ static async Task ApplySchemaUpdatesAsync(
             AddColIfMissing ("EquipmentMaintenanceRequests", "PartsSuppliedBy",         "nvarchar(200)"),
             AddColIfMissing ("EquipmentMaintenanceRequests", "DateTakenToWorkshop",     "datetime2"),
             AddColIfMissing ("EquipmentMaintenanceRequests", "JustificationEvaluation", "nvarchar(2000)"),
+            AddColIfMissing ("EquipmentMaintenanceRequests", "AmountNaira",             "decimal(18,2)"),
 
             // ── FacilityMaintenanceRequests ─────────────────────────────────
             AddColIfMissing ("FacilityMaintenanceRequests", "FaultIdentified",          "nvarchar(2000)"),
@@ -1205,6 +1208,7 @@ static async Task ApplySchemaUpdatesAsync(
             AddColIfMissing ("FacilityMaintenanceRequests", "PartsSuppliedBy",          "nvarchar(200)"),
             AddColIfMissing ("FacilityMaintenanceRequests", "DateTakenToWorkshop",      "datetime2"),
             AddColIfMissing ("FacilityMaintenanceRequests", "JustificationEvaluation",  "nvarchar(2000)"),
+            AddColIfMissing ("FacilityMaintenanceRequests", "AmountNaira",              "decimal(18,2)"),
 
             // ── MaintenanceSchedules — reminder / escalation tracking columns ──
             """
@@ -1424,6 +1428,13 @@ static async Task ApplySchemaUpdatesAsync(
             );
             IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_DieselDistributions_DistributionReference')
                 CREATE UNIQUE INDEX IX_DieselDistributions_DistributionReference ON DieselDistributions (DistributionReference);
+            """,
+
+            // Widen BulkSupplyReference for free-text batch entry (was nvarchar(20))
+            """
+            IF EXISTS (SELECT 1 FROM sys.columns
+                WHERE object_id = OBJECT_ID(N'DieselDistributions') AND name = N'BulkSupplyReference' AND max_length < 200)
+            ALTER TABLE DieselDistributions ALTER COLUMN BulkSupplyReference nvarchar(100) NOT NULL;
             """,
 
             // ── AppUsers — ensure nullable columns added after initial create ──

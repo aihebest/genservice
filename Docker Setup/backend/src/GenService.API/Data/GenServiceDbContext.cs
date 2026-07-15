@@ -139,6 +139,8 @@ public class GenServiceDbContext(DbContextOptions<GenServiceDbContext> options)
             e.Property(x => x.Status)           .HasMaxLength(30).IsRequired();
             e.Property(x => x.CurrentLocation)  .HasMaxLength(200);
             e.Property(x => x.OdometerReading)  .HasMaxLength(100);
+            e.Property(x => x.AssetNo)          .HasMaxLength(50);
+            e.Property(x => x.AmountNaira)      .HasColumnType("decimal(18,2)");
             e.Property(x => x.RequestedByEmail) .HasMaxLength(150).IsRequired();
             e.Property(x => x.RequestedByName)  .HasMaxLength(100).IsRequired();
             e.Property(x => x.ApprovedByEmail)  .HasMaxLength(150);
@@ -226,6 +228,7 @@ public class GenServiceDbContext(DbContextOptions<GenServiceDbContext> options)
             e.Property(x => x.OdometerReading)        .HasMaxLength(100);
             e.Property(x => x.PartsSuppliedBy)        .HasMaxLength(200);
             e.Property(x => x.JustificationEvaluation).HasMaxLength(2000);
+            e.Property(x => x.AmountNaira)            .HasColumnType("decimal(18,2)");
             e.Ignore(x => x.DaysTakenToComplete);
             e.HasIndex(x => x.Status);
         });
@@ -271,6 +274,7 @@ public class GenServiceDbContext(DbContextOptions<GenServiceDbContext> options)
             e.Property(x => x.OdometerReading)        .HasMaxLength(100);
             e.Property(x => x.PartsSuppliedBy)        .HasMaxLength(200);
             e.Property(x => x.JustificationEvaluation).HasMaxLength(2000);
+            e.Property(x => x.AmountNaira)            .HasColumnType("decimal(18,2)");
             e.Ignore(x => x.DaysTakenToComplete);
             e.HasIndex(x => x.Status);
         });
@@ -578,7 +582,7 @@ public class GenServiceDbContext(DbContextOptions<GenServiceDbContext> options)
             e.HasKey(x => x.Id);
             e.Property(x => x.DistributionReference).HasMaxLength(20) .IsRequired();
             e.Property(x => x.DistributionType)     .HasMaxLength(20) .IsRequired();
-            e.Property(x => x.BulkSupplyReference)  .HasMaxLength(20) .IsRequired();
+            e.Property(x => x.BulkSupplyReference)  .HasMaxLength(100).IsRequired();
             e.Property(x => x.Purpose)              .HasMaxLength(500);
             e.Property(x => x.VehicleRegNo)         .HasMaxLength(30);
             e.Property(x => x.Driver)               .HasMaxLength(150);

@@ -22,9 +22,10 @@ public class EquipmentMaintenanceRequest
     public double? NextServiceHour  { get; set; }   // next service due at
 
     // ── Request details ───────────────────────────────────────────────────────
-    public string  Description { get; set; } = "";           // problem reported by requestor
-    public string  Priority    { get; set; } = RequestPriority.Normal;
-    public string  Status      { get; set; } = MaintenanceRequestStatus.Pending;
+    public string   Description { get; set; } = "";           // problem reported by requestor
+    public string   Priority    { get; set; } = RequestPriority.Normal;
+    public string   Status      { get; set; } = MaintenanceRequestStatus.Pending;
+    public decimal? AmountNaira { get; set; }                 // amount / cost (₦)
 
     // ── Requester ─────────────────────────────────────────────────────────────
     public string  RequestedByEmail { get; set; } = "";

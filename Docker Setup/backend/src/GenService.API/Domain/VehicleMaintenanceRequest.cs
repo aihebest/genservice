@@ -13,9 +13,11 @@ public class VehicleMaintenanceRequest
     // ── Vehicle info ─────────────────────────────────────────────────────────
     public string  VehicleRegNo      { get; set; } = "";   // e.g. PHC 185 AM
     public string  VehicleType       { get; set; } = "";   // NISSAN PICKUP, TOYOTA HILUX, etc.
+    public string? AssetNo           { get; set; }         // asset / fleet number
     public string  MaintenanceType   { get; set; } = VehicleMaintenanceType.RoutineService;
     public string  CurrentLocation   { get; set; } = "";   // where vehicle currently is
     public string? OdometerReading   { get; set; }         // odometer at time of request (km/miles)
+    public decimal? AmountNaira      { get; set; }         // amount / cost (₦)
 
     // ── Request details ───────────────────────────────────────────────────────
     public string Description { get; set; } = "";           // problem reported by requestor/user

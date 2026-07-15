@@ -8,8 +8,10 @@ public record CreateVehicleMaintenanceRequest(
     string  MaintenanceType,
     string  Description,
     string  Priority,
-    string  CurrentLocation,
-    string? OdometerReading = null
+    string   CurrentLocation,
+    string?  OdometerReading = null,
+    string?  AssetNo         = null,
+    decimal? AmountNaira     = null
 );
 
 public record ApproveVehicleMaintenanceRequest(string? Notes);
@@ -99,7 +101,9 @@ public record VehicleMaintenanceDto(
     DateTime  CreatedAt,
     DateTime  UpdatedAt,
     int       DaysOpen,
-    int?      DaysInWorkshop
+    int?      DaysInWorkshop,
+    string?   AssetNo,
+    decimal?  AmountNaira
 );
 
 public record VehicleMaintenanceStatsDto(

@@ -44,7 +44,8 @@ public class VehicleMaintenanceController(
             // handover
             r.HandoverConfirmed, r.DateHandedOver, r.HandedOverBy,
             r.Notes, r.CreatedAt, r.UpdatedAt,
-            daysOpen, daysInShop
+            daysOpen, daysInShop,
+            r.AssetNo, r.AmountNaira
         );
     }
 
@@ -141,6 +142,8 @@ public class VehicleMaintenanceController(
             Priority         = req.Priority,
             CurrentLocation  = req.CurrentLocation.Trim(),
             OdometerReading  = req.OdometerReading?.Trim(),
+            AssetNo          = req.AssetNo?.Trim(),
+            AmountNaira      = req.AmountNaira,
             RequestedByEmail = CallerEmail,
             RequestedByName  = CallerName,
             CreatedAt        = DateTime.UtcNow,

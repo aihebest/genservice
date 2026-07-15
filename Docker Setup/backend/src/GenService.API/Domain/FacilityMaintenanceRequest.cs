@@ -18,8 +18,9 @@ public class FacilityMaintenanceRequest
     public string? RoomFlat        { get; set; }          // specific room, flat, or area
 
     // ── Request details ───────────────────────────────────────────────────────
-    public string  Priority { get; set; } = RequestPriority.Normal;
-    public string  Status   { get; set; } = MaintenanceRequestStatus.Pending;
+    public string   Priority { get; set; } = RequestPriority.Normal;
+    public string   Status   { get; set; } = MaintenanceRequestStatus.Pending;
+    public decimal? AmountNaira { get; set; }                 // amount / cost (₦)
 
     // ── Requester ─────────────────────────────────────────────────────────────
     public string  RequestedByEmail { get; set; } = "";

@@ -27,6 +27,8 @@ export const vehicleMaintenanceApi = {
     priority:        string;
     currentLocation: string;
     odometerReading?: string;
+    assetNo?:        string;
+    amountNaira?:    number;
   }) => apiClient.post<VehicleMaintenance>('/vehicle-maintenance', data).then(r => r.data),
 
   approve: (id: string, notes?: string) =>

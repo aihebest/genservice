@@ -38,7 +38,8 @@ public class FacilityMaintenanceController(
         (int)(DateTime.UtcNow - r.CreatedAt).TotalDays,
         // register fields (July 2026)
         r.DateOfRequest, r.Requestor, r.NotificationStatus, r.AssetNo, r.OdometerReading,
-        r.PartsSuppliedBy, r.DateTakenToWorkshop, r.JustificationEvaluation, r.DaysTakenToComplete
+        r.PartsSuppliedBy, r.DateTakenToWorkshop, r.JustificationEvaluation, r.DaysTakenToComplete,
+        r.AmountNaira
     );
 
     private async Task<string> NextRefAsync()
@@ -130,6 +131,7 @@ public class FacilityMaintenanceController(
             NotificationStatus = req.NotificationStatus?.Trim(),
             AssetNo            = req.AssetNo?.Trim(),
             OdometerReading    = req.OdometerReading?.Trim(),
+            AmountNaira        = req.AmountNaira,
             RequestedByEmail = CallerEmail,
             RequestedByName  = CallerName,
             CreatedAt        = DateTime.UtcNow,

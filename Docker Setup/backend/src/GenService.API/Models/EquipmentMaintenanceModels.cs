@@ -15,7 +15,8 @@ public record CreateEquipmentMaintenanceRequest(
     DateTime? DateOfRequest      = null,
     string?   Requestor          = null,
     string?   NotificationStatus = null,
-    string?   OdometerReading    = null
+    string?   OdometerReading    = null,
+    decimal?  AmountNaira        = null
 );
 
 public record ApproveEquipmentRequest(string? Notes);
@@ -107,7 +108,8 @@ public record EquipmentMaintenanceDto(
     string?   PartsSuppliedBy,
     DateTime? DateTakenToWorkshop,
     string?   JustificationEvaluation,
-    int?      DaysTakenToComplete
+    int?      DaysTakenToComplete,
+    decimal?  AmountNaira
 );
 
 public record EquipmentMaintenanceStatsDto(

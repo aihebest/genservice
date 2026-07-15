@@ -135,7 +135,7 @@ export default function VehicleRegistryPage() {
   };
 
   const vehicleColumns: ColumnsType<VehicleRegistryRecord> = [
-    { title: 'Fleet No.', dataIndex: 'fleetNumber', width: 100 },
+    { title: 'Asset No.', dataIndex: 'fleetNumber', width: 100 },
     { title: 'Reg. No.', dataIndex: 'registrationNumber', width: 130, render: (v: string) => <Text strong>{v}</Text> },
     { title: 'Type', dataIndex: 'vehicleType', width: 110 },
     { title: 'Make / Model', dataIndex: 'makeModel', ellipsis: true, render: (v?: string) => v ?? '—' },
@@ -252,7 +252,7 @@ export default function VehicleRegistryPage() {
         confirmLoading={saving} okText="Save" width={640}>
         <Form form={vForm} layout="vertical" onFinish={saveVehicle}>
           <Row gutter={12}>
-            <Col span={8}><Form.Item name="fleetNumber" label="Fleet No." rules={[{ required: true }]}><Input /></Form.Item></Col>
+            <Col span={8}><Form.Item name="fleetNumber" label="Asset No." rules={[{ required: true }]}><Input /></Form.Item></Col>
             <Col span={8}>
               <Form.Item name="registrationNumber" label="Registration No." rules={[{ required: true }]}
                 tooltip="Pick a vehicle to auto-fill the type, or type a new registration.">
