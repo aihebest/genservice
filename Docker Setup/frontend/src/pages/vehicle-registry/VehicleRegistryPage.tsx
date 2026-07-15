@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  Alert, Button, Card, Col, Form, Input, InputNumber, Modal, Row,
+  Alert, AutoComplete, Button, Card, Col, Form, Input, InputNumber, Modal, Row,
   Select, Space, Table, Tag, Tabs, Typography, DatePicker, message,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
@@ -11,7 +11,7 @@ import { vehicleRegistryApi } from '../../api/vehicleRegistry.api';
 import {
   VEHICLE_OPERATIONAL_STATUSES, VEHICLE_OPERATIONAL_STATUS_META,
   VEHICLE_DOCUMENT_TYPES, VEHICLE_DOCUMENT_TYPE_META, VEHICLE_DOCUMENT_STATUS_META,
-  OFFICE_LOCATIONS,
+  OFFICE_LOCATIONS, VEHICLE_LIST,
 } from '../../types';
 import type {
   VehicleRegistryRecord, VehicleDocument, VehicleOperationalStatus, VehicleDocumentStatus, VehicleDocumentType,
@@ -253,7 +253,20 @@ export default function VehicleRegistryPage() {
         <Form form={vForm} layout="vertical" onFinish={saveVehicle}>
           <Row gutter={12}>
             <Col span={8}><Form.Item name="fleetNumber" label="Fleet No." rules={[{ required: true }]}><Input /></Form.Item></Col>
-            <Col span={8}><Form.Item name="registrationNumber" label="Registration No." rules={[{ required: true }]}><Input /></Form.Item></Col>
+            <Col span={8}>
+              <Form.Item name="registrationNumber" label="Registration No." rules={[{ required: true }]}
+                tooltip="Pick a vehicle to auto-fill the type, or type a new registration.">
+                <AutoComplete
+                  placeholder="Select or type…"
+                  onSelect={(val: string) => {
+                    const v = VEHICLE_LIST.find(x => x.regNo === val);
+                    if (v) vForm.setFieldsValue({ vehicleType: v.description });
+                  }}
+                  filterOption={(input, option) =>
+                    String(option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
+                  options={VEHICLE_LIST.map(v => ({ value: v.regNo, label: `${v.regNo} - ${v.description}` }))} />
+              </Form.Item>
+            </Col>
             <Col span={8}><Form.Item name="vehicleType" label="Type" rules={[{ required: true }]}><Input placeholder="Pickup, SUV, Bus…" /></Form.Item></Col>
           </Row>
           <Row gutter={12}>
@@ -282,8 +295,12 @@ export default function VehicleRegistryPage() {
         onCancel={() => { setDocModal(false); dForm.resetFields(); }} confirmLoading={saving} okText="Save" width={520} destroyOnClose>
         <Form form={dForm} layout="vertical" onFinish={saveDoc}>
           <Form.Item name="vehicleRegNo" label="Vehicle Registration" rules={[{ required: true }]}
-            tooltip="Type the vehicle registration number. It links to the registry automatically if it matches a registered vehicle.">
-            <Input placeholder="e.g. PHC 185 AM" />
+            tooltip="Pick a vehicle or type the registration manually. Links to the registry automatically if it matches.">
+            <AutoComplete
+              placeholder="Select or type e.g. PHC 185 AM"
+              filterOption={(input, option) =>
+                String(option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
+              options={VEHICLE_LIST.map(v => ({ value: v.regNo, label: `${v.regNo} - ${v.description}` }))} />
           </Form.Item>
           <Form.Item name="documentType" label="Document Type" rules={[{ required: true }]}>
             <Select options={VEHICLE_DOCUMENT_TYPES.map(t => ({ value: t, label: VEHICLE_DOCUMENT_TYPE_META[t].label }))} />
