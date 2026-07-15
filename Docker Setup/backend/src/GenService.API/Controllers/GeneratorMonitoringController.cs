@@ -26,7 +26,8 @@ public class GeneratorMonitoringController(
         r.PreviousEngineReading, r.CurrentEngineReading,
         r.CumulativeRunHours, r.RunHoursToday,
         r.GeneratorStatus,
-        r.PreviousFuelLevelLitres, r.FuelLevelLitres, r.FuelConsumedLitres,
+        r.PreviousFuelLevelLitres, r.FuelLevelLitres,
+        r.FuelAddedLitres, r.FuelRemovedLitres, r.FuelConsumedLitres,
         r.PreviousUtilityReading, r.CurrentUtilityReading, r.UtilityAvailableHours,
         r.ServiceIntervalHours, r.RemainingServiceHours,
         r.ServiceCompleted, r.LastServicedAtHours,
@@ -119,12 +120,16 @@ public class GeneratorMonitoringController(
                              ?? req.CurrentEngineReading;
         var runHoursToday  = Math.Max(0, req.CurrentEngineReading - previousEngine);
 
-        // ── §3 Fuel consumed = Previous − Current ───────────────────────────────
+        // ── §3 Fuel consumed = (Previous + Added − Removed) − Current ────────────
+        // Optional Fuel Added / Removed account for top-ups and withdrawals so the
+        // day's true consumption is accurate even when the tank level rises.
         var previousFuel   = req.PreviousFuelLevelLitres
                              ?? last?.FuelLevelLitres
                              ?? req.CurrentFuelLevelLitres;
-        var fuelDelta      = previousFuel - req.CurrentFuelLevelLitres;
-        double? fuelConsumed = fuelDelta >= 0 ? fuelDelta : null;   // negative ⇒ refill, not consumption
+        var fuelAdded      = req.FuelAddedLitres   ?? 0;
+        var fuelRemoved    = req.FuelRemovedLitres ?? 0;
+        var fuelDelta      = (previousFuel + fuelAdded - fuelRemoved) - req.CurrentFuelLevelLitres;
+        double? fuelConsumed = fuelDelta >= 0 ? fuelDelta : null;   // negative ⇒ likely an unrecorded supply
 
         // ── §4 Utility (NEPA) available = Current − Previous (hour meter) ───────
         var previousUtil   = req.PreviousUtilityReading ?? last?.CurrentUtilityReading;
@@ -166,6 +171,8 @@ public class GeneratorMonitoringController(
             GeneratorStatus         = req.GeneratorStatus,
             PreviousFuelLevelLitres = previousFuel,
             FuelLevelLitres         = req.CurrentFuelLevelLitres,
+            FuelAddedLitres         = req.FuelAddedLitres,
+            FuelRemovedLitres       = req.FuelRemovedLitres,
             FuelConsumedLitres      = fuelConsumed,
             PreviousUtilityReading  = previousUtil,
             CurrentUtilityReading   = req.CurrentUtilityReading,

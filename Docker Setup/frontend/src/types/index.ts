@@ -190,6 +190,8 @@ export interface GeneratorDailyReading {
   generatorStatus:        GeneratorDailyStatus;
   previousFuelLevelLitres:number;
   fuelLevelLitres:        number;
+  fuelAddedLitres?:       number;
+  fuelRemovedLitres?:     number;
   fuelConsumedLitres?:    number;
   previousUtilityReading?:number;
   currentUtilityReading?: number;

@@ -19,6 +19,8 @@ export const generatorMonitoringApi = {
     currentEngineReading:    number;
     generatorStatus:         string;
     currentFuelLevelLitres:  number;
+    fuelAddedLitres?:        number;
+    fuelRemovedLitres?:      number;
     previousEngineReading?:  number;
     previousFuelLevelLitres?:number;
     previousUtilityReading?: number;

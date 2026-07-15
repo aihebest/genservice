@@ -9,6 +9,8 @@ public record CreateGeneratorReadingRequest(
     double  CurrentEngineReading,        // §1 current engine-hour meter reading (required)
     string  GeneratorStatus,
     double  CurrentFuelLevelLitres,      // §3 current fuel level (required)
+    double? FuelAddedLitres        = null, // §3 diesel added into the tank that day (optional)
+    double? FuelRemovedLitres      = null, // §3 diesel removed from the tank that day (optional)
     double? PreviousEngineReading  = null, // optional — auto-filled from last reading
     double? PreviousFuelLevelLitres= null, // optional — auto-filled from last reading
     double? PreviousUtilityReading = null, // §4 optional — auto-filled from last reading
@@ -33,6 +35,8 @@ public record GeneratorReadingDto(
     string    GeneratorStatus,
     double    PreviousFuelLevelLitres,
     double    FuelLevelLitres,
+    double?   FuelAddedLitres,
+    double?   FuelRemovedLitres,
     double?   FuelConsumedLitres,
     double?   PreviousUtilityReading,
     double?   CurrentUtilityReading,

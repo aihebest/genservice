@@ -1228,6 +1228,8 @@ static async Task ApplySchemaUpdatesAsync(
             AddColIfMissing     ("GeneratorDailyReadings", "CurrentUtilityReading",   "float"),
             AddFloatColIfMissing("GeneratorDailyReadings", "RemainingServiceHours",   "250"),
             AddBitColIfMissing  ("GeneratorDailyReadings", "ServiceCompleted"),
+            AddColIfMissing     ("GeneratorDailyReadings", "FuelAddedLitres",   "float"),
+            AddColIfMissing     ("GeneratorDailyReadings", "FuelRemovedLitres", "float"),
 
             // ── PowerMeterReadings — Previous/Current meter reading columns ──
             AddFloatColIfMissing("PowerMeterReadings", "PreviousMeterReading", "0"),

@@ -34,7 +34,9 @@ public class GeneratorDailyReading
     // ── Fuel level (Henry §3) ─────────────────────────────────────────────────
     public double  PreviousFuelLevelLitres { get; set; }   // previous fuel level (L)
     public double  FuelLevelLitres         { get; set; }   // current fuel level (L)
-    public double? FuelConsumedLitres      { get; set; }   // = Previous − Current (auto)
+    public double? FuelAddedLitres         { get; set; }   // diesel supplied INTO the tank that day (optional)
+    public double? FuelRemovedLitres       { get; set; }   // diesel taken OUT of the tank that day (optional)
+    public double? FuelConsumedLitres      { get; set; }   // = (Previous + Added − Removed) − Current (auto)
 
     // ── Utility (NEPA) power (Henry §4) ───────────────────────────────────────
     public double? PreviousUtilityReading  { get; set; }   // previous utility hour-meter reading

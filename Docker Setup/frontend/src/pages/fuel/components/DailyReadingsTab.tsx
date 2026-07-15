@@ -81,12 +81,17 @@ export default function DailyReadingsTab() {
   const wCurrEngine = Form.useWatch('currentEngineReading',    form) as number | undefined;
   const wPrevFuel   = Form.useWatch('previousFuelLevelLitres', form) as number | undefined;
   const wCurrFuel   = Form.useWatch('currentFuelLevelLitres',  form) as number | undefined;
+  const wFuelAdded  = Form.useWatch('fuelAddedLitres',        form) as number | undefined;
+  const wFuelRemoved= Form.useWatch('fuelRemovedLitres',      form) as number | undefined;
   const wPrevUtil   = Form.useWatch('previousUtilityReading',  form) as number | undefined;
   const wCurrUtil   = Form.useWatch('currentUtilityReading',   form) as number | undefined;
   const runHoursPreview =
     wCurrEngine != null && wPrevEngine != null ? Math.max(0, wCurrEngine - wPrevEngine) : null;
+  // Fuel Consumed = (Previous + Added − Removed) − Current
   const fuelConsumedPreview =
-    wCurrFuel != null && wPrevFuel != null ? wPrevFuel - wCurrFuel : null;
+    wCurrFuel != null && wPrevFuel != null
+      ? (wPrevFuel + (wFuelAdded ?? 0) - (wFuelRemoved ?? 0)) - wCurrFuel
+      : null;
   const utilityPreview =
     wCurrUtil != null && wPrevUtil != null ? Math.max(0, wCurrUtil - wPrevUtil) : null;
 
@@ -122,6 +127,8 @@ export default function DailyReadingsTab() {
         generatorStatus: values.generatorStatus as string,
         previousFuelLevelLitres: values.previousFuelLevelLitres as number | undefined,
         currentFuelLevelLitres: values.currentFuelLevelLitres as number,
+        fuelAddedLitres: values.fuelAddedLitres as number | undefined,
+        fuelRemovedLitres: values.fuelRemovedLitres as number | undefined,
         previousUtilityReading: values.previousUtilityReading as number | undefined,
         currentUtilityReading: values.currentUtilityReading as number | undefined,
         serviceIntervalHours: (values.serviceIntervalHours as number) ?? 250,
@@ -318,9 +325,23 @@ export default function DailyReadingsTab() {
               </Form.Item>
             </Col>
           </Row>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="fuelAddedLitres" label="Fuel Added (L) — optional"
+                tooltip="Diesel supplied INTO this tank between the previous and current reading. Fill only if a top-up was made.">
+                <InputNumber style={{ width: '100%' }} placeholder="e.g. 300" min={0} />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="fuelRemovedLitres" label="Fuel Removed (L) — optional"
+                tooltip="Diesel taken OUT of this tank (transfer, testing, emergency, etc.). Fill only if fuel was removed.">
+                <InputNumber style={{ width: '100%' }} placeholder="e.g. 50" min={0} />
+              </Form.Item>
+            </Col>
+          </Row>
           {fuelConsumedPreview != null && fuelConsumedPreview >= 0 && (
             <Text type="secondary" style={{ display: 'block', marginTop: -6, marginBottom: 10, fontSize: 12 }}>
-              Fuel Consumed = <strong>{fuelConsumedPreview.toFixed(0)} L</strong>
+              Fuel Consumed = (Prev + Added − Removed) − Current = <strong>{fuelConsumedPreview.toFixed(0)} L</strong>
             </Text>
           )}
 
@@ -399,6 +420,12 @@ export default function DailyReadingsTab() {
             <Descriptions.Item label="Fuel Level">{selected.fuelLevelLitres.toLocaleString()} L
               {selected.fuelConsumedLitres != null && <Text type="secondary"> (consumed: {selected.fuelConsumedLitres} L)</Text>}
             </Descriptions.Item>
+            {selected.fuelAddedLitres != null && (
+              <Descriptions.Item label="Fuel Added">{selected.fuelAddedLitres.toLocaleString()} L</Descriptions.Item>
+            )}
+            {selected.fuelRemovedLitres != null && (
+              <Descriptions.Item label="Fuel Removed">{selected.fuelRemovedLitres.toLocaleString()} L</Descriptions.Item>
+            )}
             {selected.utilityAvailableHours != null && (
               <Descriptions.Item label="Utility Power">{selected.utilityAvailableHours} h available</Descriptions.Item>
             )}
