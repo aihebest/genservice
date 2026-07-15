@@ -1574,16 +1574,17 @@ export const VEHICLE_OPERATIONAL_STATUS_META: Record<VehicleOperationalStatus, {
 };
 
 export const VEHICLE_DOCUMENT_TYPES = [
-  'VehicleLicence', 'RoadWorthiness', 'Insurance', 'HackneyPermit', 'HeavyDutyPermit',
+  'VehicleLicence', 'RoadWorthiness', 'Insurance', 'HackneyPermit', 'HeavyDutyPermit', 'ProofOfOwnership',
 ] as const;
 export type VehicleDocumentType = typeof VEHICLE_DOCUMENT_TYPES[number];
 
 export const VEHICLE_DOCUMENT_TYPE_META: Record<VehicleDocumentType, { label: string }> = {
-  VehicleLicence:  { label: 'Vehicle Licence'          },
-  RoadWorthiness:  { label: 'Road Worthiness'          },
-  Insurance:       { label: 'Insurance'                },
-  HackneyPermit:   { label: 'Hackney Carriage Permit'  },
-  HeavyDutyPermit: { label: 'Heavy Duty Permit'        },
+  VehicleLicence:   { label: 'Vehicle Licence'          },
+  RoadWorthiness:   { label: 'Road Worthiness'          },
+  Insurance:        { label: 'Insurance'                },
+  HackneyPermit:    { label: 'Hackney Carriage Permit'  },
+  HeavyDutyPermit:  { label: 'Heavy Duty Permit'        },
+  ProofOfOwnership: { label: 'Proof of Ownership'       },
 };
 
 export type VehicleDocumentStatus = 'Valid' | 'Expiring' | 'Expired';

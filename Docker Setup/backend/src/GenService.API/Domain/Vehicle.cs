@@ -85,9 +85,10 @@ public static class VehicleDocumentType
     public const string Insurance          = "Insurance";
     public const string HackneyPermit      = "HackneyPermit";
     public const string HeavyDutyPermit    = "HeavyDutyPermit";
+    public const string ProofOfOwnership   = "ProofOfOwnership";
 
     public static readonly string[] All =
-        [VehicleLicence, RoadWorthiness, Insurance, HackneyPermit, HeavyDutyPermit];
+        [VehicleLicence, RoadWorthiness, Insurance, HackneyPermit, HeavyDutyPermit, ProofOfOwnership];
 }
 
 public static class VehicleDocumentStatus

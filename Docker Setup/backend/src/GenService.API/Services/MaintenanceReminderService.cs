@@ -360,6 +360,7 @@ public class MaintenanceReminderService(
         VehicleDocumentType.Insurance       => "Insurance",
         VehicleDocumentType.HackneyPermit   => "Hackney Carriage Permit",
         VehicleDocumentType.HeavyDutyPermit => "Heavy Duty Permit",
+        VehicleDocumentType.ProofOfOwnership => "Proof of Ownership",
         _                                    => type,
     };
 }

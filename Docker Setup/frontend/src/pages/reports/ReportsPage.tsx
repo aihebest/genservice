@@ -1359,7 +1359,7 @@ function DstvReportTab() {
 type VehDocRow = { vehicleRegNo: string; documentType: string; expiryDate: string; daysToExpiry: number; status: string; renewalCostNaira?: number };
 const VEH_DOC_LABEL: Record<string, string> = {
   VehicleLicence: 'Vehicle Licence', RoadWorthiness: 'Road Worthiness', Insurance: 'Insurance',
-  HackneyPermit: 'Hackney Permit', HeavyDutyPermit: 'Heavy Duty Permit',
+  HackneyPermit: 'Hackney Permit', HeavyDutyPermit: 'Heavy Duty Permit', ProofOfOwnership: 'Proof of Ownership',
 };
 
 function VehicleDocumentsReportTab() {
