@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   Alert, AutoComplete, Button, Card, Col, Form, Input, InputNumber, Modal, Row,
-  Select, Space, Table, Tag, Tabs, Typography, DatePicker, message, Switch,
+  Select, Space, Table, Tag, Tabs, Tooltip, Typography, DatePicker, message, Switch,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { PlusOutlined, ReloadOutlined, DropboxOutlined, SendOutlined } from '@ant-design/icons';
@@ -93,6 +93,10 @@ export default function DieselSupplyPage() {
     { title: 'Unit ₦/L', dataIndex: 'unitPriceNaira', width: 100, render: (v: number) => `₦${v.toLocaleString()}` },
     { title: 'Total', dataIndex: 'totalCostNaira', width: 130, render: (v: number) => <Text strong style={{ color: '#cf1322' }}>₦{v.toLocaleString()}</Text> },
     { title: 'Storage', dataIndex: 'storageLocation', width: 130, render: (v?: string) => v ?? '—' },
+    { title: 'Notes', dataIndex: 'notes', key: 'notes', width: 200, ellipsis: true,
+      render: (v?: string) => v
+        ? <Tooltip title={v}><Text style={{ fontSize: 12 }}>{v}</Text></Tooltip>
+        : <Text type="secondary" style={{ fontSize: 12 }}>—</Text> },
   ];
 
   const distColumns: ColumnsType<DieselDistribution> = [
@@ -160,7 +164,7 @@ export default function DieselSupplyPage() {
         {tab === 'supplies' && (
           <Table<DieselSupply> columns={supplyColumns} dataSource={supplies?.items ?? []} rowKey="id" loading={sFetch}
             pagination={{ current: sPage, pageSize: 20, total: supplies?.totalCount ?? 0, onChange: setSPage, showSizeChanger: false }}
-            size="middle" scroll={{ x: 1150 }} style={{ padding: '0 8px' }} />
+            size="middle" scroll={{ x: 1350 }} style={{ padding: '0 8px' }} />
         )}
         {tab === 'distributions' && (
           <Table<DieselDistribution> columns={distColumns} dataSource={dists?.items ?? []} rowKey="id" loading={dFetch}

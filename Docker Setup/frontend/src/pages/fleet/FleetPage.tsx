@@ -13,7 +13,7 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { vehicleMaintenanceApi } from '../../api/vehicleMaintenance.api';
 import ProgressLogSection from '../../components/shared/ProgressLogSection';
-import { VM_STATUS_META, VM_TYPE_META, PRIORITY_META, OFFICE_LOCATIONS, VEHICLE_LIST } from '../../types';
+import { VM_STATUS_META, VM_TYPE_META, PRIORITY_META, OFFICE_LOCATIONS, VEHICLE_LIST, VEHICLE_ASSET_NO } from '../../types';
 import type { VehicleMaintenance, VehicleMaintenanceStatus } from '../../types';
 import { useAuthStore } from '../../store/authStore';
 
@@ -267,7 +267,10 @@ export default function FleetPage() {
                   placeholder="Select or type e.g. PHC 185 AM"
                   onSelect={(val: string) => {
                     const v = VEHICLE_LIST.find(x => x.regNo === val);
-                    if (v) createForm.setFieldsValue({ vehicleType: v.description });
+                    createForm.setFieldsValue({
+                      ...(v ? { vehicleType: v.description } : {}),
+                      ...(VEHICLE_ASSET_NO[val] ? { assetNo: VEHICLE_ASSET_NO[val] } : {}),
+                    });
                   }}
                   filterOption={(input, option) =>
                     String(option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
@@ -297,8 +300,9 @@ export default function FleetPage() {
           </Row>
           <Row gutter={12}>
             <Col span={12}>
-              <Form.Item name="assetNo" label="Asset No.">
-                <Input placeholder="Asset / fleet number" />
+              <Form.Item name="assetNo" label="Asset No."
+                tooltip="Auto-fills from the vehicle registry when you pick a vehicle. You can still edit it.">
+                <Input placeholder="Auto-fills from vehicle" />
               </Form.Item>
             </Col>
             <Col span={12}>
