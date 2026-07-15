@@ -210,12 +210,13 @@ export default function DieselSupplyPage() {
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="bulkSupplyReference" label="From Supply Batch" rules={[{ required: true }]}
-                tooltip="Type a batch reference, or pick one. Matching a real batch draws down its balance.">
-                <AutoComplete
-                  placeholder="e.g. DSL/26/001"
-                  filterOption={(input, option) =>
-                    String(option?.value ?? '').toLowerCase().includes(input.toLowerCase())}
+              <Form.Item name="bulkSupplyReference" label="From Supply Batch" rules={[{ required: true, message: 'Select a supply batch' }]}
+                tooltip="Pick a bulk-supply batch. The quantity issued is deducted from that batch's balance and from the total available.">
+                <Select
+                  showSearch
+                  optionFilterProp="label"
+                  disabled={(available ?? []).length === 0}
+                  placeholder={(available ?? []).length ? 'Select a batch' : 'No batch with balance — add a bulk supply first'}
                   options={(available ?? []).map(s => ({
                     value: s.supplyReference,
                     label: `${s.supplyReference} — ${s.quantityRemainingLitres.toLocaleString()} L left`,

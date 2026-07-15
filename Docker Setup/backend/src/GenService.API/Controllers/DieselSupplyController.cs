@@ -159,12 +159,19 @@ public class DieselSupplyController(
         if (string.IsNullOrWhiteSpace(reference))
             return BadRequest(new { message = "Supply batch reference is required." });
 
-        // Match the typed/selected reference to a real batch. If found, enforce the
-        // running balance and decrement it; if not, record the free-text reference as-is.
+        // The distribution MUST draw from a real bulk-supply batch so the running
+        // balance always stays accurate. A reference that doesn't match a batch is
+        // rejected rather than recorded as free-text.
         var supply = await db.DieselBulkSupplies
             .FirstOrDefaultAsync(s => s.SupplyReference == reference);
 
-        if (supply is not null && req.QuantityLitres > supply.QuantityRemainingLitres)
+        if (supply is null)
+            return BadRequest(new
+            {
+                message = $"Supply batch '{reference}' was not found. Select an existing bulk-supply batch to distribute from."
+            });
+
+        if (req.QuantityLitres > supply.QuantityRemainingLitres)
             return BadRequest(new
             {
                 message = $"Cannot issue {req.QuantityLitres:0.#} L — only {supply.QuantityRemainingLitres:0.#} L "
@@ -176,8 +183,8 @@ public class DieselSupplyController(
             DistributionReference = await NextDistributionRefAsync(),
             DistributionType      = req.DistributionType.Trim(),
             SupplyType            = string.IsNullOrWhiteSpace(req.SupplyType) ? "Regular" : req.SupplyType.Trim(),
-            BulkSupplyId          = supply?.Id ?? Guid.Empty,
-            BulkSupplyReference   = supply?.SupplyReference ?? reference,
+            BulkSupplyId          = supply.Id,
+            BulkSupplyReference   = supply.SupplyReference,
             DistributionDate      = req.DistributionDate?.Date ?? DateTime.UtcNow.Date,
             QuantityLitres        = req.QuantityLitres,
             Purpose               = req.Purpose?.Trim(),
@@ -195,13 +202,9 @@ public class DieselSupplyController(
             UpdatedAt             = DateTime.UtcNow,
         };
 
-        // Reduce the source batch balance atomically with the distribution insert
-        // (only when the reference matched a real batch).
-        if (supply is not null)
-        {
-            supply.QuantityRemainingLitres -= req.QuantityLitres;
-            supply.UpdatedAt                = DateTime.UtcNow;
-        }
+        // Reduce the source batch balance atomically with the distribution insert.
+        supply.QuantityRemainingLitres -= req.QuantityLitres;
+        supply.UpdatedAt                = DateTime.UtcNow;
         db.DieselDistributions.Add(dist);
         await db.SaveChangesAsync();
 
@@ -223,7 +226,7 @@ public class DieselSupplyController(
                     message:    $"Total available diesel is {available:0.#} L (threshold {LowStockThresholdLitres:0} L). Arrange resupply.",
                     type:       NotificationType.DieselLowStock,
                     module:     "Diesel",
-                    entityId:   supply?.Id.ToString(),
+                    entityId:   supply.Id.ToString(),
                     targetRole: NotificationTarget.Management);
             }
         }
