@@ -24,12 +24,17 @@ export const facilityMaintenanceApi = {
     apiClient.get<FacilityMaintenance>(`/facility-maintenance/${id}`).then(r => r.data),
 
   create: (data: {
-    maintenanceType: string;
-    description:     string;
-    location:        string;
-    endUser:         string;
-    roomFlat?:       string;
-    priority:        string;
+    maintenanceType:    string;
+    description:        string;
+    location:           string;
+    endUser:            string;
+    roomFlat?:          string;
+    priority:           string;
+    dateOfRequest?:     string;
+    requestor?:         string;
+    notificationStatus?:string;
+    assetNo?:           string;
+    odometerReading?:   string;
   }) => apiClient.post<FacilityMaintenance>('/facility-maintenance', data).then(r => r.data),
 
   approve: (id: string, notes?: string) =>
@@ -52,10 +57,15 @@ export const facilityMaintenanceApi = {
   }) => apiClient.post<FacilityMaintenance>(`/facility-maintenance/${id}/assess`, data).then(r => r.data),
 
   complete: (id: string, data: {
-    workDone?:        string;
-    actionedBy?:      string;
-    sparesCostNaira?: number;
-    notes?:           string;
+    workDone?:                string;
+    actionedBy?:              string;
+    sparesCostNaira?:         number;
+    notes?:                   string;
+    partsSuppliedBy?:         string;
+    dateTakenToWorkshop?:     string;
+    dateCompleted?:           string;
+    justificationEvaluation?: string;
+    notificationStatus?:      string;
   }) => apiClient.post<FacilityMaintenance>(`/facility-maintenance/${id}/complete`, data).then(r => r.data),
 
   handover: (id: string, data: {

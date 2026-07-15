@@ -903,6 +903,15 @@ export interface EquipmentMaintenance {
   createdAt:         string;
   updatedAt:         string;
   daysOpen:          number;
+  // register fields (July 2026)
+  dateOfRequest?:          string;
+  requestor?:              string;
+  notificationStatus?:     string;
+  odometerReading?:        string;
+  partsSuppliedBy?:        string;
+  dateTakenToWorkshop?:    string;
+  justificationEvaluation?:string;
+  daysTakenToComplete?:    number;
 }
 
 export interface EquipmentMaintenanceStats {
@@ -980,6 +989,16 @@ export interface FacilityMaintenance {
   createdAt:         string;
   updatedAt:         string;
   daysOpen:          number;
+  // register fields (July 2026)
+  dateOfRequest?:          string;
+  requestor?:              string;
+  notificationStatus?:     string;
+  assetNo?:                string;
+  odometerReading?:        string;
+  partsSuppliedBy?:        string;
+  dateTakenToWorkshop?:    string;
+  justificationEvaluation?:string;
+  daysTakenToComplete?:    number;
 }
 
 export interface FacilityMaintenanceStats {

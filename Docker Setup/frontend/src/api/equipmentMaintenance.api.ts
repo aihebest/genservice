@@ -24,15 +24,19 @@ export const equipmentMaintenanceApi = {
     apiClient.get<EquipmentMaintenance>(`/equipment-maintenance/${id}`).then(r => r.data),
 
   create: (data: {
-    assetNo:          string;
-    assetDescription: string;
-    maintenanceType:  string;
-    endUser:          string;
-    location:         string;
-    description:      string;
-    priority:         string;
-    runningHours?:    number;
-    nextServiceHour?: number;
+    assetNo:            string;
+    assetDescription:   string;
+    maintenanceType:    string;
+    endUser:            string;
+    location:           string;
+    description:        string;
+    priority:           string;
+    runningHours?:      number;
+    nextServiceHour?:   number;
+    dateOfRequest?:     string;
+    requestor?:         string;
+    notificationStatus?:string;
+    odometerReading?:   string;
   }) => apiClient.post<EquipmentMaintenance>('/equipment-maintenance', data).then(r => r.data),
 
   approve: (id: string, notes?: string) =>
@@ -55,10 +59,15 @@ export const equipmentMaintenanceApi = {
   }) => apiClient.post<EquipmentMaintenance>(`/equipment-maintenance/${id}/assess`, data).then(r => r.data),
 
   complete: (id: string, data: {
-    workDone?:        string;
-    actionedBy?:      string;
-    sparesCostNaira?: number;
-    notes?:           string;
+    workDone?:                string;
+    actionedBy?:              string;
+    sparesCostNaira?:         number;
+    notes?:                   string;
+    partsSuppliedBy?:         string;
+    dateTakenToWorkshop?:     string;
+    dateCompleted?:           string;
+    justificationEvaluation?: string;
+    notificationStatus?:      string;
   }) => apiClient.post<EquipmentMaintenance>(`/equipment-maintenance/${id}/complete`, data).then(r => r.data),
 
   handover: (id: string, data: {

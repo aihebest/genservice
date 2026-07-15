@@ -133,6 +133,11 @@ export default function FacilityTab() {
         endUser:         (values.endUser as string).trim(),
         roomFlat:        (values.roomFlat as string | undefined)?.trim() || undefined,
         priority:        values.priority as string,
+        dateOfRequest:      values.dateOfRequest ? (values.dateOfRequest as dayjs.Dayjs).format('YYYY-MM-DD') : undefined,
+        requestor:          (values.requestor as string | undefined)?.trim(),
+        notificationStatus: values.notificationStatus as string | undefined,
+        assetNo:            (values.assetNo as string | undefined)?.trim(),
+        odometerReading:    (values.odometerReading as string | undefined)?.trim(),
       });
       createForm.resetFields(); setLocationSel(null); setCreateOpen(false); refresh();
     } catch (e: unknown) {
@@ -161,6 +166,10 @@ export default function FacilityTab() {
       actionedBy:      (values.actionedBy as string)?.trim(),
       sparesCostNaira: values.sparesCostNaira as number,
       notes:           (values.notes as string)?.trim(),
+      partsSuppliedBy:         (values.partsSuppliedBy as string | undefined)?.trim(),
+      dateTakenToWorkshop:     values.dateTakenToWorkshop ? (values.dateTakenToWorkshop as dayjs.Dayjs).format('YYYY-MM-DD') : undefined,
+      dateCompleted:           values.dateCompleted ? (values.dateCompleted as dayjs.Dayjs).format('YYYY-MM-DD') : undefined,
+      justificationEvaluation: (values.justificationEvaluation as string | undefined)?.trim(),
     }));
     setCompleteOpen(false); completeForm.resetFields();
   };
@@ -265,6 +274,35 @@ export default function FacilityTab() {
           <Form.Item name="roomFlat" label="Room / Flat / Specific Area (optional)">
             <Input placeholder="e.g. Conference Room B, 3rd Floor Convenience, External Walls" />
           </Form.Item>
+          <Row gutter={12}>
+            <Col span={8}>
+              <Form.Item name="dateOfRequest" label="Date of Request">
+                <DatePicker style={{ width: '100%' }} format="D MMM YYYY" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="requestor" label="Requestor">
+                <Input placeholder="Person who requested" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="notificationStatus" label="Notification Status" initialValue="Open">
+                <Select options={['Open','Notified','Closed'].map(s => ({ value: s, label: s }))} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="assetNo" label="Asset No. (optional)">
+                <Input placeholder="Asset number if applicable" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="odometerReading" label="Odometer / Hour Reading (optional)">
+                <Input placeholder="Reading at time of request" />
+              </Form.Item>
+            </Col>
+          </Row>
         </Form>
       </Modal>
 
@@ -327,13 +365,39 @@ export default function FacilityTab() {
           <Form.Item name="workDone" label="Description of Work Done" rules={[{ required: true }]}>
             <TextArea rows={4} placeholder="Describe work performed, materials used…" maxLength={2000} showCount />
           </Form.Item>
-          <Form.Item name="actionedBy" label="Actioned By (Contractor / Staff)">
-            <Input placeholder="e.g. Woji Store, Third Party, contractor name" />
-          </Form.Item>
-          <Form.Item name="sparesCostNaira" label="Final Materials Cost (₦)">
-            <InputNumber style={{ width: '100%' }} min={0}
-              formatter={v => `₦ ${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-              parser={(v: string | undefined) => parseFloat(v?.replace(/₦\s?|(,*)/g, '') ?? '0') as 0} />
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="actionedBy" label="Actioned By (Contractor / Staff)">
+                <Input placeholder="e.g. Third Party, contractor name" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="partsSuppliedBy" label="Parts Supplied By">
+                <Input placeholder="e.g. Wojishop, Third Party" />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={12}>
+            <Col span={8}>
+              <Form.Item name="dateTakenToWorkshop" label="Date Taken to Workshop">
+                <DatePicker style={{ width: '100%' }} format="D MMM YYYY" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="dateCompleted" label="Date Completed">
+                <DatePicker style={{ width: '100%' }} format="D MMM YYYY" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="sparesCostNaira" label="Materials Cost (₦)">
+                <InputNumber style={{ width: '100%' }} min={0}
+                  formatter={v => `₦ ${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                  parser={(v: string | undefined) => parseFloat(v?.replace(/₦\s?|(,*)/g, '') ?? '0') as 0} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Form.Item name="justificationEvaluation" label="Justification / Evaluation">
+            <TextArea rows={2} placeholder="Justification or evaluation remarks…" maxLength={2000} />
           </Form.Item>
           <Form.Item name="notes" label="Additional Notes">
             <TextArea rows={2} placeholder="Any remarks…" maxLength={1000} />
@@ -433,6 +497,17 @@ export default function FacilityTab() {
             <Descriptions.Item label="End User">{selected.endUser}</Descriptions.Item>
             <Descriptions.Item label="Location">{selected.location}</Descriptions.Item>
             {selected.roomFlat && <Descriptions.Item label="Room / Area">{selected.roomFlat}</Descriptions.Item>}
+            {selected.assetNo && <Descriptions.Item label="Asset No.">{selected.assetNo}</Descriptions.Item>}
+            {selected.dateOfRequest && (
+              <Descriptions.Item label="Date of Request">{dayjs(selected.dateOfRequest).format('D MMM YYYY')}</Descriptions.Item>
+            )}
+            {selected.requestor && <Descriptions.Item label="Requestor">{selected.requestor}</Descriptions.Item>}
+            {selected.notificationStatus && (
+              <Descriptions.Item label="Notification Status">{selected.notificationStatus}</Descriptions.Item>
+            )}
+            {selected.odometerReading && (
+              <Descriptions.Item label="Odometer / Hour Reading">{selected.odometerReading}</Descriptions.Item>
+            )}
             <Descriptions.Item label="Raised By">
               {selected.requestedByName} <Text type="secondary">({selected.requestedByEmail})</Text>
             </Descriptions.Item>
@@ -521,9 +596,21 @@ export default function FacilityTab() {
                   </Descriptions.Item>
                 )}
                 {selected.actionedBy && <Descriptions.Item label="Actioned By">{selected.actionedBy}</Descriptions.Item>}
+                {selected.partsSuppliedBy && <Descriptions.Item label="Parts Supplied By">{selected.partsSuppliedBy}</Descriptions.Item>}
+                {selected.dateTakenToWorkshop && (
+                  <Descriptions.Item label="Date Taken to Workshop">{dayjs(selected.dateTakenToWorkshop).format('D MMM YYYY')}</Descriptions.Item>
+                )}
                 <Descriptions.Item label="Date Completed">
                   {dayjs(selected.completedAt).format('D MMM YYYY')}
                 </Descriptions.Item>
+                {selected.daysTakenToComplete != null && (
+                  <Descriptions.Item label="Days Taken to Complete">{selected.daysTakenToComplete} day{selected.daysTakenToComplete === 1 ? '' : 's'}</Descriptions.Item>
+                )}
+                {selected.justificationEvaluation && (
+                  <Descriptions.Item label="Justification / Evaluation">
+                    <Text style={{ whiteSpace: 'pre-wrap' }}>{selected.justificationEvaluation}</Text>
+                  </Descriptions.Item>
+                )}
                 {selected.notes && <Descriptions.Item label="Notes">{selected.notes}</Descriptions.Item>}
               </Descriptions>
             </>

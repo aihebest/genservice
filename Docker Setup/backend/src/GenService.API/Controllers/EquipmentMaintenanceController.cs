@@ -35,7 +35,10 @@ public class EquipmentMaintenanceController(
         // handover
         r.HandoverConfirmed, r.DateHandedOver, r.HandedOverBy,
         r.Notes, r.CreatedAt, r.UpdatedAt,
-        (int)(DateTime.UtcNow - r.CreatedAt).TotalDays
+        (int)(DateTime.UtcNow - r.CreatedAt).TotalDays,
+        // register fields (July 2026)
+        r.DateOfRequest, r.Requestor, r.NotificationStatus, r.OdometerReading,
+        r.PartsSuppliedBy, r.DateTakenToWorkshop, r.JustificationEvaluation, r.DaysTakenToComplete
     );
 
     private async Task<string> NextRefAsync()
@@ -125,6 +128,10 @@ public class EquipmentMaintenanceController(
             Priority         = req.Priority,
             RunningHours     = req.RunningHours,
             NextServiceHour  = req.NextServiceHour,
+            DateOfRequest      = req.DateOfRequest?.Date ?? DateTime.UtcNow.Date,
+            Requestor          = req.Requestor?.Trim(),
+            NotificationStatus = req.NotificationStatus?.Trim(),
+            OdometerReading    = req.OdometerReading?.Trim(),
             RequestedByEmail = CallerEmail,
             RequestedByName  = CallerName,
             CreatedAt        = DateTime.UtcNow,
@@ -237,7 +244,11 @@ public class EquipmentMaintenanceController(
         r.ActionedBy      = req.ActionedBy?.Trim() ?? CallerName;
         r.SparesCostNaira = req.SparesCostNaira ?? r.SparesCostNaira;
         r.Notes           = req.Notes ?? r.Notes;
-        r.CompletedAt     = DateTime.UtcNow;
+        r.PartsSuppliedBy         = req.PartsSuppliedBy?.Trim() ?? r.PartsSuppliedBy;
+        r.DateTakenToWorkshop     = req.DateTakenToWorkshop?.Date ?? r.DateTakenToWorkshop;
+        r.JustificationEvaluation = req.JustificationEvaluation?.Trim() ?? r.JustificationEvaluation;
+        if (!string.IsNullOrWhiteSpace(req.NotificationStatus)) r.NotificationStatus = req.NotificationStatus.Trim();
+        r.CompletedAt     = req.DateCompleted?.Date ?? DateTime.UtcNow;
         r.UpdatedAt       = DateTime.UtcNow;
         await db.SaveChangesAsync();
         return Ok(ToDto(r));

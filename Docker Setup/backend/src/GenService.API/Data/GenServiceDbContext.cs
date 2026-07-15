@@ -220,6 +220,13 @@ public class GenServiceDbContext(DbContextOptions<GenServiceDbContext> options)
             e.Property(x => x.HandoverConfirmed).HasDefaultValue(false);
             e.Property(x => x.HandedOverBy)     .HasMaxLength(100);
             e.Property(x => x.Notes)            .HasMaxLength(2000);
+            // Register fields
+            e.Property(x => x.Requestor)              .HasMaxLength(150);
+            e.Property(x => x.NotificationStatus)     .HasMaxLength(50);
+            e.Property(x => x.OdometerReading)        .HasMaxLength(100);
+            e.Property(x => x.PartsSuppliedBy)        .HasMaxLength(200);
+            e.Property(x => x.JustificationEvaluation).HasMaxLength(2000);
+            e.Ignore(x => x.DaysTakenToComplete);
             e.HasIndex(x => x.Status);
         });
 
@@ -257,6 +264,14 @@ public class GenServiceDbContext(DbContextOptions<GenServiceDbContext> options)
             e.Property(x => x.HandoverConfirmed).HasDefaultValue(false);
             e.Property(x => x.HandedOverBy)     .HasMaxLength(100);
             e.Property(x => x.Notes)            .HasMaxLength(2000);
+            // Register fields
+            e.Property(x => x.Requestor)              .HasMaxLength(150);
+            e.Property(x => x.NotificationStatus)     .HasMaxLength(50);
+            e.Property(x => x.AssetNo)                .HasMaxLength(50);
+            e.Property(x => x.OdometerReading)        .HasMaxLength(100);
+            e.Property(x => x.PartsSuppliedBy)        .HasMaxLength(200);
+            e.Property(x => x.JustificationEvaluation).HasMaxLength(2000);
+            e.Ignore(x => x.DaysTakenToComplete);
             e.HasIndex(x => x.Status);
         });
 

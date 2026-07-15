@@ -10,8 +10,12 @@ public record CreateEquipmentMaintenanceRequest(
     string  Location,
     string  Description,
     string  Priority,
-    double? RunningHours    = null,
-    double? NextServiceHour = null
+    double?   RunningHours       = null,
+    double?   NextServiceHour    = null,
+    DateTime? DateOfRequest      = null,
+    string?   Requestor          = null,
+    string?   NotificationStatus = null,
+    string?   OdometerReading    = null
 );
 
 public record ApproveEquipmentRequest(string? Notes);
@@ -29,10 +33,15 @@ public record EquipmentAssessmentRequest(
 );
 
 public record CompleteEquipmentRequest(
-    string   WorkDone,
-    string?  ActionedBy,
-    decimal? SparesCostNaira = null,
-    string?  Notes           = null
+    string    WorkDone,
+    string?   ActionedBy,
+    decimal?  SparesCostNaira         = null,
+    string?   Notes                   = null,
+    string?   PartsSuppliedBy         = null,
+    DateTime? DateTakenToWorkshop     = null,
+    DateTime? DateCompleted           = null,
+    string?   JustificationEvaluation = null,
+    string?   NotificationStatus      = null
 );
 
 public record EquipmentHandoverRequest(
@@ -89,7 +98,16 @@ public record EquipmentMaintenanceDto(
     string?   Notes,
     DateTime  CreatedAt,
     DateTime  UpdatedAt,
-    int       DaysOpen
+    int       DaysOpen,
+    // Register fields (July 2026)
+    DateTime? DateOfRequest,
+    string?   Requestor,
+    string?   NotificationStatus,
+    string?   OdometerReading,
+    string?   PartsSuppliedBy,
+    DateTime? DateTakenToWorkshop,
+    string?   JustificationEvaluation,
+    int?      DaysTakenToComplete
 );
 
 public record EquipmentMaintenanceStatsDto(

@@ -57,6 +57,21 @@ public class EquipmentMaintenanceRequest
     public DateTime? DateHandedOver    { get; set; }
     public string?   HandedOverBy      { get; set; }
 
+    // ── Register fields (MRSF register — July 2026) ───────────────────────────
+    public DateTime? DateOfRequest        { get; set; }   // when the request was raised
+    public string?   Requestor            { get; set; }   // person who requested the work
+    public string?   NotificationStatus   { get; set; }   // Open | Notified | Closed, etc.
+    public string?   OdometerReading      { get; set; }   // odometer / hour reading at request
+    public string?   PartsSuppliedBy      { get; set; }   // who supplied the parts
+    public DateTime? DateTakenToWorkshop  { get; set; }   // date item went to workshop
+    public string?   JustificationEvaluation { get; set; } // justification / evaluation remarks
+
+    /// <summary>Days between workshop delivery (or request) and completion — not persisted.</summary>
+    public int? DaysTakenToComplete =>
+        CompletedAt.HasValue
+            ? (int)(CompletedAt.Value - (DateTakenToWorkshop ?? DateOfRequest ?? CreatedAt)).TotalDays
+            : null;
+
     public string?   Notes     { get; set; }
     public DateTime  CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime  UpdatedAt { get; set; } = DateTime.UtcNow;

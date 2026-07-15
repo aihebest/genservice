@@ -1175,6 +1175,14 @@ static async Task ApplySchemaUpdatesAsync(
             AddBitColIfMissing("EquipmentMaintenanceRequests", "HandoverConfirmed"),
             AddColIfMissing ("EquipmentMaintenanceRequests", "DateHandedOver",          "datetime2"),
             AddColIfMissing ("EquipmentMaintenanceRequests", "HandedOverBy",            "nvarchar(100)"),
+            // Register fields (July 2026)
+            AddColIfMissing ("EquipmentMaintenanceRequests", "DateOfRequest",           "datetime2"),
+            AddColIfMissing ("EquipmentMaintenanceRequests", "Requestor",               "nvarchar(150)"),
+            AddColIfMissing ("EquipmentMaintenanceRequests", "NotificationStatus",      "nvarchar(50)"),
+            AddColIfMissing ("EquipmentMaintenanceRequests", "OdometerReading",         "nvarchar(100)"),
+            AddColIfMissing ("EquipmentMaintenanceRequests", "PartsSuppliedBy",         "nvarchar(200)"),
+            AddColIfMissing ("EquipmentMaintenanceRequests", "DateTakenToWorkshop",     "datetime2"),
+            AddColIfMissing ("EquipmentMaintenanceRequests", "JustificationEvaluation", "nvarchar(2000)"),
 
             // ── FacilityMaintenanceRequests ─────────────────────────────────
             AddColIfMissing ("FacilityMaintenanceRequests", "FaultIdentified",          "nvarchar(2000)"),
@@ -1188,6 +1196,15 @@ static async Task ApplySchemaUpdatesAsync(
             AddBitColIfMissing("FacilityMaintenanceRequests", "HandoverConfirmed"),
             AddColIfMissing ("FacilityMaintenanceRequests", "DateHandedOver",           "datetime2"),
             AddColIfMissing ("FacilityMaintenanceRequests", "HandedOverBy",             "nvarchar(100)"),
+            // Register fields (July 2026)
+            AddColIfMissing ("FacilityMaintenanceRequests", "DateOfRequest",            "datetime2"),
+            AddColIfMissing ("FacilityMaintenanceRequests", "Requestor",                "nvarchar(150)"),
+            AddColIfMissing ("FacilityMaintenanceRequests", "NotificationStatus",       "nvarchar(50)"),
+            AddColIfMissing ("FacilityMaintenanceRequests", "AssetNo",                  "nvarchar(50)"),
+            AddColIfMissing ("FacilityMaintenanceRequests", "OdometerReading",          "nvarchar(100)"),
+            AddColIfMissing ("FacilityMaintenanceRequests", "PartsSuppliedBy",          "nvarchar(200)"),
+            AddColIfMissing ("FacilityMaintenanceRequests", "DateTakenToWorkshop",      "datetime2"),
+            AddColIfMissing ("FacilityMaintenanceRequests", "JustificationEvaluation",  "nvarchar(2000)"),
 
             // ── MaintenanceSchedules — reminder / escalation tracking columns ──
             """

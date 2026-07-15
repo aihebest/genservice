@@ -8,7 +8,12 @@ public record CreateFacilityMaintenanceRequest(
     string  Location,
     string  EndUser,
     string? RoomFlat,
-    string  Priority
+    string  Priority,
+    DateTime? DateOfRequest      = null,
+    string?   Requestor          = null,
+    string?   NotificationStatus = null,
+    string?   AssetNo            = null,
+    string?   OdometerReading    = null
 );
 
 public record ApproveFacilityRequest(string? Notes);
@@ -26,10 +31,15 @@ public record FacilityAssessmentRequest(
 );
 
 public record CompleteFacilityRequest(
-    string   WorkDone,
-    string?  ActionedBy,
-    decimal? SparesCostNaira = null,
-    string?  Notes           = null
+    string    WorkDone,
+    string?   ActionedBy,
+    decimal?  SparesCostNaira         = null,
+    string?   Notes                   = null,
+    string?   PartsSuppliedBy         = null,
+    DateTime? DateTakenToWorkshop     = null,
+    DateTime? DateCompleted           = null,
+    string?   JustificationEvaluation = null,
+    string?   NotificationStatus      = null
 );
 
 public record FacilityHandoverRequest(
@@ -83,7 +93,17 @@ public record FacilityMaintenanceDto(
     string?   Notes,
     DateTime  CreatedAt,
     DateTime  UpdatedAt,
-    int       DaysOpen
+    int       DaysOpen,
+    // Register fields (July 2026)
+    DateTime? DateOfRequest,
+    string?   Requestor,
+    string?   NotificationStatus,
+    string?   AssetNo,
+    string?   OdometerReading,
+    string?   PartsSuppliedBy,
+    DateTime? DateTakenToWorkshop,
+    string?   JustificationEvaluation,
+    int?      DaysTakenToComplete
 );
 
 public record FacilityMaintenanceStatsDto(
