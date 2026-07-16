@@ -1164,6 +1164,9 @@ static async Task ApplySchemaUpdatesAsync(
             AddColIfMissing ("VehicleMaintenanceRequests", "HandedOverBy",              "nvarchar(100)"),
             AddColIfMissing ("VehicleMaintenanceRequests", "AssetNo",                   "nvarchar(50)"),
             AddColIfMissing ("VehicleMaintenanceRequests", "AmountNaira",               "decimal(18,2)"),
+            AddColIfMissing ("VehicleMaintenanceRequests", "RunningHours",               "float"),
+            AddColIfMissing ("VehicleMaintenanceRequests", "NextServiceHour",            "float"),
+            AddColIfMissing ("VehicleMaintenanceRequests", "NotificationStatus",         "nvarchar(50)"),
 
             // ── EquipmentMaintenanceRequests ────────────────────────────────
             AddColIfMissing ("EquipmentMaintenanceRequests", "FaultIdentified",         "nvarchar(2000)"),

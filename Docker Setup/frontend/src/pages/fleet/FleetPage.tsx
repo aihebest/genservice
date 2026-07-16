@@ -176,6 +176,10 @@ export default function FleetPage() {
         priority: values.priority, currentLocation: location,
         assetNo: values.assetNo?.trim() || undefined,
         amountNaira: values.amountNaira ? Number(values.amountNaira) : undefined,
+        odometerReading: values.odometerReading?.trim() || undefined,
+        runningHours: values.runningHours ? Number(values.runningHours) : undefined,
+        nextServiceHour: values.nextServiceHour ? Number(values.nextServiceHour) : undefined,
+        notificationStatus: values.notificationStatus || undefined,
       });
       createForm.resetFields(); setLocationSel(null); setCreateOpen(false); refresh();
     } catch (e: unknown) {
@@ -313,6 +317,30 @@ export default function FleetPage() {
               </Form.Item>
             </Col>
           </Row>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="odometerReading" label="Odometer / Hour Reading">
+                <Input placeholder="Reading at time of request (optional)" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="notificationStatus" label="Notification Status" initialValue="Open">
+                <Select options={['Open','Notified','Closed'].map(s => ({ value: s, label: s }))} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="runningHours" label="Current Running Hours">
+                <InputNumber style={{ width: '100%' }} placeholder="e.g. 13602" min={0} />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="nextServiceHour" label="Next Service Due At">
+                <InputNumber style={{ width: '100%' }} placeholder="e.g. 13852" min={0} />
+              </Form.Item>
+            </Col>
+          </Row>
           <Form.Item name="description" label="Fault / Work Description" rules={[{ required: true }]}>
             <TextArea rows={3} placeholder="Describe the fault, symptoms, or work required…" maxLength={2000} showCount />
           </Form.Item>
@@ -379,6 +407,18 @@ export default function FleetPage() {
             {selected.assetNo && <Descriptions.Item label="Asset No.">{selected.assetNo}</Descriptions.Item>}
             {selected.amountNaira != null && (
               <Descriptions.Item label="Amount">₦{Number(selected.amountNaira).toLocaleString()}</Descriptions.Item>
+            )}
+            {selected.odometerReading && (
+              <Descriptions.Item label="Odometer / Hour Reading">{selected.odometerReading}</Descriptions.Item>
+            )}
+            {selected.runningHours != null && (
+              <Descriptions.Item label="Current Running Hours">{selected.runningHours.toLocaleString()} h</Descriptions.Item>
+            )}
+            {selected.nextServiceHour != null && (
+              <Descriptions.Item label="Next Service Due At">{selected.nextServiceHour.toLocaleString()} h</Descriptions.Item>
+            )}
+            {selected.notificationStatus && (
+              <Descriptions.Item label="Notification Status">{selected.notificationStatus}</Descriptions.Item>
             )}
             <Descriptions.Item label="Description">
               <Text style={{ whiteSpace: 'pre-wrap' }}>{selected.description}</Text>

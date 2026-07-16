@@ -26,9 +26,12 @@ export const vehicleMaintenanceApi = {
     description:     string;
     priority:        string;
     currentLocation: string;
-    odometerReading?: string;
-    assetNo?:        string;
-    amountNaira?:    number;
+    odometerReading?:    string;
+    assetNo?:            string;
+    amountNaira?:        number;
+    runningHours?:       number;
+    nextServiceHour?:    number;
+    notificationStatus?: string;
   }) => apiClient.post<VehicleMaintenance>('/vehicle-maintenance', data).then(r => r.data),
 
   approve: (id: string, notes?: string) =>

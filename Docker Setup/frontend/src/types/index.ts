@@ -829,6 +829,9 @@ export interface VehicleMaintenance {
   daysInWorkshop?:   number;
   assetNo?:          string;
   amountNaira?:      number;
+  runningHours?:       number;
+  nextServiceHour?:    number;
+  notificationStatus?: string;
 }
 
 export interface VehicleMaintenanceStats {

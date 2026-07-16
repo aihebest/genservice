@@ -45,7 +45,8 @@ public class VehicleMaintenanceController(
             r.HandoverConfirmed, r.DateHandedOver, r.HandedOverBy,
             r.Notes, r.CreatedAt, r.UpdatedAt,
             daysOpen, daysInShop,
-            r.AssetNo, r.AmountNaira
+            r.AssetNo, r.AmountNaira,
+            r.RunningHours, r.NextServiceHour, r.NotificationStatus
         );
     }
 
@@ -144,6 +145,9 @@ public class VehicleMaintenanceController(
             OdometerReading  = req.OdometerReading?.Trim(),
             AssetNo          = req.AssetNo?.Trim(),
             AmountNaira      = req.AmountNaira,
+            RunningHours       = req.RunningHours,
+            NextServiceHour    = req.NextServiceHour,
+            NotificationStatus = string.IsNullOrWhiteSpace(req.NotificationStatus) ? "Open" : req.NotificationStatus.Trim(),
             RequestedByEmail = CallerEmail,
             RequestedByName  = CallerName,
             CreatedAt        = DateTime.UtcNow,

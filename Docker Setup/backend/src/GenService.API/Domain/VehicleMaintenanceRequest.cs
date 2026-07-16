@@ -16,8 +16,11 @@ public class VehicleMaintenanceRequest
     public string? AssetNo           { get; set; }         // asset / fleet number
     public string  MaintenanceType   { get; set; } = VehicleMaintenanceType.RoutineService;
     public string  CurrentLocation   { get; set; } = "";   // where vehicle currently is
-    public string? OdometerReading   { get; set; }         // odometer at time of request (km/miles)
+    public string? OdometerReading   { get; set; }         // odometer / hour reading at time of request
     public decimal? AmountNaira      { get; set; }         // amount / cost (₦)
+    public double?  RunningHours       { get; set; }       // current running hours (hour-metered assets)
+    public double?  NextServiceHour    { get; set; }       // next service due at (hour reading)
+    public string?  NotificationStatus { get; set; }       // Open | Notified | Closed
 
     // ── Request details ───────────────────────────────────────────────────────
     public string Description { get; set; } = "";           // problem reported by requestor/user
