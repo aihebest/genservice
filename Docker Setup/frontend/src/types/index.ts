@@ -322,6 +322,7 @@ export const OFFICE_LOCATIONS = [
   'GML',
   'DMGS',
   'Woji',
+  'Woji Logistic Tank',
   'Uyo',
   'Warri',
   // Residences
@@ -832,6 +833,7 @@ export interface VehicleMaintenance {
   runningHours?:       number;
   nextServiceHour?:    number;
   notificationStatus?: string;
+  finalAmountNaira?:   number;
 }
 
 export interface VehicleMaintenanceStats {
@@ -952,6 +954,7 @@ export interface EquipmentMaintenance {
   justificationEvaluation?:string;
   daysTakenToComplete?:    number;
   amountNaira?:            number;
+  finalAmountNaira?:       number;
 }
 
 export interface EquipmentMaintenanceStats {
@@ -1040,6 +1043,7 @@ export interface FacilityMaintenance {
   justificationEvaluation?:string;
   daysTakenToComplete?:    number;
   amountNaira?:            number;
+  finalAmountNaira?:       number;
 }
 
 export interface FacilityMaintenanceStats {

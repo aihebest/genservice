@@ -72,6 +72,10 @@ function buildColumns(onView: (r: EquipmentMaintenance) => void): ColumnsType<Eq
       render: (v?: number) => v != null
         ? <Text style={{ fontSize: 12 }}>₦{Number(v).toLocaleString()}</Text>
         : <Text type="secondary" style={{ fontSize: 12 }}>—</Text> },
+    { title: 'Final Amount (₦)', dataIndex: 'finalAmountNaira', key: 'finalAmount', width: 130,
+      render: (v?: number) => v != null
+        ? <Text strong style={{ fontSize: 12, color: '#389e0d' }}>₦{Number(v).toLocaleString()}</Text>
+        : <Text type="secondary" style={{ fontSize: 12 }}>—</Text> },
     { title: 'Fault ID', dataIndex: 'faultIdentified', key: 'fault', width: 160, ellipsis: true,
       render: (v?: string) => v
         ? <Tooltip title={v}><Text style={{ fontSize: 12 }}>{v}</Text></Tooltip>
@@ -214,6 +218,7 @@ export default function EquipmentTab() {
       dateTakenToWorkshop:     values.dateTakenToWorkshop ? (values.dateTakenToWorkshop as dayjs.Dayjs).format('YYYY-MM-DD') : undefined,
       dateCompleted:           values.dateCompleted ? (values.dateCompleted as dayjs.Dayjs).format('YYYY-MM-DD') : undefined,
       justificationEvaluation: (values.justificationEvaluation as string | undefined)?.trim(),
+      finalAmountNaira:        values.finalAmountNaira as number | undefined,
     }));
     setCompleteOpen(false); completeForm.resetFields();
   };
@@ -477,6 +482,16 @@ export default function EquipmentTab() {
           </Row>
           <Row gutter={12}>
             <Col span={12}>
+              <Form.Item name="finalAmountNaira" label="Final Amount (₦)"
+                tooltip="Actual total cost of this maintenance. Flows to the summary.">
+                <InputNumber style={{ width: '100%' }} min={0} placeholder="Total actual cost"
+                  formatter={v => `₦ ${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                  parser={(v: string | undefined) => parseFloat(v?.replace(/₦\s?|(,*)/g, '') ?? '0') as 0} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={12}>
+            <Col span={12}>
               <Form.Item name="dateTakenToWorkshop" label="Date Taken to Workshop">
                 <DatePicker style={{ width: '100%' }} format="D MMM YYYY" />
               </Form.Item>
@@ -601,7 +616,10 @@ export default function EquipmentTab() {
               <Descriptions.Item label="Odometer / Hour Reading">{selected.odometerReading}</Descriptions.Item>
             )}
             {selected.amountNaira != null && (
-              <Descriptions.Item label="Amount">₦{Number(selected.amountNaira).toLocaleString()}</Descriptions.Item>
+              <Descriptions.Item label="Amount (estimated)">₦{Number(selected.amountNaira).toLocaleString()}</Descriptions.Item>
+            )}
+            {selected.finalAmountNaira != null && (
+              <Descriptions.Item label="Final Amount">₦{Number(selected.finalAmountNaira).toLocaleString()}</Descriptions.Item>
             )}
             {selected.runningHours != null && (
               <Descriptions.Item label="Running Hours">{selected.runningHours.toLocaleString()} h</Descriptions.Item>

@@ -17,7 +17,8 @@ public class VehicleMaintenanceRequest
     public string  MaintenanceType   { get; set; } = VehicleMaintenanceType.RoutineService;
     public string  CurrentLocation   { get; set; } = "";   // where vehicle currently is
     public string? OdometerReading   { get; set; }         // odometer / hour reading at time of request
-    public decimal? AmountNaira      { get; set; }         // amount / cost (₦)
+    public decimal? AmountNaira      { get; set; }         // estimated amount / cost at request (₦)
+    public decimal? FinalAmountNaira { get; set; }         // actual final cost captured at completion (₦)
     public double?  RunningHours       { get; set; }       // current running hours (hour-metered assets)
     public double?  NextServiceHour    { get; set; }       // next service due at (hour reading)
     public string?  NotificationStatus { get; set; }       // Open | Notified | Closed

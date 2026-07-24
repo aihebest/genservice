@@ -39,7 +39,7 @@ public class EquipmentMaintenanceController(
         // register fields (July 2026)
         r.DateOfRequest, r.Requestor, r.NotificationStatus, r.OdometerReading,
         r.PartsSuppliedBy, r.DateTakenToWorkshop, r.JustificationEvaluation, r.DaysTakenToComplete,
-        r.AmountNaira
+        r.AmountNaira, r.FinalAmountNaira
     );
 
     private async Task<string> NextRefAsync()
@@ -241,6 +241,17 @@ public class EquipmentMaintenanceController(
         var r = await db.EquipmentMaintenanceRequests.FindAsync(id);
         if (r is null) return NotFound();
 
+        // A request may only be completed once work is under way — never straight from
+        // Pending/Approved, and not if already Completed or Rejected.
+        var completable = new[]
+        {
+            MaintenanceRequestStatus.Ongoing,
+            MaintenanceRequestStatus.AwaitingSpares,
+            MaintenanceRequestStatus.AwaitingFunds,
+        };
+        if (!completable.Contains(r.Status))
+            return BadRequest(new { message = "A request can only be marked Completed once work is Ongoing (or awaiting spares/funds). It cannot be completed while Pending, Approved, Rejected, or already Completed." });
+
         r.Status          = MaintenanceRequestStatus.Completed;
         r.WorkDone        = req.WorkDone?.Trim();
         r.ActionedBy      = req.ActionedBy?.Trim() ?? CallerName;
@@ -250,6 +261,7 @@ public class EquipmentMaintenanceController(
         r.DateTakenToWorkshop     = req.DateTakenToWorkshop?.Date ?? r.DateTakenToWorkshop;
         r.JustificationEvaluation = req.JustificationEvaluation?.Trim() ?? r.JustificationEvaluation;
         if (!string.IsNullOrWhiteSpace(req.NotificationStatus)) r.NotificationStatus = req.NotificationStatus.Trim();
+        r.FinalAmountNaira = req.FinalAmountNaira ?? r.FinalAmountNaira;
         r.CompletedAt     = req.DateCompleted?.Date ?? DateTime.UtcNow;
         r.UpdatedAt       = DateTime.UtcNow;
         await db.SaveChangesAsync();

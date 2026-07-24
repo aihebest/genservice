@@ -1164,6 +1164,7 @@ static async Task ApplySchemaUpdatesAsync(
             AddColIfMissing ("VehicleMaintenanceRequests", "HandedOverBy",              "nvarchar(100)"),
             AddColIfMissing ("VehicleMaintenanceRequests", "AssetNo",                   "nvarchar(50)"),
             AddColIfMissing ("VehicleMaintenanceRequests", "AmountNaira",               "decimal(18,2)"),
+            AddColIfMissing ("VehicleMaintenanceRequests", "FinalAmountNaira",          "decimal(18,2)"),
             AddColIfMissing ("VehicleMaintenanceRequests", "RunningHours",               "float"),
             AddColIfMissing ("VehicleMaintenanceRequests", "NextServiceHour",            "float"),
             AddColIfMissing ("VehicleMaintenanceRequests", "NotificationStatus",         "nvarchar(50)"),
@@ -1189,6 +1190,7 @@ static async Task ApplySchemaUpdatesAsync(
             AddColIfMissing ("EquipmentMaintenanceRequests", "DateTakenToWorkshop",     "datetime2"),
             AddColIfMissing ("EquipmentMaintenanceRequests", "JustificationEvaluation", "nvarchar(2000)"),
             AddColIfMissing ("EquipmentMaintenanceRequests", "AmountNaira",             "decimal(18,2)"),
+            AddColIfMissing ("EquipmentMaintenanceRequests", "FinalAmountNaira",        "decimal(18,2)"),
 
             // ── FacilityMaintenanceRequests ─────────────────────────────────
             AddColIfMissing ("FacilityMaintenanceRequests", "FaultIdentified",          "nvarchar(2000)"),
@@ -1212,6 +1214,7 @@ static async Task ApplySchemaUpdatesAsync(
             AddColIfMissing ("FacilityMaintenanceRequests", "DateTakenToWorkshop",      "datetime2"),
             AddColIfMissing ("FacilityMaintenanceRequests", "JustificationEvaluation",  "nvarchar(2000)"),
             AddColIfMissing ("FacilityMaintenanceRequests", "AmountNaira",              "decimal(18,2)"),
+            AddColIfMissing ("FacilityMaintenanceRequests", "FinalAmountNaira",         "decimal(18,2)"),
 
             // ── MaintenanceSchedules — reminder / escalation tracking columns ──
             """

@@ -83,6 +83,12 @@ function buildColumns(onView: (r: VehicleMaintenance) => void): ColumnsType<Vehi
         : <Text type="secondary" style={{ fontSize: 12 }}>—</Text>,
     },
     {
+      title: 'Final Amount (₦)', dataIndex: 'finalAmountNaira', key: 'finalAmountNaira', width: 130,
+      render: (v?: number) => v != null
+        ? <Text strong style={{ fontSize: 12, color: '#389e0d' }}>₦{Number(v).toLocaleString()}</Text>
+        : <Text type="secondary" style={{ fontSize: 12 }}>—</Text>,
+    },
+    {
       title: 'Days Open', dataIndex: 'daysOpen', key: 'daysOpen', width: 95,
       render: (v: number, r) => {
         const isLong = r.status === 'InWorkshop' && (r.daysInWorkshop ?? 0) > 7;
@@ -131,6 +137,7 @@ export default function FleetPage() {
   const [workshopLoc,   setWorkshopLoc]   = useState('');
   const [completeOpen,  setCompleteOpen]  = useState(false);
   const [completeNotes, setCompleteNotes] = useState('');
+  const [completeFinal, setCompleteFinal] = useState<number | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError,   setActionError]   = useState<string | null>(null);
 
@@ -406,7 +413,10 @@ export default function FleetPage() {
             <Descriptions.Item label="Vehicle Type">{selected.vehicleType}</Descriptions.Item>
             {selected.assetNo && <Descriptions.Item label="Asset No.">{selected.assetNo}</Descriptions.Item>}
             {selected.amountNaira != null && (
-              <Descriptions.Item label="Amount">₦{Number(selected.amountNaira).toLocaleString()}</Descriptions.Item>
+              <Descriptions.Item label="Amount (estimated)">₦{Number(selected.amountNaira).toLocaleString()}</Descriptions.Item>
+            )}
+            {selected.finalAmountNaira != null && (
+              <Descriptions.Item label="Final Amount">₦{Number(selected.finalAmountNaira).toLocaleString()}</Descriptions.Item>
             )}
             {selected.odometerReading && (
               <Descriptions.Item label="Odometer / Hour Reading">{selected.odometerReading}</Descriptions.Item>
@@ -512,10 +522,17 @@ export default function FleetPage() {
 
       {/* Complete modal */}
       <Modal title={<><CheckOutlined /> Mark as Completed</>} open={completeOpen}
-        onOk={async () => { if (!selected) return; await act(() => vehicleMaintenanceApi.complete(selected.id, { notes: completeNotes || undefined })); setCompleteOpen(false); setCompleteNotes(''); }}
-        onCancel={() => { setCompleteOpen(false); setCompleteNotes(''); }}
+        onOk={async () => { if (!selected) return; await act(() => vehicleMaintenanceApi.complete(selected.id, { notes: completeNotes || undefined, finalAmountNaira: completeFinal ?? undefined })); setCompleteOpen(false); setCompleteNotes(''); setCompleteFinal(null); }}
+        onCancel={() => { setCompleteOpen(false); setCompleteNotes(''); setCompleteFinal(null); }}
         okText="Confirm Completion" confirmLoading={actionLoading}>
         <p>Mark <strong>{selected?.requestNumber}</strong> ({selected?.vehicleRegNo}) as completed:</p>
+        <div style={{ marginBottom: 12 }}>
+          <Text strong style={{ display: 'block', marginBottom: 6 }}>Final Amount (₦)</Text>
+          <InputNumber style={{ width: '100%' }} min={0} value={completeFinal ?? undefined}
+            onChange={v => setCompleteFinal(v as number | null)} placeholder="Actual total cost of this repair"
+            formatter={v => `₦ ${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+            parser={(v: string | undefined) => parseFloat(v?.replace(/₦\s?|(,*)/g, '') ?? '0') as 0} />
+        </div>
         <TextArea rows={3} value={completeNotes} onChange={e => setCompleteNotes(e.target.value)}
           placeholder="Completion notes — work done, parts replaced, etc. (optional)" maxLength={2000} />
       </Modal>

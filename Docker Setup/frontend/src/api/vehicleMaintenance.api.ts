@@ -58,10 +58,11 @@ export const vehicleMaintenanceApi = {
   }) => apiClient.post<VehicleMaintenance>(`/vehicle-maintenance/${id}/assess`, data).then(r => r.data),
 
   complete: (id: string, data: {
-    workDone?:       string;
-    actionedBy?:     string;
+    workDone?:        string;
+    actionedBy?:      string;
     sparesCostNaira?: number;
-    notes?:          string;
+    notes?:           string;
+    finalAmountNaira?: number;
   }) => apiClient.post<VehicleMaintenance>(`/vehicle-maintenance/${id}/complete`, data).then(r => r.data),
 
   handover: (id: string, data: {

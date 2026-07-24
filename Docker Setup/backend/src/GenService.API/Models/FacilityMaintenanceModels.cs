@@ -40,7 +40,8 @@ public record CompleteFacilityRequest(
     DateTime? DateTakenToWorkshop     = null,
     DateTime? DateCompleted           = null,
     string?   JustificationEvaluation = null,
-    string?   NotificationStatus      = null
+    string?   NotificationStatus      = null,
+    decimal?  FinalAmountNaira        = null
 );
 
 public record FacilityHandoverRequest(
@@ -105,7 +106,8 @@ public record FacilityMaintenanceDto(
     DateTime? DateTakenToWorkshop,
     string?   JustificationEvaluation,
     int?      DaysTakenToComplete,
-    decimal?  AmountNaira
+    decimal?  AmountNaira,
+    decimal?  FinalAmountNaira
 );
 
 public record FacilityMaintenanceStatsDto(

@@ -67,6 +67,7 @@ export const facilityMaintenanceApi = {
     dateCompleted?:           string;
     justificationEvaluation?: string;
     notificationStatus?:      string;
+    finalAmountNaira?:        number;
   }) => apiClient.post<FacilityMaintenance>(`/facility-maintenance/${id}/complete`, data).then(r => r.data),
 
   handover: (id: string, data: {

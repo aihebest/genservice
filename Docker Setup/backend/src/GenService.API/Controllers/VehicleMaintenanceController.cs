@@ -46,7 +46,8 @@ public class VehicleMaintenanceController(
             r.Notes, r.CreatedAt, r.UpdatedAt,
             daysOpen, daysInShop,
             r.AssetNo, r.AmountNaira,
-            r.RunningHours, r.NextServiceHour, r.NotificationStatus
+            r.RunningHours, r.NextServiceHour, r.NotificationStatus,
+            r.FinalAmountNaira
         );
     }
 
@@ -299,6 +300,7 @@ public class VehicleMaintenanceController(
         r.ActionedBy      = req.ActionedBy?.Trim() ?? CallerName;
         r.SparesCostNaira = req.SparesCostNaira ?? r.SparesCostNaira;
         r.Notes           = req.Notes ?? r.Notes;
+        r.FinalAmountNaira = req.FinalAmountNaira ?? r.FinalAmountNaira;
         r.CompletedAt     = DateTime.UtcNow;
         r.UpdatedAt       = DateTime.UtcNow;
 

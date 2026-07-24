@@ -20,7 +20,8 @@ public class FacilityMaintenanceRequest
     // ── Request details ───────────────────────────────────────────────────────
     public string   Priority { get; set; } = RequestPriority.Normal;
     public string   Status   { get; set; } = MaintenanceRequestStatus.Pending;
-    public decimal? AmountNaira { get; set; }                 // amount / cost (₦)
+    public decimal? AmountNaira { get; set; }                 // estimated amount / cost at request (₦)
+    public decimal? FinalAmountNaira { get; set; }            // actual final cost captured at completion (₦)
 
     // ── Requester ─────────────────────────────────────────────────────────────
     public string  RequestedByEmail { get; set; } = "";

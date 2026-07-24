@@ -41,8 +41,9 @@ public record VehicleAssessmentRequest(
 public record CompleteVehicleMaintenanceRequest(
     string?  WorkDone,
     string?  ActionedBy,
-    decimal? SparesCostNaira = null,
-    string?  Notes           = null
+    decimal? SparesCostNaira  = null,
+    string?  Notes            = null,
+    decimal? FinalAmountNaira = null
 );
 
 public record VehicleHandoverRequest(
@@ -109,7 +110,8 @@ public record VehicleMaintenanceDto(
     decimal?  AmountNaira,
     double?   RunningHours,
     double?   NextServiceHour,
-    string?   NotificationStatus
+    string?   NotificationStatus,
+    decimal?  FinalAmountNaira
 );
 
 public record VehicleMaintenanceStatsDto(

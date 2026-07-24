@@ -42,7 +42,8 @@ public record CompleteEquipmentRequest(
     DateTime? DateTakenToWorkshop     = null,
     DateTime? DateCompleted           = null,
     string?   JustificationEvaluation = null,
-    string?   NotificationStatus      = null
+    string?   NotificationStatus      = null,
+    decimal?  FinalAmountNaira        = null
 );
 
 public record EquipmentHandoverRequest(
@@ -109,7 +110,8 @@ public record EquipmentMaintenanceDto(
     DateTime? DateTakenToWorkshop,
     string?   JustificationEvaluation,
     int?      DaysTakenToComplete,
-    decimal?  AmountNaira
+    decimal?  AmountNaira,
+    decimal?  FinalAmountNaira
 );
 
 public record EquipmentMaintenanceStatsDto(
