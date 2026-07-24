@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
-  Alert, Badge, Button, Card, Col, Dropdown, List, Progress, Row,
-  Select, Space, Statistic, Table, Tabs, Tag, Tooltip, Typography,
+  Alert, Badge, Button, Card, Col, DatePicker, Dropdown, Input, InputNumber, List, Progress, Row,
+  Select, Space, Statistic, Table, Tabs, Tag, Tooltip, Typography, message,
 } from 'antd';
 import {
   BarChartOutlined, DownloadOutlined, ToolOutlined, ThunderboltOutlined,
@@ -9,6 +9,7 @@ import {
   ClockCircleOutlined, FireOutlined, CarOutlined,
   HomeOutlined, TeamOutlined, BankOutlined,
   BulbOutlined, PlaySquareOutlined, SafetyCertificateOutlined, DropboxOutlined,
+  FilterOutlined,
 } from '@ant-design/icons';
 import {
   exportVehicleRegister,
@@ -25,11 +26,12 @@ import {
 } from 'recharts';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
-import { reportsApi } from '../../api/reports.api';
-import type { ReportPeriod, PeriodBreakdownItem } from '../../api/reports.api';
+import { reportsApi, downloadExplorerExport } from '../../api/reports.api';
+import type { ReportPeriod, PeriodBreakdownItem, ExplorerColumn, ExplorerParams } from '../../api/reports.api';
 import {
   CATEGORY_META, STATUS_META,
   MAINTENANCE_CATEGORY_META, GENERATOR_RUN_REASON_META,
+  OFFICE_LOCATIONS,
 } from '../../types';
 import type { RequestCategory, RequestStatus, MaintenanceCategory, GeneratorRunReason } from '../../types';
 
@@ -559,8 +561,147 @@ function FuelReportTab({ period }: { period: ReportPeriod }) {
 // ══════════════════════════════════════════════════════════════════════════════
 //  Main Page
 // ══════════════════════════════════════════════════════════════════════════════
+// ── Report Explorer (unified, filterable view over live data) ────────────────────
+const EXPLORER_DATASETS = [
+  { value: 'vehicle',       label: 'Vehicle Maintenance' },
+  { value: 'equipment',     label: 'Equipment Maintenance' },
+  { value: 'facility',      label: 'Facility Maintenance' },
+  { value: 'diesel',        label: 'Diesel Distribution' },
+  { value: 'electricity',   label: 'Electricity' },
+  { value: 'dstv',          label: 'DStv Subscriptions' },
+  { value: 'accommodation', label: 'Feeding/Accommodation' },
+  { value: 'requests',      label: 'Requests' },
+  { value: 'generator',     label: 'Generator' },
+];
+
+function renderExplorerCell(v: unknown, kind: string): React.ReactNode {
+  if (v === null || v === undefined || v === '') return <Text type="secondary">—</Text>;
+  if (kind === 'money')  return <Text strong>₦{Number(v).toLocaleString()}</Text>;
+  if (kind === 'number') return Number(v).toLocaleString();
+  if (kind === 'date')   return dayjs(String(v)).isValid() ? dayjs(String(v)).format('D MMM YY') : String(v);
+  return String(v);
+}
+
+function ReportExplorerTab() {
+  const [dataset, setDataset]     = useState('vehicle');
+  const [from, setFrom]           = useState<string | undefined>();
+  const [to, setTo]               = useState<string | undefined>();
+  const [location, setLocation]   = useState<string | undefined>();
+  const [statusF, setStatusF]     = useState<string | undefined>();
+  const [typeF, setTypeF]         = useState<string | undefined>();
+  const [minAmount, setMinAmount] = useState<number | undefined>();
+  const [maxAmount, setMaxAmount] = useState<number | undefined>();
+  const [search, setSearch]       = useState<string | undefined>();
+  const [page, setPage]           = useState(1);
+  const [exporting, setExporting] = useState(false);
+
+  const params: ExplorerParams = { dataset, from, to, location, status: statusF, type: typeF, minAmount, maxAmount, search, page, pageSize: 50 };
+
+  const { data, isFetching } = useQuery({
+    queryKey: ['reports', 'explorer', dataset, from, to, location, statusF, typeF, minAmount, maxAmount, search, page],
+    queryFn:  () => reportsApi.explorer(params),
+  });
+
+  const resetFilters = () => {
+    setFrom(undefined); setTo(undefined); setLocation(undefined); setStatusF(undefined);
+    setTypeF(undefined); setMinAmount(undefined); setMaxAmount(undefined); setSearch(undefined); setPage(1);
+  };
+
+  const handleExport = async () => {
+    setExporting(true);
+    try { await downloadExplorerExport(params); }
+    catch { message.error('Export failed — please try again.'); }
+    finally { setExporting(false); }
+  };
+
+  const columns = (data?.columns ?? []).map((c: ExplorerColumn) => ({
+    title: c.label, dataIndex: c.key, key: c.key,
+    render: (v: unknown) => renderExplorerCell(v, c.kind),
+  }));
+
+  const hasAmount = !!data?.amountKey;
+
+  return (
+    <div style={{ padding: '12px 0' }}>
+      <Card size="small" style={{ marginBottom: 12 }}>
+        <Row gutter={[12, 12]} align="middle">
+          <Col>
+            <Text strong style={{ marginRight: 6 }}>Dataset</Text>
+            <Select value={dataset} style={{ width: 210 }} options={EXPLORER_DATASETS}
+              onChange={v => { setDataset(v); setPage(1); resetFilters(); }} />
+          </Col>
+          <Col>
+            <DatePicker.RangePicker allowEmpty={[true, true]}
+              onChange={(vals) => {
+                const [a, b] = vals ?? [null, null];
+                setFrom(a ? a.format('YYYY-MM-DD') : undefined);
+                setTo(b ? b.format('YYYY-MM-DD') : undefined);
+                setPage(1);
+              }} />
+          </Col>
+          <Col>
+            <Select allowClear placeholder="Location" style={{ width: 160 }} value={location} showSearch
+              options={OFFICE_LOCATIONS.map(l => ({ value: l, label: l }))}
+              onChange={v => { setLocation(v); setPage(1); }} />
+          </Col>
+          <Col>
+            <Input allowClear placeholder="Status" style={{ width: 130 }} value={statusF}
+              onChange={e => { setStatusF(e.target.value || undefined); setPage(1); }} />
+          </Col>
+          <Col>
+            <Input allowClear placeholder="Work / Type" style={{ width: 150 }} value={typeF}
+              onChange={e => { setTypeF(e.target.value || undefined); setPage(1); }} />
+          </Col>
+          <Col>
+            <InputNumber placeholder="Min ₦" style={{ width: 110 }} min={0} value={minAmount}
+              onChange={v => { setMinAmount(v ?? undefined); setPage(1); }} />
+          </Col>
+          <Col>
+            <InputNumber placeholder="Max ₦" style={{ width: 110 }} min={0} value={maxAmount}
+              onChange={v => { setMaxAmount(v ?? undefined); setPage(1); }} />
+          </Col>
+          <Col>
+            <Input.Search allowClear placeholder="Search" style={{ width: 170 }}
+              onSearch={v => { setSearch(v || undefined); setPage(1); }} />
+          </Col>
+          <Col>
+            <Button icon={<ReloadOutlined />} onClick={resetFilters}>Reset</Button>
+          </Col>
+          <Col>
+            <Button type="primary" icon={<DownloadOutlined />} loading={exporting}
+              onClick={handleExport}>Export Excel</Button>
+          </Col>
+        </Row>
+      </Card>
+
+      <Row gutter={12} style={{ marginBottom: 12 }}>
+        <Col><Card size="small" styles={{ body: { padding: '8px 16px' } }}>
+          <Text type="secondary" style={{ fontSize: 12 }}>Records</Text>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#1677ff' }}>{(data?.totalCount ?? 0).toLocaleString()}</div>
+        </Card></Col>
+        {hasAmount && (
+          <Col><Card size="small" styles={{ body: { padding: '8px 16px' } }}>
+            <Text type="secondary" style={{ fontSize: 12 }}>Total Amount (filtered)</Text>
+            <div style={{ fontSize: 18, fontWeight: 700, color: '#389e0d' }}>₦{Number(data?.totalAmountNaira ?? 0).toLocaleString()}</div>
+          </Card></Col>
+        )}
+      </Row>
+
+      <Table
+        columns={columns}
+        dataSource={data?.rows ?? []}
+        rowKey={(_, i) => String(i)}
+        loading={isFetching}
+        size="small"
+        scroll={{ x: 'max-content' }}
+        pagination={{ current: page, pageSize: 50, total: data?.totalCount ?? 0, onChange: setPage, showSizeChanger: false, showTotal: t => `${t} records` }}
+      />
+    </div>
+  );
+}
+
 export default function ReportsPage() {
-  const [activeTab, setActiveTab] = useState('requests');
+  const [activeTab, setActiveTab] = useState('explorer');
   const [period, setPeriod]       = useState<ReportPeriod>('30d');
   const qc = useQueryClient();
 
@@ -597,6 +738,11 @@ export default function ReportsPage() {
         onChange={setActiveTab}
         size="small"
         items={[
+          {
+            key:      'explorer',
+            label:    <Space><FilterOutlined />Report Explorer</Space>,
+            children: <ReportExplorerTab />,
+          },
           {
             key:      'requests',
             label:    <Space><BarChartOutlined />Request Reports</Space>,

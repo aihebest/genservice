@@ -1,11 +1,24 @@
 using GenService.API.Data;
 using GenService.API.Domain;
 using GenService.API.Models;
+using ClosedXML.Excel;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace GenService.API.Controllers;
+
+// ── Report Explorer shared shapes ───────────────────────────────────────────────
+public record ExplorerColumn(string Key, string Label, string Kind); // kind: text | date | money | number
+
+public record ExplorerRowInternal(
+    Dictionary<string, object?> Row,
+    DateTime? Date,
+    string?   Location,
+    string?   Status,
+    string?   Type,
+    decimal?  Amount,
+    string    Search);
 
 [ApiController]
 [Route("api/v1/reports")]
@@ -691,5 +704,300 @@ public class ReportsController(GenServiceDbContext db) : ControllerBase
                 d.QuantityLitres, d.BulkSupplyReference, d.IssuingOfficer
             }).ToList(),
         });
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  REPORT EXPLORER — one unified, filterable view over live data
+    // ══════════════════════════════════════════════════════════════════════════
+
+    // ── GET /api/v1/reports/explorer ─────────────────────────────────────────
+    [HttpGet("explorer")]
+    public async Task<IActionResult> Explorer(
+        [FromQuery] string  dataset   = "vehicle",
+        [FromQuery] string? from      = null,
+        [FromQuery] string? to        = null,
+        [FromQuery] string? location  = null,
+        [FromQuery] string? status    = null,
+        [FromQuery] string? type      = null,
+        [FromQuery] decimal? minAmount = null,
+        [FromQuery] decimal? maxAmount = null,
+        [FromQuery] string? search    = null,
+        [FromQuery] int     page      = 1,
+        [FromQuery] int     pageSize  = 200)
+    {
+        var (columns, amountKey, rows) = await BuildExplorerAsync(dataset);
+        var filtered = FilterExplorer(rows, from, to, location, status, type, minAmount, maxAmount, search);
+
+        var total       = filtered.Count;
+        var totalAmount = amountKey is null ? 0m : filtered.Sum(x => x.Amount ?? 0);
+        var paged       = filtered.Skip((page - 1) * pageSize).Take(pageSize).Select(x => x.Row).ToList();
+
+        return Ok(new
+        {
+            dataset,
+            columns,
+            amountKey,
+            rows             = paged,
+            totalCount       = total,
+            totalAmountNaira = totalAmount,
+            page,
+            pageSize,
+        });
+    }
+
+    // ── GET /api/v1/reports/explorer/export ──────────────────────────────────
+    [HttpGet("explorer/export")]
+    public async Task<IActionResult> ExplorerExport(
+        [FromQuery] string  dataset   = "vehicle",
+        [FromQuery] string? from      = null,
+        [FromQuery] string? to        = null,
+        [FromQuery] string? location  = null,
+        [FromQuery] string? status    = null,
+        [FromQuery] string? type      = null,
+        [FromQuery] decimal? minAmount = null,
+        [FromQuery] decimal? maxAmount = null,
+        [FromQuery] string? search    = null)
+    {
+        var (columns, amountKey, rows) = await BuildExplorerAsync(dataset);
+        var filtered = FilterExplorer(rows, from, to, location, status, type, minAmount, maxAmount, search);
+
+        using var wb = new XLWorkbook();
+        var ws = wb.AddWorksheet(dataset.Length > 28 ? dataset[..28] : dataset);
+
+        for (int c = 0; c < columns.Count; c++)
+        {
+            var cell = ws.Cell(1, c + 1);
+            cell.Value = columns[c].Label;
+            cell.Style.Font.Bold = true;
+            cell.Style.Fill.BackgroundColor = XLColor.FromHtml("#1677ff");
+            cell.Style.Font.FontColor = XLColor.White;
+        }
+
+        for (int r = 0; r < filtered.Count; r++)
+        {
+            var row = filtered[r].Row;
+            for (int c = 0; c < columns.Count; c++)
+            {
+                var col = columns[c];
+                var val = row.GetValueOrDefault(col.Key);
+                var cell = ws.Cell(r + 2, c + 1);
+                if (val is null) { cell.Value = ""; }
+                else if (col.Kind == "money" || col.Kind == "number")
+                    cell.Value = Convert.ToDouble(val);
+                else cell.Value = val.ToString();
+            }
+            if (r % 2 == 1) ws.Row(r + 2).Style.Fill.BackgroundColor = XLColor.FromHtml("#f5f5f5");
+        }
+
+        // Totals row for money columns
+        if (amountKey is not null && filtered.Count > 0)
+        {
+            var totalRow = filtered.Count + 2;
+            ws.Cell(totalRow, 1).Value = "TOTAL";
+            ws.Cell(totalRow, 1).Style.Font.Bold = true;
+            var amtIdx = columns.FindIndex(c => c.Key == amountKey);
+            if (amtIdx >= 0)
+            {
+                ws.Cell(totalRow, amtIdx + 1).Value = (double)filtered.Sum(x => x.Amount ?? 0);
+                ws.Cell(totalRow, amtIdx + 1).Style.Font.Bold = true;
+            }
+        }
+
+        ws.Columns().AdjustToContents(8, 60);
+        ws.SheetView.FreezeRows(1);
+
+        using var ms = new MemoryStream();
+        wb.SaveAs(ms);
+        var filename = $"Report_{dataset}_{DateTime.UtcNow:yyyyMMdd}.xlsx";
+        return File(ms.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", filename);
+    }
+
+    // ── Filter helper (in-memory) ────────────────────────────────────────────
+    private static List<ExplorerRowInternal> FilterExplorer(
+        List<ExplorerRowInternal> rows, string? from, string? to, string? location,
+        string? status, string? type, decimal? minAmount, decimal? maxAmount, string? search)
+    {
+        DateTime? fromDt = DateTime.TryParse(from, out var fd) ? fd.Date : null;
+        DateTime? toDt   = DateTime.TryParse(to,   out var td) ? td.Date.AddDays(1).AddTicks(-1) : null;
+        var s = search?.Trim();
+
+        return rows.Where(x =>
+            (fromDt is null || (x.Date is not null && x.Date >= fromDt)) &&
+            (toDt   is null || (x.Date is not null && x.Date <= toDt)) &&
+            (string.IsNullOrWhiteSpace(location) || string.Equals(x.Location, location, StringComparison.OrdinalIgnoreCase)) &&
+            (string.IsNullOrWhiteSpace(status)   || string.Equals(x.Status,   status,   StringComparison.OrdinalIgnoreCase)) &&
+            (string.IsNullOrWhiteSpace(type)     || string.Equals(x.Type,     type,     StringComparison.OrdinalIgnoreCase)) &&
+            (minAmount is null || (x.Amount is not null && x.Amount >= minAmount)) &&
+            (maxAmount is null || (x.Amount is not null && x.Amount <= maxAmount)) &&
+            (string.IsNullOrWhiteSpace(s) || x.Search.Contains(s, StringComparison.OrdinalIgnoreCase))
+        ).ToList();
+    }
+
+    private static ExplorerColumn Col(string key, string label, string kind = "text") => new(key, label, kind);
+
+    // ── Dataset builder ──────────────────────────────────────────────────────
+    private async Task<(List<ExplorerColumn> Columns, string? AmountKey, List<ExplorerRowInternal> Rows)>
+        BuildExplorerAsync(string dataset)
+    {
+        switch (dataset)
+        {
+            case "equipment":
+            {
+                var cols = new List<ExplorerColumn> {
+                    Col("reference","Ref"), Col("assetNo","Asset No."), Col("asset","Asset"),
+                    Col("type","Type"), Col("status","Status"), Col("location","Location"),
+                    Col("date","Date","date"), Col("amount","Final/Est. Amount","money") };
+                var data = await db.EquipmentMaintenanceRequests.AsNoTracking().ToListAsync();
+                var rows = data.Select(r => {
+                    var amt = r.FinalAmountNaira ?? r.AmountNaira;
+                    var row = new Dictionary<string, object?> {
+                        ["reference"] = r.RequestNumber, ["assetNo"] = r.AssetNo, ["asset"] = r.AssetDescription,
+                        ["type"] = r.MaintenanceType, ["status"] = r.Status, ["location"] = r.Location,
+                        ["date"] = r.CreatedAt.ToString("yyyy-MM-dd"), ["amount"] = amt };
+                    return new ExplorerRowInternal(row, r.CreatedAt, r.Location, r.Status, r.MaintenanceType, amt,
+                        $"{r.RequestNumber} {r.AssetNo} {r.AssetDescription}");
+                }).ToList();
+                return (cols, "amount", rows);
+            }
+            case "facility":
+            {
+                var cols = new List<ExplorerColumn> {
+                    Col("reference","Ref"), Col("description","Description"), Col("type","Type"),
+                    Col("status","Status"), Col("location","Location"), Col("date","Date","date"),
+                    Col("amount","Final/Est. Amount","money") };
+                var data = await db.FacilityMaintenanceRequests.AsNoTracking().ToListAsync();
+                var rows = data.Select(r => {
+                    var amt = r.FinalAmountNaira ?? r.AmountNaira;
+                    var row = new Dictionary<string, object?> {
+                        ["reference"] = r.RequestNumber, ["description"] = r.Description,
+                        ["type"] = r.MaintenanceType, ["status"] = r.Status, ["location"] = r.Location,
+                        ["date"] = r.CreatedAt.ToString("yyyy-MM-dd"), ["amount"] = amt };
+                    return new ExplorerRowInternal(row, r.CreatedAt, r.Location, r.Status, r.MaintenanceType, amt,
+                        $"{r.RequestNumber} {r.Description}");
+                }).ToList();
+                return (cols, "amount", rows);
+            }
+            case "diesel":
+            {
+                var cols = new List<ExplorerColumn> {
+                    Col("reference","Ref"), Col("type","Type"), Col("supplyType","Supply Type"),
+                    Col("recipient","Recipient"), Col("location","Location"), Col("date","Date","date"),
+                    Col("litres","Qty (L)","number"), Col("issuedBy","Issued By") };
+                var data = await db.DieselDistributions.AsNoTracking().ToListAsync();
+                var rows = data.Select(r => {
+                    var recipient = r.VehicleRegNo ?? r.DestinationLocation;
+                    var row = new Dictionary<string, object?> {
+                        ["reference"] = r.DistributionReference, ["type"] = r.DistributionType,
+                        ["supplyType"] = r.SupplyType, ["recipient"] = recipient, ["location"] = r.DestinationLocation,
+                        ["date"] = r.DistributionDate.ToString("yyyy-MM-dd"), ["litres"] = r.QuantityLitres,
+                        ["issuedBy"] = r.IssuingOfficer };
+                    return new ExplorerRowInternal(row, r.DistributionDate, r.DestinationLocation, null, r.DistributionType, null,
+                        $"{r.DistributionReference} {recipient} {r.IssuingOfficer}");
+                }).ToList();
+                return (cols, null, rows);
+            }
+            case "electricity":
+            {
+                var cols = new List<ExplorerColumn> {
+                    Col("type","Type"), Col("location","Location"), Col("vendor","Vendor"),
+                    Col("date","Date","date"), Col("units","Units (kWh)","number"),
+                    Col("amount","Amount","money"), Col("status","Status") };
+                var data = await db.ElectricityPurchases.AsNoTracking().ToListAsync();
+                var rows = data.Select(r => {
+                    var row = new Dictionary<string, object?> {
+                        ["type"] = r.PurchaseType, ["location"] = r.Location, ["vendor"] = r.Vendor,
+                        ["date"] = r.PurchaseDate.ToString("yyyy-MM-dd"), ["units"] = r.UnitsKwh,
+                        ["amount"] = r.AmountNaira, ["status"] = r.Status };
+                    return new ExplorerRowInternal(row, r.PurchaseDate, r.Location, r.Status, r.PurchaseType, r.AmountNaira,
+                        $"{r.Location} {r.Vendor}");
+                }).ToList();
+                return (cols, "amount", rows);
+            }
+            case "dstv":
+            {
+                var cols = new List<ExplorerColumn> {
+                    Col("decoder","Decoder"), Col("package","Package"), Col("location","Location"),
+                    Col("vendor","Vendor"), Col("start","Start","date"), Col("expiry","Expiry","date"),
+                    Col("amount","Amount","money"), Col("status","Status") };
+                var data = await db.DstvSubscriptions.AsNoTracking().ToListAsync();
+                var rows = data.Select(r => {
+                    var row = new Dictionary<string, object?> {
+                        ["decoder"] = r.DecoderNumber, ["package"] = r.Package, ["location"] = r.Location,
+                        ["vendor"] = r.Vendor, ["start"] = r.StartDate.ToString("yyyy-MM-dd"),
+                        ["expiry"] = r.ExpiryDate.ToString("yyyy-MM-dd"), ["amount"] = r.AmountNaira, ["status"] = r.Status };
+                    return new ExplorerRowInternal(row, r.StartDate, r.Location, r.Status, r.Package, r.AmountNaira,
+                        $"{r.DecoderNumber} {r.Location} {r.Vendor}");
+                }).ToList();
+                return (cols, "amount", rows);
+            }
+            case "accommodation":
+            {
+                var cols = new List<ExplorerColumn> {
+                    Col("reference","Ref"), Col("guest","Guest"), Col("location","Guest House"),
+                    Col("date","Check-In","date"), Col("nights","Nights","number"), Col("mealPlan","Meal Plan"),
+                    Col("status","Status"), Col("amount","Total Cost","money") };
+                var data = await db.AccommodationLogs.AsNoTracking().ToListAsync();
+                var rows = data.Select(r => {
+                    var row = new Dictionary<string, object?> {
+                        ["reference"] = r.Reference, ["guest"] = r.GuestName, ["location"] = r.GuestHouse,
+                        ["date"] = r.CheckInDate.ToString("yyyy-MM-dd"), ["nights"] = r.Nights, ["mealPlan"] = r.MealPlan,
+                        ["status"] = r.Status, ["amount"] = r.TotalCostNaira };
+                    return new ExplorerRowInternal(row, r.CheckInDate.ToDateTime(TimeOnly.MinValue), r.GuestHouse, r.Status, r.MealPlan,
+                        r.TotalCostNaira, $"{r.Reference} {r.GuestName} {r.Department}");
+                }).ToList();
+                return (cols, "amount", rows);
+            }
+            case "requests":
+            {
+                var cols = new List<ExplorerColumn> {
+                    Col("ticket","Ticket"), Col("title","Title"), Col("type","Category"),
+                    Col("status","Status"), Col("location","Location"), Col("priority","Priority"),
+                    Col("date","Date","date") };
+                var data = await db.ServiceRequests.AsNoTracking().ToListAsync();
+                var rows = data.Select(r => {
+                    var row = new Dictionary<string, object?> {
+                        ["ticket"] = r.TicketNumber, ["title"] = r.Title, ["type"] = r.Category,
+                        ["status"] = r.Status, ["location"] = r.Location, ["priority"] = r.Priority,
+                        ["date"] = r.CreatedAt.ToString("yyyy-MM-dd") };
+                    return new ExplorerRowInternal(row, r.CreatedAt, r.Location, r.Status, r.Category, null,
+                        $"{r.TicketNumber} {r.Title}");
+                }).ToList();
+                return (cols, null, rows);
+            }
+            case "generator":
+            {
+                var cols = new List<ExplorerColumn> {
+                    Col("assetNo","Asset No."), Col("asset","Asset"), Col("location","Location"),
+                    Col("date","Date","date"), Col("fuel","Fuel Used (L)","number"), Col("status","Status") };
+                var data = await db.GeneratorDailyReadings.AsNoTracking().ToListAsync();
+                var rows = data.Select(r => {
+                    var row = new Dictionary<string, object?> {
+                        ["assetNo"] = r.AssetNo, ["asset"] = r.AssetDescription, ["location"] = r.Location,
+                        ["date"] = r.ReadingDate.ToString("yyyy-MM-dd"), ["fuel"] = r.FuelConsumedLitres,
+                        ["status"] = r.GeneratorStatus };
+                    return new ExplorerRowInternal(row, r.ReadingDate, r.Location, r.GeneratorStatus, null, null,
+                        $"{r.AssetNo} {r.AssetDescription}");
+                }).ToList();
+                return (cols, null, rows);
+            }
+            default: // "vehicle"
+            {
+                var cols = new List<ExplorerColumn> {
+                    Col("reference","Ref"), Col("vehicle","Vehicle"), Col("assetNo","Asset No."),
+                    Col("type","Type"), Col("status","Status"), Col("location","Location"),
+                    Col("date","Date","date"), Col("amount","Final/Est. Amount","money") };
+                var data = await db.VehicleMaintenanceRequests.AsNoTracking().ToListAsync();
+                var rows = data.Select(r => {
+                    var amt = r.FinalAmountNaira ?? r.AmountNaira;
+                    var row = new Dictionary<string, object?> {
+                        ["reference"] = r.RequestNumber, ["vehicle"] = r.VehicleRegNo, ["assetNo"] = r.AssetNo,
+                        ["type"] = r.MaintenanceType, ["status"] = r.Status, ["location"] = r.CurrentLocation,
+                        ["date"] = r.CreatedAt.ToString("yyyy-MM-dd"), ["amount"] = amt };
+                    return new ExplorerRowInternal(row, r.CreatedAt, r.CurrentLocation, r.Status, r.MaintenanceType, amt,
+                        $"{r.RequestNumber} {r.VehicleRegNo} {r.AssetNo}");
+                }).ToList();
+                return (cols, "amount", rows);
+            }
+        }
     }
 }

@@ -105,4 +105,56 @@ export const reportsApi = {
 
   dieselSupply:  (period: ReportPeriod = '30d') =>
     apiClient.get<Record<string, unknown>>('/reports/diesel-supply', { params: { period } }).then(r => r.data),
+
+  explorer: (params: ExplorerParams) =>
+    apiClient.get<ExplorerResponse>('/reports/explorer', { params: cleanExplorerParams(params) }).then(r => r.data),
 };
+
+// ── Report Explorer ─────────────────────────────────────────────────────────────
+
+export interface ExplorerColumn { key: string; label: string; kind: string; }
+
+export interface ExplorerResponse {
+  dataset:          string;
+  columns:          ExplorerColumn[];
+  amountKey:        string | null;
+  rows:             Record<string, unknown>[];
+  totalCount:       number;
+  totalAmountNaira: number;
+  page:             number;
+  pageSize:         number;
+}
+
+export interface ExplorerParams {
+  dataset:    string;
+  from?:      string;
+  to?:        string;
+  location?:  string;
+  status?:    string;
+  type?:      string;
+  minAmount?: number;
+  maxAmount?: number;
+  search?:    string;
+  page?:      number;
+  pageSize?:  number;
+}
+
+function cleanExplorerParams(p: ExplorerParams): Record<string, string | number> {
+  const out: Record<string, string | number> = {};
+  Object.entries(p).forEach(([k, v]) => { if (v !== undefined && v !== '' && v !== null) out[k] = v as string | number; });
+  return out;
+}
+
+export async function downloadExplorerExport(params: ExplorerParams): Promise<void> {
+  const res = await apiClient.get('/reports/explorer/export', {
+    params: cleanExplorerParams(params), responseType: 'blob', timeout: 60_000,
+  });
+  const cd = res.headers['content-disposition'] as string | undefined;
+  let filename = `Report_${params.dataset}.xlsx`;
+  if (cd) { const m = cd.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/); if (m?.[1]) filename = m[1].replace(/['"]/g, ''); }
+  const url = URL.createObjectURL(new Blob([res.data as BlobPart]));
+  const link = document.createElement('a');
+  link.href = url; link.download = filename;
+  document.body.appendChild(link); link.click(); document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
