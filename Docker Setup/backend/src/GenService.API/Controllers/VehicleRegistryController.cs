@@ -197,7 +197,10 @@ public class VehicleRegistryController(
         if (!string.IsNullOrWhiteSpace(q.Status))
             filtered = filtered.Where(d => DocStatusFor(d.ExpiryDate) == q.Status);
 
-        var ordered = filtered.OrderBy(d => d.ExpiryDate).ToList();
+        // Newest-added first so a freshly created document always appears at the top
+        // of the list (previously ordered by expiry, which could bury new far-future
+        // documents on a later page and make them look like they weren't saved).
+        var ordered = filtered.OrderByDescending(d => d.CreatedAt).ThenBy(d => d.ExpiryDate).ToList();
         var total   = ordered.Count;
         var paged   = ordered.Skip((q.Page - 1) * q.PageSize).Take(q.PageSize);
 

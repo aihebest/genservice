@@ -83,8 +83,6 @@ export default function ElectricityPage() {
       render: (v: number) => `₦${v.toLocaleString()}` },
     { title: 'Units', dataIndex: 'unitsKwh', width: 100,
       render: (v: number) => `${v.toLocaleString()} kWh` },
-    { title: 'Balance', dataIndex: 'balanceAfterKwh', width: 110,
-      render: (v: number) => <Text strong>{v.toLocaleString()} kWh</Text> },
     { title: 'Status', dataIndex: 'status', width: 110,
       render: (v: ElectricityStatus) => {
         const m = ELECTRICITY_STATUS_META[v];

@@ -110,6 +110,8 @@ export default function DieselSupplyPage() {
         : <Tag>Regular</Tag> },
     { title: 'Recipient', key: 'recipient', ellipsis: true,
       render: (_: unknown, r: DieselDistribution) => r.vehicleRegNo ?? r.destinationLocation ?? '—' },
+    { title: 'Odometer', dataIndex: 'odometerReading', key: 'odometer', width: 100, ellipsis: true,
+      render: (v?: string) => v ?? '—' },
     { title: 'Qty', dataIndex: 'quantityLitres', width: 90, render: (v: number) => `${v.toLocaleString()} L` },
     { title: 'From Supply', dataIndex: 'bulkSupplyReference', width: 110 },
     { title: 'Purpose', dataIndex: 'purpose', ellipsis: true, render: (v?: string) => v ?? '—' },

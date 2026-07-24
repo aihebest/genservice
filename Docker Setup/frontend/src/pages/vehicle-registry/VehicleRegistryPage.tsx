@@ -112,7 +112,7 @@ export default function VehicleRegistryPage() {
         notes:            v.notes as string | undefined,
       });
       message.success('Document added');
-      dForm.resetFields(); setDocModal(false); refresh();
+      dForm.resetFields(); setDocModal(false); setDPage(1); refresh();
     } catch (e: unknown) {
       message.error((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Failed to save');
     } finally { setSaving(false); }
