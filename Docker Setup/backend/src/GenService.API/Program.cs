@@ -1278,6 +1278,33 @@ static async Task ApplySchemaUpdatesAsync(
                 CREATE UNIQUE INDEX IX_DailyParameterLogs_Location_LogDate ON DailyParameterLogs (Location, LogDate);
             """,
 
+            // ── AccommodationLogs (Feeding & Accommodation — guest house) ────
+            """
+            IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = N'AccommodationLogs')
+            CREATE TABLE AccommodationLogs (
+                Id                     uniqueidentifier NOT NULL PRIMARY KEY DEFAULT NEWID(),
+                Reference              nvarchar(30)     NOT NULL,
+                GuestName              nvarchar(200)    NOT NULL,
+                Department             nvarchar(150)    NULL,
+                GuestHouse             nvarchar(200)    NOT NULL,
+                Purpose                nvarchar(500)    NULL,
+                CheckInDate            date             NOT NULL,
+                CheckOutDate           date             NULL,
+                Nights                 int              NULL,
+                MealPlan               nvarchar(50)     NULL,
+                NumberOfMeals          int              NULL,
+                FeedingCostNaira       decimal(18,2)    NULL,
+                AccommodationCostNaira decimal(18,2)    NULL,
+                TotalCostNaira         decimal(18,2)    NULL,
+                Status                 nvarchar(30)     NOT NULL DEFAULT 'CheckedIn',
+                Notes                  nvarchar(2000)   NULL,
+                LoggedByEmail          nvarchar(150)    NOT NULL,
+                LoggedByName           nvarchar(100)    NOT NULL,
+                CreatedAt              datetime2        NOT NULL DEFAULT GETUTCDATE(),
+                UpdatedAt              datetime2        NOT NULL DEFAULT GETUTCDATE()
+            );
+            """,
+
             // ── ElectricityPurchases (new table) ────────────────────────────
             """
             IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = N'ElectricityPurchases')

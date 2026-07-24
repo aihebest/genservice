@@ -21,6 +21,7 @@ public class GenServiceDbContext(DbContextOptions<GenServiceDbContext> options)
     public DbSet<EquipmentMaintenanceRequest>  EquipmentMaintenanceRequests  => Set<EquipmentMaintenanceRequest>();
     public DbSet<FacilityMaintenanceRequest>   FacilityMaintenanceRequests   => Set<FacilityMaintenanceRequest>();
     public DbSet<DailyParameterLog>            DailyParameterLogs            => Set<DailyParameterLog>();
+    public DbSet<AccommodationLog>             AccommodationLogs             => Set<AccommodationLog>();
     public DbSet<AppUser>                      AppUsers                      => Set<AppUser>();
     public DbSet<StoreItem>                    StoreItems                    => Set<StoreItem>();
     public DbSet<StoreRequisition>             StoreRequisitions             => Set<StoreRequisition>();

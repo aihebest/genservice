@@ -11,6 +11,7 @@ import MaintenancePage from '../pages/maintenance/MaintenancePage';
 import FuelPage from '../pages/fuel/FuelPage';
 import ReportsPage from '../pages/reports/ReportsPage';
 import DailyLogPage from '../pages/daily-log/DailyLogPage';
+import FeedingAccommodationPage from '../pages/accommodation/FeedingAccommodationPage';
 import UserManagementPage from '../pages/users/UserManagementPage';
 import StoreManagementPage from '../pages/store/StoreManagementPage';
 import NotificationsPage from '../pages/notifications/NotificationsPage';
@@ -52,6 +53,7 @@ export const router = createBrowserRouter([
       { path: 'vehicle-registry', element: <VehicleRegistryPage /> },
       { path: 'diesel-supply', element: <DieselSupplyPage /> },
       { path: 'daily-log',     element: <DailyLogPage /> },
+      { path: 'feeding-accommodation', element: <FeedingAccommodationPage /> },
       { path: 'users',         element: <UserManagementPage /> },
       { path: 'store',         element: <StoreManagementPage /> },
       { path: 'reports',       element: <ReportsPage /> },

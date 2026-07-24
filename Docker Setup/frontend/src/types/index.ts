@@ -1146,6 +1146,71 @@ export interface CreateDailyParameterLogPayload {
 
 export interface UpdateDailyParameterLogPayload extends Partial<Omit<CreateDailyParameterLogPayload, 'logDate' | 'location'>> {}
 
+// ── Feeding & Accommodation (guest house) ───────────────────────────────────────
+
+export const MEAL_PLAN_OPTIONS = ['None', 'Breakfast', 'Half Board', 'Full Board'] as const;
+export const ACCOMMODATION_STATUSES = ['Reserved', 'CheckedIn', 'CheckedOut'] as const;
+
+export const ACCOMMODATION_STATUS_META: Record<string, { label: string; color: string }> = {
+  Reserved:   { label: 'Reserved',    color: 'blue'    },
+  CheckedIn:  { label: 'Checked In',  color: 'green'   },
+  CheckedOut: { label: 'Checked Out', color: 'default' },
+};
+
+export interface AccommodationLog {
+  id:                     string;
+  reference:              string;
+  guestName:              string;
+  department?:            string;
+  guestHouse:             string;
+  purpose?:               string;
+  checkInDate:            string;
+  checkOutDate?:          string;
+  nights?:                number;
+  mealPlan?:              string;
+  numberOfMeals?:         number;
+  feedingCostNaira?:      number;
+  accommodationCostNaira?: number;
+  totalCostNaira?:        number;
+  status:                 string;
+  notes?:                 string;
+  loggedByEmail:          string;
+  loggedByName:           string;
+  createdAt:              string;
+  updatedAt:              string;
+}
+
+export interface AccommodationListResponse {
+  items:      AccommodationLog[];
+  totalCount: number;
+  page:       number;
+  pageSize:   number;
+}
+
+export interface AccommodationStats {
+  guestsThisMonth:            number;
+  currentlyCheckedIn:         number;
+  feedingCostThisMonth:       number;
+  accommodationCostThisMonth: number;
+  totalCostThisMonth:         number;
+}
+
+export interface CreateAccommodationPayload {
+  guestName:               string;
+  guestHouse:              string;
+  checkInDate:             string;
+  department?:             string;
+  purpose?:                string;
+  checkOutDate?:           string;
+  nights?:                 number;
+  mealPlan?:               string;
+  numberOfMeals?:          number;
+  feedingCostNaira?:       number;
+  accommodationCostNaira?: number;
+  status?:                 string;
+  notes?:                  string;
+}
+
 // ── User Management ────────────────────────────────────────────────────────────
 
 export const ALL_ROLES = [
