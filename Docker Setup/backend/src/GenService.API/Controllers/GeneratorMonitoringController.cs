@@ -39,9 +39,16 @@ public class GeneratorMonitoringController(
     [HttpGet("readings")]
     public async Task<IActionResult> ListReadings([FromQuery] GeneratorReadingQuery q)
     {
-        var from  = DateTime.UtcNow.AddDays(-q.Days).Date;
-        var query = db.GeneratorDailyReadings.AsNoTracking()
-                      .Where(r => r.ReadingDate >= from);
+        var query = db.GeneratorDailyReadings.AsNoTracking().AsQueryable();
+
+        // Only apply a date window when one is explicitly requested (Days > 0).
+        // Days <= 0 means "all history", so a location's readings never disappear
+        // from the list just because they were logged more than N days ago.
+        if (q.Days > 0)
+        {
+            var from = DateTime.UtcNow.AddDays(-q.Days).Date;
+            query = query.Where(r => r.ReadingDate >= from);
+        }
 
         if (!string.IsNullOrWhiteSpace(q.Location))
             query = query.Where(r => r.Location == q.Location);

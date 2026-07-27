@@ -99,7 +99,7 @@ export default function DailyReadingsTab() {
 
   const { data, isFetching } = useQuery({
     queryKey: ['gen-readings', 'list', locationFilter, page],
-    queryFn: () => generatorMonitoringApi.listReadings({ location: locationFilter, days: 60, page }),
+    queryFn: () => generatorMonitoringApi.listReadings({ location: locationFilter, days: 0, page }),
   });
 
   const { data: summary } = useQuery({
