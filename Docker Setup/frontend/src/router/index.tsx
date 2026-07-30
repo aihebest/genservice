@@ -13,7 +13,6 @@ import ReportsPage from '../pages/reports/ReportsPage';
 import DailyLogPage from '../pages/daily-log/DailyLogPage';
 import FeedingAccommodationPage from '../pages/accommodation/FeedingAccommodationPage';
 import UserManagementPage from '../pages/users/UserManagementPage';
-import StoreManagementPage from '../pages/store/StoreManagementPage';
 import NotificationsPage from '../pages/notifications/NotificationsPage';
 import ElectricityPage from '../pages/electricity/ElectricityPage';
 import DstvPage from '../pages/dstv/DstvPage';
@@ -55,7 +54,6 @@ export const router = createBrowserRouter([
       { path: 'daily-log',     element: <DailyLogPage /> },
       { path: 'feeding-accommodation', element: <FeedingAccommodationPage /> },
       { path: 'users',         element: <UserManagementPage /> },
-      { path: 'store',         element: <StoreManagementPage /> },
       { path: 'reports',       element: <ReportsPage /> },
       { path: 'notifications', element: <NotificationsPage /> },
     ],

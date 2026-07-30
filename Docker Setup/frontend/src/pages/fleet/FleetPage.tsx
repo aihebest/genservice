@@ -42,6 +42,10 @@ function buildColumns(onView: (r: VehicleMaintenance) => void): ColumnsType<Vehi
       render: (v: string) => <Text code style={{ fontSize: 12 }}>{v}</Text>,
     },
     {
+      title: 'Date Raised', dataIndex: 'createdAt', key: 'createdAt', width: 115,
+      render: (v: string) => <Text style={{ fontSize: 12 }}>{dayjs(v).format('D MMM YYYY')}</Text>,
+    },
+    {
       title: 'Vehicle Reg', dataIndex: 'vehicleRegNo', key: 'vehicleRegNo', width: 120,
       render: (v: string) => <Tag icon={<CarOutlined />} color="blue">{v}</Tag>,
     },

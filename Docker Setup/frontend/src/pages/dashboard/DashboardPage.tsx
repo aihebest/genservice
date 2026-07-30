@@ -252,24 +252,6 @@ export default function DashboardPage() {
         />
       )}
 
-      {isApprover && (data?.storeLowStockCount ?? 0) > 0 && (
-        <Alert
-          type="warning" showIcon icon={<ShopOutlined />}
-          message={
-            <span>
-              <strong>{data!.storeLowStockCount} store item{data!.storeLowStockCount > 1 ? 's are' : ' is'}</strong>
-              {' '}at or below reorder level.
-            </span>
-          }
-          action={
-            <Button size="small" onClick={() => navigate('/store')} icon={<ArrowRightOutlined />}>
-              View stock
-            </Button>
-          }
-          style={{ marginBottom: 12 }}
-        />
-      )}
-
       {isApprover && (data?.dieselReqsPending ?? 0) > 0 && (
         <Alert
           type="info" showIcon icon={<FileProtectOutlined />}
@@ -347,22 +329,6 @@ export default function DashboardPage() {
         </Text>
       </div>
       <Row gutter={[12, 12]} style={{ marginBottom: 24 }}>
-        <Col xs={12} sm={8} md={8} lg={4}>
-          <KpiCard
-            title="Store Reqs Pending" value={data?.storeReqsPending} loading={isLoading}
-            icon={<ShopOutlined />} color="#eb2f96"
-            onClick={() => navigate('/store')}
-            alert={(data?.storeReqsPending ?? 0) > 0}
-          />
-        </Col>
-        <Col xs={12} sm={8} md={8} lg={4}>
-          <KpiCard
-            title="Low Stock Items" value={data?.storeLowStockCount} loading={isLoading}
-            icon={<WarningOutlined />} color="#fa541c"
-            onClick={() => navigate('/store')}
-            alert={(data?.storeLowStockCount ?? 0) > 0}
-          />
-        </Col>
         <Col xs={12} sm={8} md={8} lg={4}>
           <KpiCard
             title="Diesel Reqs Pending" value={data?.dieselReqsPending} loading={isLoading}
@@ -801,8 +767,8 @@ export default function DashboardPage() {
               }
             </Card>
 
-            {/* Low stock items */}
-            {(data?.storeLowStockCount ?? 0) > 0 && (
+            {/* Low stock items — Store module removed from UI */}
+            {false && (data?.storeLowStockCount ?? 0) > 0 && (
               <Card
                 title={
                   <Space>

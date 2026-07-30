@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  Modal, Form, Input, Select, Switch, Space, Alert, Typography,
+  Modal, Form, Input, Select, Switch, Space, Alert, Typography, AutoComplete,
 } from 'antd';
 import { activitiesApi } from '../../../api/activities.api';
 import { ACTIVITY_CATEGORY_META } from '../../../types';
@@ -25,7 +25,7 @@ interface Props {
 }
 
 interface FormValues {
-  staffEmail?:         string;
+  staffName?:          string;
   activityDescription: string;
   category:            ActivityCategory;
   location:            string;
@@ -56,11 +56,13 @@ export default function LogActivityModal({ open, onClose, onCreated }: Props) {
       setLoading(true);
       setError(null);
 
+      const typedName = (vals.staffName ?? '').trim();
+      const matched   = STAFF_LIST.find(s => s.name.toLowerCase() === typedName.toLowerCase());
       const req = {
-        staffEmail:          isProxy ? (vals.staffEmail ?? '') : (user?.email ?? ''),
-        staffName:           isProxy
-          ? (STAFF_LIST.find(s => s.email === vals.staffEmail)?.name ?? '')
-          : (user?.fullName ?? ''),
+        // For a typed (non-listed) staff member we key the record on their name so
+        // proxy activities still group correctly even when they aren't a system user.
+        staffEmail:          isProxy ? (matched?.email ?? typedName) : (user?.email ?? ''),
+        staffName:           isProxy ? typedName : (user?.fullName ?? ''),
         activityDescription: vals.activityDescription,
         category:            vals.category,
         location:            vals.location,
@@ -112,17 +114,16 @@ export default function LogActivityModal({ open, onClose, onCreated }: Props) {
       <Form form={form} layout="vertical">
         {isProxy && (
           <Form.Item
-            name="staffEmail"
+            name="staffName"
             label="Staff Member"
-            rules={[{ required: true, message: 'Select a staff member' }]}
+            rules={[{ required: true, message: 'Enter or select a staff member' }]}
           >
-            <Select placeholder="Select staff member">
-              {STAFF_LIST.map(s => (
-                <Select.Option key={s.email} value={s.email}>
-                  {s.name}
-                </Select.Option>
-              ))}
-            </Select>
+            <AutoComplete
+              placeholder="Type or select staff name"
+              filterOption={(input, option) =>
+                String(option?.value ?? '').toLowerCase().includes(input.toLowerCase())}
+              options={STAFF_LIST.map(s => ({ value: s.name }))}
+            />
           </Form.Item>
         )}
 
