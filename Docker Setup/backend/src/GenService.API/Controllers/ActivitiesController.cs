@@ -125,7 +125,7 @@ public class ActivitiesController(GenServiceDbContext db) : ControllerBase
 
         db.StaffActivities.Add(activity);
         await db.SaveChangesAsync();
-        return CreatedAtAction(nameof(GetById), new { id = activity.Id }, ToDto(activity));
+        return Ok(ToDto(activity));
     }
 
     // ── POST /api/v1/activities/proxy ──────────────────────────────────────
@@ -160,7 +160,7 @@ public class ActivitiesController(GenServiceDbContext db) : ControllerBase
 
         db.StaffActivities.Add(activity);
         await db.SaveChangesAsync();
-        return CreatedAtAction(nameof(GetById), new { id = activity.Id }, ToDto(activity));
+        return Ok(ToDto(activity));
     }
 
     // ── PATCH /api/v1/activities/{id}/status ──────────────────────────────

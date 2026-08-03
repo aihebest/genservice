@@ -14,7 +14,8 @@ public record CreateVehicleMaintenanceRequest(
     decimal? AmountNaira        = null,
     double?  RunningHours       = null,
     double?  NextServiceHour    = null,
-    string?  NotificationStatus = null
+    string?  NotificationStatus = null,
+    DateTime? DateOfRequest     = null
 );
 
 public record ApproveVehicleMaintenanceRequest(string? Notes);
@@ -111,7 +112,8 @@ public record VehicleMaintenanceDto(
     double?   RunningHours,
     double?   NextServiceHour,
     string?   NotificationStatus,
-    decimal?  FinalAmountNaira
+    decimal?  FinalAmountNaira,
+    DateTime? DateOfRequest
 );
 
 public record VehicleMaintenanceStatsDto(

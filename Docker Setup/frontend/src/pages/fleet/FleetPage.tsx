@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import {
-  Alert, AutoComplete, Badge, Button, Card, Col, Descriptions, Divider, Drawer,
+  Alert, AutoComplete, Badge, Button, Card, Col, DatePicker, Descriptions, Divider, Drawer,
   Form, Input, InputNumber, Modal, Row, Select, Space, Statistic, Table, Tag, Tooltip, Typography,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
@@ -42,8 +42,8 @@ function buildColumns(onView: (r: VehicleMaintenance) => void): ColumnsType<Vehi
       render: (v: string) => <Text code style={{ fontSize: 12 }}>{v}</Text>,
     },
     {
-      title: 'Date Raised', dataIndex: 'createdAt', key: 'createdAt', width: 115,
-      render: (v: string) => <Text style={{ fontSize: 12 }}>{dayjs(v).format('D MMM YYYY')}</Text>,
+      title: 'Date of Request', dataIndex: 'dateOfRequest', key: 'dateOfRequest', width: 130,
+      render: (_: unknown, r: VehicleMaintenance) => <Text style={{ fontSize: 12 }}>{dayjs(r.dateOfRequest ?? r.createdAt).format('D MMM YYYY')}</Text>,
     },
     {
       title: 'Vehicle Reg', dataIndex: 'vehicleRegNo', key: 'vehicleRegNo', width: 120,
@@ -191,6 +191,7 @@ export default function FleetPage() {
         runningHours: values.runningHours ? Number(values.runningHours) : undefined,
         nextServiceHour: values.nextServiceHour ? Number(values.nextServiceHour) : undefined,
         notificationStatus: values.notificationStatus || undefined,
+        dateOfRequest: values.dateOfRequest ? (values.dateOfRequest as unknown as dayjs.Dayjs).format('YYYY-MM-DD') : undefined,
       });
       createForm.resetFields(); setLocationSel(null); setCreateOpen(false); refresh();
     } catch (e: unknown) {
@@ -296,6 +297,13 @@ export default function FleetPage() {
               <Form.Item name="vehicleType" label="Vehicle Type"
                 rules={[{ required: true, message: 'Enter vehicle type' }]}>
                 <Input placeholder="e.g. Toyota Hilux" />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="dateOfRequest" label="Date of Request" initialValue={dayjs()}>
+                <DatePicker style={{ width: '100%' }} format="D MMM YYYY" />
               </Form.Item>
             </Col>
           </Row>

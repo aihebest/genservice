@@ -32,6 +32,7 @@ export const vehicleMaintenanceApi = {
     runningHours?:       number;
     nextServiceHour?:    number;
     notificationStatus?: string;
+    dateOfRequest?:      string;
   }) => apiClient.post<VehicleMaintenance>('/vehicle-maintenance', data).then(r => r.data),
 
   approve: (id: string, notes?: string) =>

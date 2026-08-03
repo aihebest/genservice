@@ -47,7 +47,7 @@ public class VehicleMaintenanceController(
             daysOpen, daysInShop,
             r.AssetNo, r.AmountNaira,
             r.RunningHours, r.NextServiceHour, r.NotificationStatus,
-            r.FinalAmountNaira
+            r.FinalAmountNaira, r.DateOfRequest
         );
     }
 
@@ -149,6 +149,7 @@ public class VehicleMaintenanceController(
             RunningHours       = req.RunningHours,
             NextServiceHour    = req.NextServiceHour,
             NotificationStatus = string.IsNullOrWhiteSpace(req.NotificationStatus) ? "Open" : req.NotificationStatus.Trim(),
+            DateOfRequest      = req.DateOfRequest?.Date ?? DateTime.UtcNow.Date,
             RequestedByEmail = CallerEmail,
             RequestedByName  = CallerName,
             CreatedAt        = DateTime.UtcNow,

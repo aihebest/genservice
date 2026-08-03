@@ -834,6 +834,7 @@ export interface VehicleMaintenance {
   nextServiceHour?:    number;
   notificationStatus?: string;
   finalAmountNaira?:   number;
+  dateOfRequest?:      string;
 }
 
 export interface VehicleMaintenanceStats {

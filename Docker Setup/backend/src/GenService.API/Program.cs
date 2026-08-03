@@ -1168,6 +1168,7 @@ static async Task ApplySchemaUpdatesAsync(
             AddColIfMissing ("VehicleMaintenanceRequests", "RunningHours",               "float"),
             AddColIfMissing ("VehicleMaintenanceRequests", "NextServiceHour",            "float"),
             AddColIfMissing ("VehicleMaintenanceRequests", "NotificationStatus",         "nvarchar(50)"),
+            AddColIfMissing ("VehicleMaintenanceRequests", "DateOfRequest",              "datetime2"),
 
             // ── EquipmentMaintenanceRequests ────────────────────────────────
             AddColIfMissing ("EquipmentMaintenanceRequests", "FaultIdentified",         "nvarchar(2000)"),

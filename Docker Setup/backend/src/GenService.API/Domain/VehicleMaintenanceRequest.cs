@@ -22,6 +22,7 @@ public class VehicleMaintenanceRequest
     public double?  RunningHours       { get; set; }       // current running hours (hour-metered assets)
     public double?  NextServiceHour    { get; set; }       // next service due at (hour reading)
     public string?  NotificationStatus { get; set; }       // Open | Notified | Closed
+    public DateTime? DateOfRequest     { get; set; }       // date the request was raised (user-selectable)
 
     // ── Request details ───────────────────────────────────────────────────────
     public string Description { get; set; } = "";           // problem reported by requestor/user
