@@ -123,9 +123,14 @@ public class ActivitiesController(GenServiceDbContext db) : ControllerBase
     // ── POST /api/v1/activities/proxy ──────────────────────────────────────
     // Supervisor / Manager logs on behalf of a technician
     [HttpPost("proxy")]
-    [Authorize(Roles = "SystemAdmin,DepartmentManager,Supervisor")]
     public async Task<ActionResult<ActivityDto>> ProxyLog([FromBody] ProxyLogRequest req)
     {
+        // Role-gate via the role claim the app actually issues (ClaimTypes.Role, read by
+        // CallerRole). Using [Authorize(Roles=...)] here returned 403 for everyone because
+        // the token's role claim and the validator's RoleClaimType ("role") didn't match.
+        if (CallerRole is not ("SystemAdmin" or "DepartmentManager" or "Supervisor"))
+            return Forbid();
+
         // Each proxy log is a distinct, permanent record — no auto-completion of the
         // staff's previous activity, so entries are never replaced.
         var activity = new StaffActivity
@@ -171,9 +176,10 @@ public class ActivitiesController(GenServiceDbContext db) : ControllerBase
 
     // ── DELETE /api/v1/activities/{id} ────────────────────────────────────
     [HttpDelete("{id:guid}")]
-    [Authorize(Roles = "SystemAdmin,DepartmentManager,Supervisor")]
     public async Task<IActionResult> Delete(Guid id)
     {
+        if (CallerRole is not ("SystemAdmin" or "DepartmentManager" or "Supervisor"))
+            return Forbid();
         var a = await db.StaffActivities.FirstOrDefaultAsync(x => x.Id == id);
         if (a is null) return NotFound();
         db.StaffActivities.Remove(a);

@@ -284,6 +284,9 @@ public class AuthController(
             new Claim(ClaimTypes.Email,  email),
             new Claim(ClaimTypes.Name,   fullName),
             new Claim(ClaimTypes.Role,   role),
+            // Also emit a short "role" claim so [Authorize(Roles=...)] matches the
+            // validator's RoleClaimType ("role"). Takes effect on the next login.
+            new Claim("role",            role),
         };
 
         var token = new JwtSecurityToken(
