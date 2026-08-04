@@ -99,17 +99,9 @@ public class ActivitiesController(GenServiceDbContext db) : ControllerBase
     [HttpPost]
     public async Task<ActionResult<ActivityDto>> Log([FromBody] LogActivityRequest req)
     {
-        // Complete any previously Active entry for this staff member
-        var existing = await db.StaffActivities
-            .Where(a => a.StaffEmail == CallerEmail && a.Status == ActivityStatus.Active)
-            .ToListAsync();
-        foreach (var old in existing)
-        {
-            old.Status      = ActivityStatus.Completed;
-            old.CompletedAt = DateTime.UtcNow;
-            old.UpdatedAt   = DateTime.UtcNow;
-        }
-
+        // Each log is a distinct, permanent record — we no longer auto-complete the
+        // staff's previous activity, so entries are never replaced. Staff/supervisors
+        // mark an activity Paused or Completed manually when the work is done.
         var activity = new StaffActivity
         {
             StaffEmail          = CallerEmail,
@@ -134,17 +126,8 @@ public class ActivitiesController(GenServiceDbContext db) : ControllerBase
     [Authorize(Roles = "SystemAdmin,DepartmentManager,Supervisor")]
     public async Task<ActionResult<ActivityDto>> ProxyLog([FromBody] ProxyLogRequest req)
     {
-        // Complete any previously Active entry for this staff member
-        var existing = await db.StaffActivities
-            .Where(a => a.StaffEmail == req.StaffEmail && a.Status == ActivityStatus.Active)
-            .ToListAsync();
-        foreach (var old in existing)
-        {
-            old.Status      = ActivityStatus.Completed;
-            old.CompletedAt = DateTime.UtcNow;
-            old.UpdatedAt   = DateTime.UtcNow;
-        }
-
+        // Each proxy log is a distinct, permanent record — no auto-completion of the
+        // staff's previous activity, so entries are never replaced.
         var activity = new StaffActivity
         {
             StaffEmail          = req.StaffEmail,
