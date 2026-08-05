@@ -132,7 +132,7 @@ public class GenServiceDbContext(DbContextOptions<GenServiceDbContext> options)
             e.HasKey(x => x.Id);
             e.Property(x => x.RequestNumber)    .HasMaxLength(20).IsRequired();
             e.HasIndex(x => x.RequestNumber).IsUnique();
-            e.Property(x => x.VehicleRegNo)     .HasMaxLength(20).IsRequired();
+            e.Property(x => x.VehicleRegNo)     .HasMaxLength(60).IsRequired();
             e.Property(x => x.VehicleType)      .HasMaxLength(200).IsRequired();
             e.Property(x => x.MaintenanceType)  .HasMaxLength(50).IsRequired();
             e.Property(x => x.Description)      .HasMaxLength(2000);
@@ -524,7 +524,7 @@ public class GenServiceDbContext(DbContextOptions<GenServiceDbContext> options)
         {
             e.HasKey(x => x.Id);
             e.Property(x => x.FleetNumber)       .HasMaxLength(50) .IsRequired();
-            e.Property(x => x.RegistrationNumber).HasMaxLength(30) .IsRequired();
+            e.Property(x => x.RegistrationNumber).HasMaxLength(60) .IsRequired();
             e.Property(x => x.VehicleType)       .HasMaxLength(80) .IsRequired();
             e.Property(x => x.MakeModel)         .HasMaxLength(150);
             e.Property(x => x.EngineNumber)      .HasMaxLength(80);
@@ -544,7 +544,7 @@ public class GenServiceDbContext(DbContextOptions<GenServiceDbContext> options)
         mb.Entity<VehicleDocument>(e =>
         {
             e.HasKey(x => x.Id);
-            e.Property(x => x.VehicleRegNo)     .HasMaxLength(30) .IsRequired();
+            e.Property(x => x.VehicleRegNo)     .HasMaxLength(60) .IsRequired();
             e.Property(x => x.DocumentType)     .HasMaxLength(40) .IsRequired();
             e.Property(x => x.IssuingAuthority) .HasMaxLength(200);
             e.Property(x => x.RenewalCostNaira) .HasColumnType("decimal(18,2)");
@@ -586,7 +586,7 @@ public class GenServiceDbContext(DbContextOptions<GenServiceDbContext> options)
             e.Property(x => x.SupplyType)           .HasMaxLength(30) .IsRequired();
             e.Property(x => x.BulkSupplyReference)  .HasMaxLength(100).IsRequired();
             e.Property(x => x.Purpose)              .HasMaxLength(500);
-            e.Property(x => x.VehicleRegNo)         .HasMaxLength(30);
+            e.Property(x => x.VehicleRegNo)         .HasMaxLength(60);
             e.Property(x => x.Driver)               .HasMaxLength(150);
             e.Property(x => x.OdometerReading)      .HasMaxLength(100);
             e.Property(x => x.DestinationLocation)  .HasMaxLength(200);

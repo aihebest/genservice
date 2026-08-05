@@ -1472,6 +1472,28 @@ static async Task ApplySchemaUpdatesAsync(
                 WHERE object_id = OBJECT_ID(N'DieselDistributions') AND name = N'BulkSupplyReference' AND max_length < 200)
             ALTER TABLE DieselDistributions ALTER COLUMN BulkSupplyReference nvarchar(100) NOT NULL;
             """,
+            // Widen vehicle registration columns to support long / double-plate regs
+            // (e.g. "KRD 406 CG / PF 2415 SPY"). Maintenance was nvarchar(20); others nvarchar(30).
+            """
+            IF EXISTS (SELECT 1 FROM sys.columns
+                WHERE object_id = OBJECT_ID(N'VehicleMaintenanceRequests') AND name = N'VehicleRegNo' AND max_length < 120)
+            ALTER TABLE VehicleMaintenanceRequests ALTER COLUMN VehicleRegNo nvarchar(60) NOT NULL;
+            """,
+            """
+            IF EXISTS (SELECT 1 FROM sys.columns
+                WHERE object_id = OBJECT_ID(N'Vehicles') AND name = N'RegistrationNumber' AND max_length < 120)
+            ALTER TABLE Vehicles ALTER COLUMN RegistrationNumber nvarchar(60) NOT NULL;
+            """,
+            """
+            IF EXISTS (SELECT 1 FROM sys.columns
+                WHERE object_id = OBJECT_ID(N'VehicleDocuments') AND name = N'VehicleRegNo' AND max_length < 120)
+            ALTER TABLE VehicleDocuments ALTER COLUMN VehicleRegNo nvarchar(60) NOT NULL;
+            """,
+            """
+            IF EXISTS (SELECT 1 FROM sys.columns
+                WHERE object_id = OBJECT_ID(N'DieselDistributions') AND name = N'VehicleRegNo' AND max_length < 120)
+            ALTER TABLE DieselDistributions ALTER COLUMN VehicleRegNo nvarchar(60) NULL;
+            """,
             // Supply Type (Regular | Extra) on distributions
             """
             IF NOT EXISTS (SELECT 1 FROM sys.columns
