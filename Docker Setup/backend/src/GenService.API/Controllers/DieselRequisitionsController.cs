@@ -28,6 +28,11 @@ public class DieselRequisitionsController(
     private static readonly string[] PrivilegedRoles =
         ["SystemAdmin", "DepartmentManager", "Supervisor", "StoreOfficer"];
 
+    // Approval-capable roles. Checked manually rather than via [Authorize(Roles=...)],
+    // which returns 403 for everyone under .NET 8's JsonWebTokenHandler claim mapping.
+    private static readonly string[] ApproverRoles =
+        ["SystemAdmin", "DepartmentManager", "Supervisor"];
+
     private static readonly string[] ApproverRoles =
         ["SystemAdmin", "DepartmentManager", "Supervisor"];
 
@@ -158,10 +163,10 @@ public class DieselRequisitionsController(
 
     // ── POST /api/v1/diesel/requisitions/{id}/approve ─────────────────────────
     [HttpPost("{id:guid}/approve")]
-    [Authorize(Roles = "SystemAdmin,DepartmentManager,Supervisor")]
     public async Task<ActionResult<DieselRequisitionDto>> Approve(
         Guid id, [FromBody] ApproveDieselRequisitionRequest body)
     {
+        if (!ApproverRoles.Contains(UserRole)) return Forbid();
         var req = await db.DieselRequisitions.FindAsync(id);
         if (req is null) return NotFound();
         if (req.Status != DieselRequisitionStatus.Pending)
@@ -183,10 +188,10 @@ public class DieselRequisitionsController(
 
     // ── POST /api/v1/diesel/requisitions/{id}/reject ──────────────────────────
     [HttpPost("{id:guid}/reject")]
-    [Authorize(Roles = "SystemAdmin,DepartmentManager,Supervisor")]
     public async Task<ActionResult<DieselRequisitionDto>> Reject(
         Guid id, [FromBody] RejectDieselRequisitionRequest body)
     {
+        if (!ApproverRoles.Contains(UserRole)) return Forbid();
         var req = await db.DieselRequisitions.FindAsync(id);
         if (req is null) return NotFound();
         if (req.Status != DieselRequisitionStatus.Pending)
@@ -210,10 +215,10 @@ public class DieselRequisitionsController(
     /// Tank level before is supplied by the dispenser; after is calculated.
     /// </summary>
     [HttpPost("{id:guid}/dispense")]
-    [Authorize(Roles = "SystemAdmin,DepartmentManager,Supervisor,StoreOfficer")]
     public async Task<ActionResult<DieselRequisitionDto>> Dispense(
         Guid id, [FromBody] DispenseDieselRequest body)
     {
+        if (!PrivilegedRoles.Contains(UserRole)) return Forbid();
         if (body.QuantityDispensedLitres <= 0) return BadRequest("Quantity must be greater than zero.");
         if (body.TankLevelBeforeLitres  < 0)  return BadRequest("Tank level cannot be negative.");
 
@@ -290,9 +295,9 @@ public class DieselRequisitionsController(
 
     // ── GET /api/v1/diesel/requisitions/stats ─────────────────────────────────
     [HttpGet("stats")]
-    [Authorize(Roles = "SystemAdmin,DepartmentManager,Supervisor")]
     public async Task<IActionResult> Stats()
     {
+        if (!ApproverRoles.Contains(UserRole)) return Forbid();
         var now        = DateTime.UtcNow;
         var monthStart = new DateTime(now.Year, now.Month, 1);
         var yearStart  = new DateTime(now.Year, 1, 1);

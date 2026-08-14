@@ -19,6 +19,14 @@ public class MaintenanceController(GenServiceDbContext db) : ControllerBase
     private string CallerName  => User.FindFirst("name")?.Value
                                ?? User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value
                                ?? "Unknown User";
+    // NOTE: [Authorize(Roles=...)] cannot be used here — .NET 8's JsonWebTokenHandler
+    // does not remap the token's role claim, so it returns 403 for every user.
+    // Role checks are done manually against this helper instead.
+    private string CallerRole  => User.FindFirst("role")?.Value
+                               ?? User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value
+                               ?? "Requester";
+    private bool IsManagerOrAbove =>
+        CallerRole is "SystemAdmin" or "DepartmentManager" or "Supervisor";
 
     private static ScheduleDto ToDto(MaintenanceSchedule m) => new(
         m.Id, m.TaskName, m.Description, m.Category, m.Location,
@@ -99,9 +107,9 @@ public class MaintenanceController(GenServiceDbContext db) : ControllerBase
 
     // ── POST /api/v1/maintenance ────────────────────────────────────────────
     [HttpPost]
-    [Authorize(Roles = "SystemAdmin,DepartmentManager,Supervisor")]
     public async Task<ActionResult<ScheduleDto>> Create([FromBody] CreateScheduleRequest req)
     {
+        if (!IsManagerOrAbove) return Forbid();
         var schedule = new MaintenanceSchedule
         {
             TaskName        = req.TaskName,
@@ -122,9 +130,9 @@ public class MaintenanceController(GenServiceDbContext db) : ControllerBase
 
     // ── PATCH /api/v1/maintenance/{id} ──────────────────────────────────────
     [HttpPatch("{id:guid}")]
-    [Authorize(Roles = "SystemAdmin,DepartmentManager,Supervisor")]
     public async Task<ActionResult<ScheduleDto>> Update(Guid id, [FromBody] UpdateScheduleRequest req)
     {
+        if (!IsManagerOrAbove) return Forbid();
         var m = await db.MaintenanceSchedules.FirstOrDefaultAsync(x => x.Id == id);
         if (m is null) return NotFound();
 
@@ -186,9 +194,9 @@ public class MaintenanceController(GenServiceDbContext db) : ControllerBase
     // ── GET /api/v1/maintenance/escalations ─────────────────────────────────
     /// <summary>Returns all tasks with EscalationLevel > 0 (currently escalated).</summary>
     [HttpGet("escalations")]
-    [Authorize(Roles = "SystemAdmin,DepartmentManager,Supervisor")]
     public async Task<ActionResult<IEnumerable<ScheduleDto>>> Escalations()
     {
+        if (!IsManagerOrAbove) return Forbid();
         var items = await db.MaintenanceSchedules
             .AsNoTracking()
             .Where(m => m.IsActive && m.EscalationLevel > 0)
@@ -207,10 +215,10 @@ public class MaintenanceController(GenServiceDbContext db) : ControllerBase
     /// won't re-send until the cooldown elapses.
     /// </summary>
     [HttpPost("{id:guid}/snooze-reminder")]
-    [Authorize(Roles = "SystemAdmin,DepartmentManager,Supervisor")]
     public async Task<ActionResult<ScheduleDto>> SnoozeReminder(
         Guid id, [FromBody] SnoozeReminderRequest req)
     {
+        if (!IsManagerOrAbove) return Forbid();
         if (req.HoursToSnooze < 1 || req.HoursToSnooze > 168)
             return BadRequest("Hours to snooze must be between 1 and 168 (7 days).");
 
@@ -227,9 +235,9 @@ public class MaintenanceController(GenServiceDbContext db) : ControllerBase
 
     // ── DELETE /api/v1/maintenance/{id} ─────────────────────────────────────
     [HttpDelete("{id:guid}")]
-    [Authorize(Roles = "SystemAdmin,DepartmentManager")]
     public async Task<IActionResult> Delete(Guid id)
     {
+        if (CallerRole is not ("SystemAdmin" or "DepartmentManager")) return Forbid();
         var m = await db.MaintenanceSchedules.FirstOrDefaultAsync(x => x.Id == id);
         if (m is null) return NotFound();
         db.MaintenanceSchedules.Remove(m);

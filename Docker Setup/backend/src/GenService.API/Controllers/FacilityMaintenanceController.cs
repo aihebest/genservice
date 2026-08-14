@@ -1,6 +1,7 @@
 using GenService.API.Data;
 using GenService.API.Domain;
 using GenService.API.Models;
+using GenService.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -13,6 +14,7 @@ namespace GenService.API.Controllers;
 [Authorize]
 public class FacilityMaintenanceController(
     GenServiceDbContext db,
+    NotificationService notify,
     ILogger<FacilityMaintenanceController> logger) : ControllerBase
 {
     private string CallerEmail => User.FindFirstValue(ClaimTypes.Email) ?? "";
@@ -139,6 +141,17 @@ public class FacilityMaintenanceController(
         };
         db.FacilityMaintenanceRequests.Add(r);
         await db.SaveChangesAsync();
+
+        // Alert management that a new request is awaiting approval.
+        await notify.CreateAsync(
+            title:      "🏢 Facility maintenance awaiting approval",
+            message:    $"{r.RequestNumber} — {r.Description} at {r.Location}, raised by {r.RequestedByName}.",
+            type:       NotificationType.MaintenancePending,
+            module:     "FacilityMaintenance",
+            entityId:   r.Id.ToString(),
+            refNumber:  r.RequestNumber,
+            targetRole: NotificationTarget.Management);
+
         return CreatedAtAction(nameof(GetById), new { id = r.Id }, ToDto(r));
     }
 
@@ -160,6 +173,17 @@ public class FacilityMaintenanceController(
         r.Notes           = req.Notes ?? r.Notes;
         r.UpdatedAt       = DateTime.UtcNow;
         await db.SaveChangesAsync();
+
+        await notify.CreateAsync(
+            title:       "✅ Facility maintenance approved",
+            message:     $"{r.RequestNumber} ({r.Location}) was approved by {CallerName}.",
+            type:        NotificationType.GsApproved,
+            module:      "FacilityMaintenance",
+            entityId:    r.Id.ToString(),
+            refNumber:   r.RequestNumber,
+            targetRole:  NotificationTarget.Requester,
+            targetEmail: r.RequestedByEmail);
+
         return Ok(ToDto(r));
     }
 
@@ -181,6 +205,17 @@ public class FacilityMaintenanceController(
         r.RejectionReason = req.Reason?.Trim();
         r.UpdatedAt       = DateTime.UtcNow;
         await db.SaveChangesAsync();
+
+        await notify.CreateAsync(
+            title:       "❌ Facility maintenance rejected",
+            message:     $"{r.RequestNumber} ({r.Location}) was rejected by {CallerName}. Reason: {r.RejectionReason}",
+            type:        NotificationType.GsRejected,
+            module:      "FacilityMaintenance",
+            entityId:    r.Id.ToString(),
+            refNumber:   r.RequestNumber,
+            targetRole:  NotificationTarget.Requester,
+            targetEmail: r.RequestedByEmail);
+
         return Ok(ToDto(r));
     }
 

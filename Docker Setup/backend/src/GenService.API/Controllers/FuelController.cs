@@ -16,6 +16,11 @@ public class FuelController(GenServiceDbContext db) : ControllerBase
     private string CallerEmail => User.FindFirst("email")?.Value
                                ?? User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value
                                ?? "unknown@demo.local";
+    // NOTE: [Authorize(Roles=...)] returns 403 for every user under .NET 8's
+    // JsonWebTokenHandler claim mapping — role checks are done manually below.
+    private string CallerRole  => User.FindFirst("role")?.Value
+                               ?? User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value
+                               ?? "Requester";
     private string CallerName  => User.FindFirst("name")?.Value
                                ?? User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value
                                ?? "Unknown User";
@@ -251,9 +256,10 @@ public class FuelController(GenServiceDbContext db) : ControllerBase
 
     // POST /api/v1/fuel/diesel/{id}/approve
     [HttpPost("diesel/{id:guid}/approve")]
-    [Authorize(Roles = "SystemAdmin,DepartmentManager,Supervisor")]
     public async Task<ActionResult<DieselRecordDto>> ApproveDieselRecord(Guid id)
     {
+        if (CallerRole is not ("SystemAdmin" or "DepartmentManager" or "Supervisor"))
+            return Forbid();
         var d = await db.DieselRecords.FirstOrDefaultAsync(x => x.Id == id);
         if (d is null) return NotFound();
 
@@ -268,9 +274,9 @@ public class FuelController(GenServiceDbContext db) : ControllerBase
 
     // DELETE /api/v1/fuel/diesel/{id}
     [HttpDelete("diesel/{id:guid}")]
-    [Authorize(Roles = "SystemAdmin,DepartmentManager")]
     public async Task<IActionResult> DeleteDieselRecord(Guid id)
     {
+        if (CallerRole is not ("SystemAdmin" or "DepartmentManager")) return Forbid();
         var d = await db.DieselRecords.FirstOrDefaultAsync(x => x.Id == id);
         if (d is null) return NotFound();
         db.DieselRecords.Remove(d);

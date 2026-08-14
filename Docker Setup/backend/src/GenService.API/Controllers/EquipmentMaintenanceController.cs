@@ -1,6 +1,7 @@
 using GenService.API.Data;
 using GenService.API.Domain;
 using GenService.API.Models;
+using GenService.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -13,6 +14,7 @@ namespace GenService.API.Controllers;
 [Authorize]
 public class EquipmentMaintenanceController(
     GenServiceDbContext db,
+    NotificationService notify,
     ILogger<EquipmentMaintenanceController> logger) : ControllerBase
 {
     private string CallerEmail => User.FindFirstValue(ClaimTypes.Email) ?? "";
@@ -141,6 +143,17 @@ public class EquipmentMaintenanceController(
         };
         db.EquipmentMaintenanceRequests.Add(r);
         await db.SaveChangesAsync();
+
+        // Alert management that a new request is awaiting approval.
+        await notify.CreateAsync(
+            title:      "🔧 Equipment maintenance awaiting approval",
+            message:    $"{r.RequestNumber} — {r.AssetDescription} at {r.Location}, raised by {r.RequestedByName}. {r.Description}",
+            type:       NotificationType.MaintenancePending,
+            module:     "EquipmentMaintenance",
+            entityId:   r.Id.ToString(),
+            refNumber:  r.RequestNumber,
+            targetRole: NotificationTarget.Management);
+
         return CreatedAtAction(nameof(GetById), new { id = r.Id }, ToDto(r));
     }
 
@@ -162,6 +175,17 @@ public class EquipmentMaintenanceController(
         r.Notes           = req.Notes ?? r.Notes;
         r.UpdatedAt       = DateTime.UtcNow;
         await db.SaveChangesAsync();
+
+        await notify.CreateAsync(
+            title:       "✅ Equipment maintenance approved",
+            message:     $"{r.RequestNumber} ({r.AssetDescription}) was approved by {CallerName}.",
+            type:        NotificationType.GsApproved,
+            module:      "EquipmentMaintenance",
+            entityId:    r.Id.ToString(),
+            refNumber:   r.RequestNumber,
+            targetRole:  NotificationTarget.Requester,
+            targetEmail: r.RequestedByEmail);
+
         return Ok(ToDto(r));
     }
 
@@ -183,6 +207,17 @@ public class EquipmentMaintenanceController(
         r.RejectionReason = req.Reason?.Trim();
         r.UpdatedAt       = DateTime.UtcNow;
         await db.SaveChangesAsync();
+
+        await notify.CreateAsync(
+            title:       "❌ Equipment maintenance rejected",
+            message:     $"{r.RequestNumber} ({r.AssetDescription}) was rejected by {CallerName}. Reason: {r.RejectionReason}",
+            type:        NotificationType.GsRejected,
+            module:      "EquipmentMaintenance",
+            entityId:    r.Id.ToString(),
+            refNumber:   r.RequestNumber,
+            targetRole:  NotificationTarget.Requester,
+            targetEmail: r.RequestedByEmail);
+
         return Ok(ToDto(r));
     }
 

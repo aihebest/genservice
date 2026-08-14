@@ -1,6 +1,7 @@
 using GenService.API.Data;
 using GenService.API.Domain;
 using GenService.API.Models;
+using GenService.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -13,6 +14,7 @@ namespace GenService.API.Controllers;
 [Authorize]
 public class VehicleMaintenanceController(
     GenServiceDbContext db,
+    NotificationService notify,
     ILogger<VehicleMaintenanceController> logger) : ControllerBase
 {
     private string CallerEmail => User.FindFirstValue(ClaimTypes.Email) ?? "";
@@ -162,6 +164,16 @@ public class VehicleMaintenanceController(
         logger.LogInformation("Vehicle maintenance {Num} created by {User} for {Reg}",
             r.RequestNumber, CallerEmail, r.VehicleRegNo);
 
+        // Alert management that a new request is awaiting approval.
+        await notify.CreateAsync(
+            title:      "🚗 Vehicle maintenance awaiting approval",
+            message:    $"{r.RequestNumber} — {r.VehicleRegNo} ({r.VehicleType}) raised by {r.RequestedByName}. {r.Description}",
+            type:       NotificationType.MaintenancePending,
+            module:     "VehicleMaintenance",
+            entityId:   r.Id.ToString(),
+            refNumber:  r.RequestNumber,
+            targetRole: NotificationTarget.Management);
+
         return CreatedAtAction(nameof(GetById), new { id = r.Id }, ToDto(r));
     }
 
@@ -186,6 +198,18 @@ public class VehicleMaintenanceController(
         r.UpdatedAt       = DateTime.UtcNow;
 
         await db.SaveChangesAsync();
+
+        // Notify the requester that their request was approved.
+        await notify.CreateAsync(
+            title:       "✅ Vehicle maintenance approved",
+            message:     $"{r.RequestNumber} ({r.VehicleRegNo}) was approved by {CallerName}.",
+            type:        NotificationType.GsApproved,
+            module:      "VehicleMaintenance",
+            entityId:    r.Id.ToString(),
+            refNumber:   r.RequestNumber,
+            targetRole:  NotificationTarget.Requester,
+            targetEmail: r.RequestedByEmail);
+
         return Ok(ToDto(r));
     }
 
@@ -210,6 +234,18 @@ public class VehicleMaintenanceController(
         r.UpdatedAt       = DateTime.UtcNow;
 
         await db.SaveChangesAsync();
+
+        // Notify the requester that their request was rejected, with the reason.
+        await notify.CreateAsync(
+            title:       "❌ Vehicle maintenance rejected",
+            message:     $"{r.RequestNumber} ({r.VehicleRegNo}) was rejected by {CallerName}. Reason: {r.RejectionReason}",
+            type:        NotificationType.GsRejected,
+            module:      "VehicleMaintenance",
+            entityId:    r.Id.ToString(),
+            refNumber:   r.RequestNumber,
+            targetRole:  NotificationTarget.Requester,
+            targetEmail: r.RequestedByEmail);
+
         return Ok(ToDto(r));
     }
 
