@@ -38,6 +38,13 @@ public class GeneratorDailyReading
     public double? FuelRemovedLitres       { get; set; }   // diesel taken OUT of the tank that day (optional)
     public double? FuelConsumedLitres      { get; set; }   // = (Previous + Added − Removed) − Current (auto)
 
+    // ── Generator kW meter (BSI audit requirement, Aug 2026) ──────────────────
+    // Captures generator kilowatt output so diesel consumption can be analysed
+    // against actual electrical load.  Gen kW Consumed = Current kW − Previous kW.
+    public double? PreviousGeneratorKw { get; set; }   // previous generator kW meter reading
+    public double? CurrentGeneratorKw  { get; set; }   // current generator kW meter reading
+    public double? GeneratorKwConsumed { get; set; }   // = Current − Previous (auto)
+
     // ── Utility (NEPA) power (Henry §4) ───────────────────────────────────────
     public double? PreviousUtilityReading  { get; set; }   // previous utility hour-meter reading
     public double? CurrentUtilityReading   { get; set; }   // current utility hour-meter reading

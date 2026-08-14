@@ -196,6 +196,9 @@ export interface GeneratorDailyReading {
   previousUtilityReading?:number;
   currentUtilityReading?: number;
   utilityAvailableHours?: number;
+  previousGeneratorKw?:   number;
+  currentGeneratorKw?:    number;
+  generatorKwConsumed?:   number;
   serviceIntervalHours:   number;
   remainingServiceHours:  number;
   serviceCompleted:       boolean;

@@ -57,6 +57,10 @@ function buildColumns(onView: (r: GeneratorDailyReading) => void): ColumnsType<G
       )},
     { title: 'Utility Hrs', dataIndex: 'utilityAvailableHours', key: 'utility', width: 90,
       render: (v?: number) => <Text type="secondary" style={{ fontSize: 12 }}>{v != null ? `${v} h` : '—'}</Text> },
+    { title: 'Gen kW Consumed', dataIndex: 'generatorKwConsumed', key: 'genKw', width: 130,
+      render: (v?: number) => v != null
+        ? <Text strong style={{ fontSize: 12, color: '#722ed1' }}>{v.toLocaleString()} kW</Text>
+        : <Text type="secondary" style={{ fontSize: 12 }}>—</Text> },
     { title: 'Logged By', dataIndex: 'loggedByName', key: 'by', width: 140, ellipsis: true,
       render: (v: string) => <Text style={{ fontSize: 12 }}>{v}</Text> },
     { title: '', key: 'act', width: 65,
@@ -85,6 +89,8 @@ export default function DailyReadingsTab() {
   const wFuelRemoved= Form.useWatch('fuelRemovedLitres',      form) as number | undefined;
   const wPrevUtil   = Form.useWatch('previousUtilityReading',  form) as number | undefined;
   const wCurrUtil   = Form.useWatch('currentUtilityReading',   form) as number | undefined;
+  const wPrevKw     = Form.useWatch('previousGeneratorKw',     form) as number | undefined;
+  const wCurrKw     = Form.useWatch('currentGeneratorKw',      form) as number | undefined;
   const runHoursPreview =
     wCurrEngine != null && wPrevEngine != null ? Math.max(0, wCurrEngine - wPrevEngine) : null;
   // Fuel Consumed = (Previous + Added − Removed) − Current
@@ -94,6 +100,9 @@ export default function DailyReadingsTab() {
       : null;
   const utilityPreview =
     wCurrUtil != null && wPrevUtil != null ? Math.max(0, wCurrUtil - wPrevUtil) : null;
+  // Gen kW Consumed = Current Gen kW − Previous Gen kW (BSI audit requirement)
+  const genKwPreview =
+    wCurrKw != null && wPrevKw != null ? Math.max(0, wCurrKw - wPrevKw) : null;
 
   const refresh = useCallback(() => qc.invalidateQueries({ queryKey: ['gen-readings'] }), [qc]);
 
@@ -131,6 +140,8 @@ export default function DailyReadingsTab() {
         fuelRemovedLitres: values.fuelRemovedLitres as number | undefined,
         previousUtilityReading: values.previousUtilityReading as number | undefined,
         currentUtilityReading: values.currentUtilityReading as number | undefined,
+        previousGeneratorKw: values.previousGeneratorKw as number | undefined,
+        currentGeneratorKw: values.currentGeneratorKw as number | undefined,
         serviceIntervalHours: (values.serviceIntervalHours as number) ?? 250,
         serviceCompleted: (values.serviceCompleted as boolean) ?? false,
         lastServicedAtHours: values.lastServicedAtHours as number | undefined,
@@ -368,6 +379,28 @@ export default function DailyReadingsTab() {
           )}
 
           <Divider titlePlacement="left" orientationMargin={0} style={{ fontSize: 12 }}>
+            Generator Power — kW meter
+          </Divider>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="previousGeneratorKw" label="Previous Gen kW"
+                tooltip="Leave blank to auto-fill from the last recorded reading.">
+                <InputNumber style={{ width: '100%' }} placeholder="e.g. 12450" min={0} step={0.1} />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="currentGeneratorKw" label="Current Gen kW">
+                <InputNumber style={{ width: '100%' }} placeholder="e.g. 12610" min={0} step={0.1} />
+              </Form.Item>
+            </Col>
+          </Row>
+          {genKwPreview != null && genKwPreview >= 0 && (
+            <Text type="secondary" style={{ display: 'block', marginTop: -6, marginBottom: 10, fontSize: 12 }}>
+              Gen kW Consumed = Current − Previous = <strong>{genKwPreview.toFixed(1)} kW</strong>
+            </Text>
+          )}
+
+          <Divider titlePlacement="left" orientationMargin={0} style={{ fontSize: 12 }}>
             Service Interval (every 250 h)
           </Divider>
           <Row gutter={12} align="middle">
@@ -428,6 +461,14 @@ export default function DailyReadingsTab() {
             )}
             {selected.utilityAvailableHours != null && (
               <Descriptions.Item label="Utility Power">{selected.utilityAvailableHours} h available</Descriptions.Item>
+            )}
+            {(selected.previousGeneratorKw != null || selected.currentGeneratorKw != null) && (
+              <Descriptions.Item label="Gen kW (prev → current)">
+                {selected.previousGeneratorKw?.toLocaleString() ?? '—'} → {selected.currentGeneratorKw?.toLocaleString() ?? '—'} kW
+                {selected.generatorKwConsumed != null && (
+                  <Text strong style={{ color: '#722ed1' }}> (consumed: {selected.generatorKwConsumed.toLocaleString()} kW)</Text>
+                )}
+              </Descriptions.Item>
             )}
           </Descriptions>
           <Divider titlePlacement="left" orientationMargin={0} style={{ fontSize: 12 }}>Service Status</Divider>

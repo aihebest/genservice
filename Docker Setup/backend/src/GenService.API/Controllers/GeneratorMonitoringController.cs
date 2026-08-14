@@ -29,6 +29,7 @@ public class GeneratorMonitoringController(
         r.PreviousFuelLevelLitres, r.FuelLevelLitres,
         r.FuelAddedLitres, r.FuelRemovedLitres, r.FuelConsumedLitres,
         r.PreviousUtilityReading, r.CurrentUtilityReading, r.UtilityAvailableHours,
+        r.PreviousGeneratorKw, r.CurrentGeneratorKw, r.GeneratorKwConsumed,
         r.ServiceIntervalHours, r.RemainingServiceHours,
         r.ServiceCompleted, r.LastServicedAtHours,
         r.ServiceAlertActive, r.HoursUntilNextService,
@@ -139,6 +140,14 @@ public class GeneratorMonitoringController(
         double? fuelConsumed = fuelDelta >= 0 ? fuelDelta : null;   // negative ⇒ likely an unrecorded supply
 
         // ── §4 Utility (NEPA) available = Current − Previous (hour meter) ───────
+        // ── Generator kW consumed = Current kW − Previous kW (BSI audit) ────────
+        // Previous auto-fills from the last reading when not supplied, mirroring
+        // the engine-hour and utility meters.
+        var previousKw     = req.PreviousGeneratorKw ?? last?.CurrentGeneratorKw;
+        double? kwConsumed = null;
+        if (req.CurrentGeneratorKw.HasValue && previousKw.HasValue)
+            kwConsumed = Math.Max(0, req.CurrentGeneratorKw.Value - previousKw.Value);
+
         var previousUtil   = req.PreviousUtilityReading ?? last?.CurrentUtilityReading;
         double? utilAvailable = null;
         if (req.CurrentUtilityReading.HasValue && previousUtil.HasValue)
@@ -184,6 +193,9 @@ public class GeneratorMonitoringController(
             PreviousUtilityReading  = previousUtil,
             CurrentUtilityReading   = req.CurrentUtilityReading,
             UtilityAvailableHours   = utilAvailable,
+            PreviousGeneratorKw     = previousKw,
+            CurrentGeneratorKw      = req.CurrentGeneratorKw,
+            GeneratorKwConsumed     = kwConsumed,
             ServiceIntervalHours    = interval,
             RemainingServiceHours   = remaining,
             ServiceCompleted        = req.ServiceCompleted,

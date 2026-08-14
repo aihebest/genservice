@@ -1237,6 +1237,10 @@ static async Task ApplySchemaUpdatesAsync(
             AddBitColIfMissing  ("GeneratorDailyReadings", "ServiceCompleted"),
             AddColIfMissing     ("GeneratorDailyReadings", "FuelAddedLitres",   "float"),
             AddColIfMissing     ("GeneratorDailyReadings", "FuelRemovedLitres", "float"),
+            // Generator kW meter (BSI audit requirement, Aug 2026)
+            AddColIfMissing     ("GeneratorDailyReadings", "PreviousGeneratorKw", "float"),
+            AddColIfMissing     ("GeneratorDailyReadings", "CurrentGeneratorKw",  "float"),
+            AddColIfMissing     ("GeneratorDailyReadings", "GeneratorKwConsumed", "float"),
 
             // ── PowerMeterReadings — Previous/Current meter reading columns ──
             AddFloatColIfMissing("PowerMeterReadings", "PreviousMeterReading", "0"),

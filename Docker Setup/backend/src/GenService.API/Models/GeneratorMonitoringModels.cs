@@ -15,6 +15,8 @@ public record CreateGeneratorReadingRequest(
     double? PreviousFuelLevelLitres= null, // optional — auto-filled from last reading
     double? PreviousUtilityReading = null, // §4 optional — auto-filled from last reading
     double? CurrentUtilityReading  = null, // §4 current utility hour-meter reading
+    double? PreviousGeneratorKw    = null, // kW meter — optional, auto-filled from last reading
+    double? CurrentGeneratorKw     = null, // kW meter — current reading
     double  ServiceIntervalHours   = 250,
     bool    ServiceCompleted       = false, // §2 tick when a service was carried out
     double? LastServicedAtHours    = null,
@@ -41,6 +43,9 @@ public record GeneratorReadingDto(
     double?   PreviousUtilityReading,
     double?   CurrentUtilityReading,
     double?   UtilityAvailableHours,
+    double?   PreviousGeneratorKw,
+    double?   CurrentGeneratorKw,
+    double?   GeneratorKwConsumed,
     double    ServiceIntervalHours,
     double    RemainingServiceHours,
     bool      ServiceCompleted,

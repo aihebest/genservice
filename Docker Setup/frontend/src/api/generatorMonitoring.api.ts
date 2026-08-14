@@ -25,6 +25,8 @@ export const generatorMonitoringApi = {
     previousFuelLevelLitres?:number;
     previousUtilityReading?: number;
     currentUtilityReading?:  number;
+    previousGeneratorKw?:    number;
+    currentGeneratorKw?:     number;
     serviceIntervalHours:    number;
     serviceCompleted?:       boolean;
     lastServicedAtHours?:    number;
