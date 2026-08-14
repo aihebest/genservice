@@ -11,6 +11,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import accommodationApi from '../../api/accommodation.api';
+import { useAuthStore } from '../../store/authStore';
 import {
   OFFICE_LOCATIONS, MEAL_PLAN_OPTIONS, ACCOMMODATION_STATUSES, ACCOMMODATION_STATUS_META,
 } from '../../types';
@@ -23,6 +24,9 @@ const naira = (v?: number) => v != null ? `₦${Number(v).toLocaleString()}` : '
 
 export default function FeedingAccommodationPage() {
   const qc = useQueryClient();
+  // Only managers/admins may correct existing records (enforced server-side too).
+  const role = useAuthStore(s => s.user?.role);
+  const canEdit = role === 'DepartmentManager' || role === 'SystemAdmin';
 
   const [filterHouse,  setFilterHouse]  = useState<string | undefined>();
   const [filterStatus, setFilterStatus] = useState<string | undefined>();
@@ -136,10 +140,14 @@ export default function FeedingAccommodationPage() {
       render: (_: unknown, r: AccommodationLog) => (
         <Space size={4}>
           <Tooltip title="View"><Button size="small" icon={<EyeOutlined />} onClick={() => setViewRecord(r)} /></Tooltip>
-          <Tooltip title="Edit"><Button size="small" icon={<EditOutlined />} onClick={() => handleOpenEdit(r)} /></Tooltip>
-          <Popconfirm title="Delete this record?" okText="Delete" okButtonProps={{ danger: true }} onConfirm={() => deleteMutation.mutate(r.id)}>
-            <Button size="small" danger icon={<DeleteOutlined />} />
-          </Popconfirm>
+          {canEdit && (
+            <>
+              <Tooltip title="Edit record"><Button size="small" icon={<EditOutlined />} onClick={() => handleOpenEdit(r)} /></Tooltip>
+              <Popconfirm title="Delete this record?" okText="Delete" okButtonProps={{ danger: true }} onConfirm={() => deleteMutation.mutate(r.id)}>
+                <Button size="small" danger icon={<DeleteOutlined />} />
+              </Popconfirm>
+            </>
+          )}
         </Space>
       ) },
   ];

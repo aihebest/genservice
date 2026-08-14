@@ -24,6 +24,21 @@ export const dstvApi = {
     notes?:             string;
   }) => apiClient.post<DstvSubscription>('/dstv', data).then(r => r.data),
 
+  // Manager-only correction of an existing subscription.
+  update: (id: string, data: {
+    decoderNumber:      string;
+    location:           string;
+    package:            string;
+    amountNaira:        number;
+    startDate?:         string;
+    endDate?:           string;
+    durationMonths?:    number;
+    paymentMethod?:     string;
+    vendor?:            string;
+    receiptAttachment?: string;
+    notes?:             string;
+  }) => apiClient.put<DstvSubscription>(`/dstv/${id}`, data).then(r => r.data),
+
   renew: (id: string, data: {
     durationMonths:     number;
     amountNaira:        number;

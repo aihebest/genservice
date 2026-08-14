@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import {
   Alert, Button, Card, Col, Form, Input, InputNumber, Modal, Popconfirm, Row,
-  Select, Space, Table, Tag, Typography, DatePicker, message,
+  Select, Space, Table, Tag, Tooltip, Typography, DatePicker, message,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { PlusOutlined, ReloadOutlined, ThunderboltOutlined, DeleteOutlined } from '@ant-design/icons';
+import { PlusOutlined, ReloadOutlined, ThunderboltOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
+import { useAuthStore } from '../../store/authStore';
 import { electricityApi } from '../../api/electricity.api';
 import {
   ELECTRICITY_LOCATIONS, ELECTRICITY_TYPES, ELECTRICITY_STATUS_META,
@@ -23,8 +24,13 @@ export default function ElectricityPage() {
   const [typeFilter, setType]   = useState<string | undefined>();
   const [locFilter, setLoc]     = useState<string | undefined>();
   const [page, setPage]         = useState(1);
+  const [editing, setEditing]   = useState<ElectricityPurchase | null>(null);
   const [form] = Form.useForm();
   const purchaseType = Form.useWatch('purchaseType', form) as string | undefined;
+
+  // Only managers/admins may correct existing records (enforced server-side too).
+  const role = useAuthStore(s => s.user?.role);
+  const canEdit = role === 'DepartmentManager' || role === 'SystemAdmin';
 
   const { data: balances } = useQuery({
     queryKey: ['electricity', 'balances'],
@@ -39,10 +45,24 @@ export default function ElectricityPage() {
 
   const refresh = () => qc.invalidateQueries({ queryKey: ['electricity'] });
 
+  const openEdit = (r: ElectricityPurchase) => {
+    setEditing(r);
+    form.setFieldsValue({
+      purchaseType: r.purchaseType, location: r.location, amountNaira: r.amountNaira,
+      unitsKwh: r.unitsKwh, purchaseDate: r.purchaseDate ? dayjs(r.purchaseDate) : undefined,
+      vendor: r.vendor, paymentReference: r.paymentReference, tokenNumber: r.tokenNumber,
+      meterReadingKwh: r.meterReadingKwh, lowBalanceThresholdKwh: r.lowBalanceThresholdKwh,
+      notes: r.notes,
+    });
+    setOpen(true);
+  };
+
+  const closeModal = () => { setOpen(false); setEditing(null); form.resetFields(); };
+
   const handleSave = async (v: Record<string, unknown>) => {
     setSaving(true);
     try {
-      await electricityApi.create({
+      const payload = {
         purchaseType:           v.purchaseType as string,
         location:               v.location as string,
         amountNaira:            v.amountNaira as number,
@@ -54,9 +74,15 @@ export default function ElectricityPage() {
         meterReadingKwh:        v.meterReadingKwh as number | undefined,
         lowBalanceThresholdKwh: v.lowBalanceThresholdKwh as number | undefined,
         notes:                  v.notes as string | undefined,
-      });
-      message.success('Electricity purchase recorded');
-      form.resetFields(); setOpen(false); refresh();
+      };
+      if (editing) {
+        await electricityApi.update(editing.id, payload);
+        message.success('Record updated');
+      } else {
+        await electricityApi.create(payload);
+        message.success('Electricity purchase recorded');
+      }
+      closeModal(); refresh();
     } catch (e: unknown) {
       message.error((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Failed to save');
     } finally { setSaving(false); }
@@ -90,14 +116,29 @@ export default function ElectricityPage() {
       } },
     { title: 'Ref / Token', key: 'ref', ellipsis: true,
       render: (_: unknown, r: ElectricityPurchase) => r.paymentReference ?? r.tokenNumber ?? '—' },
-    { title: 'Logged By', dataIndex: 'loggedByName', width: 130, ellipsis: true },
-    { title: '', key: 'act', width: 60,
+    { title: 'Logged By', key: 'loggedBy', width: 150, ellipsis: true,
       render: (_: unknown, r: ElectricityPurchase) => (
-        <Popconfirm title="Delete this record?" okText="Delete" okButtonProps={{ danger: true }}
-          onConfirm={() => handleDelete(r.id)}>
-          <Button size="small" danger icon={<DeleteOutlined />} />
-        </Popconfirm>
+        <span>
+          {r.loggedByName}
+          {r.lastEditedByName && (
+            <Tooltip title={`Edited by ${r.lastEditedByName}${r.lastEditedAt ? ` on ${dayjs(r.lastEditedAt).format('D MMM YY HH:mm')}` : ''}`}>
+              <Tag color="gold" style={{ marginLeft: 4, fontSize: 10 }}>edited</Tag>
+            </Tooltip>
+          )}
+        </span>
       ) },
+    { title: '', key: 'act', width: 96,
+      render: (_: unknown, r: ElectricityPurchase) => canEdit ? (
+        <Space size={4}>
+          <Tooltip title="Edit record">
+            <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(r)} />
+          </Tooltip>
+          <Popconfirm title="Delete this record?" okText="Delete" okButtonProps={{ danger: true }}
+            onConfirm={() => handleDelete(r.id)}>
+            <Button size="small" danger icon={<DeleteOutlined />} />
+          </Popconfirm>
+        </Space>
+      ) : <Text type="secondary" style={{ fontSize: 11 }}>—</Text> },
   ];
 
   return (
@@ -155,9 +196,10 @@ export default function ElectricityPage() {
           size="middle" scroll={{ x: 1100 }} style={{ padding: '0 8px' }} />
       </Card>
 
-      <Modal title="Record Electricity Purchase" open={open} onOk={() => form.submit()}
-        onCancel={() => { setOpen(false); form.resetFields(); }} confirmLoading={saving}
-        okText="Save" width={560} destroyOnClose>
+      <Modal title={editing ? 'Edit Electricity Purchase' : 'Record Electricity Purchase'}
+        open={open} onOk={() => form.submit()}
+        onCancel={closeModal} confirmLoading={saving}
+        okText={editing ? 'Save Changes' : 'Save'} width={560} destroyOnClose>
         <Form form={form} layout="vertical" onFinish={handleSave} initialValues={{ purchaseType: 'PHED', lowBalanceThresholdKwh: 50 }}>
           <Row gutter={12}>
             <Col span={12}>

@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import {
   Alert, Button, Card, Col, Form, Input, InputNumber, Modal, Row,
-  Select, Space, Table, Tag, Typography, DatePicker, message,
+  Select, Space, Table, Tag, Tooltip, Typography, DatePicker, message,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { PlusOutlined, ReloadOutlined, PlayCircleOutlined } from '@ant-design/icons';
+import { PlusOutlined, ReloadOutlined, PlayCircleOutlined, EditOutlined } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
+import { useAuthStore } from '../../store/authStore';
 import { dstvApi } from '../../api/dstv.api';
 import { DSTV_PACKAGES, DSTV_STATUS_META } from '../../types';
 import type { DstvSubscription, DstvStatus } from '../../types';
@@ -20,6 +21,10 @@ export default function DstvPage() {
   const qc = useQueryClient();
   const [open, setOpen]       = useState(false);
   const [renewTarget, setRenew] = useState<DstvSubscription | null>(null);
+  const [editing, setEditing]   = useState<DstvSubscription | null>(null);
+  // Only managers/admins may correct existing records (enforced server-side too).
+  const role = useAuthStore(s => s.user?.role);
+  const canEdit = role === 'DepartmentManager' || role === 'SystemAdmin';
   const [saving, setSaving]   = useState(false);
   const [statusFilter, setStatus] = useState<string | undefined>();
   const [page, setPage]       = useState(1);
@@ -33,10 +38,24 @@ export default function DstvPage() {
 
   const refresh = () => qc.invalidateQueries({ queryKey: ['dstv'] });
 
+  const openEdit = (r: DstvSubscription) => {
+    setEditing(r);
+    form.setFieldsValue({
+      decoderNumber: r.decoderNumber, location: r.location, package: r.package,
+      amountNaira: r.amountNaira,
+      startDate: r.startDate ? dayjs(r.startDate) : undefined,
+      endDate: r.expiryDate ? dayjs(r.expiryDate) : undefined,
+      paymentMethod: r.paymentMethod, vendor: r.vendor, notes: r.notes,
+    });
+    setOpen(true);
+  };
+
+  const closeModal = () => { setOpen(false); setEditing(null); form.resetFields(); };
+
   const handleSave = async (v: Record<string, unknown>) => {
     setSaving(true);
     try {
-      await dstvApi.create({
+      const payload = {
         decoderNumber:  v.decoderNumber as string,
         location:       v.location as string,
         package:        v.package as string,
@@ -46,9 +65,15 @@ export default function DstvPage() {
         paymentMethod:  v.paymentMethod as string | undefined,
         vendor:         v.vendor as string | undefined,
         notes:          v.notes as string | undefined,
-      });
-      message.success('Subscription added');
-      form.resetFields(); setOpen(false); refresh();
+      };
+      if (editing) {
+        await dstvApi.update(editing.id, payload);
+        message.success('Subscription updated');
+      } else {
+        await dstvApi.create(payload);
+        message.success('Subscription added');
+      }
+      closeModal(); refresh();
     } catch (e: unknown) {
       message.error((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Failed to save');
     } finally { setSaving(false); }
@@ -82,9 +107,27 @@ export default function DstvPage() {
     { title: 'Amount', dataIndex: 'amountNaira', width: 110, render: (v: number) => `₦${v.toLocaleString()}` },
     { title: 'Status', dataIndex: 'status', width: 130,
       render: (v: DstvStatus) => { const m = DSTV_STATUS_META[v]; return <Tag color={m?.color}>{m?.label ?? v}</Tag>; } },
-    { title: '', key: 'act', width: 90,
+    { title: 'Logged By', key: 'loggedBy', width: 150, ellipsis: true,
       render: (_: unknown, r: DstvSubscription) => (
-        <Button size="small" icon={<PlayCircleOutlined />} onClick={() => { setRenew(r); renewForm.setFieldsValue({ durationMonths: r.durationMonths, amountNaira: r.amountNaira }); }}>Renew</Button>
+        <span>
+          {r.loggedByName}
+          {r.lastEditedByName && (
+            <Tooltip title={`Edited by ${r.lastEditedByName}${r.lastEditedAt ? ` on ${dayjs(r.lastEditedAt).format('D MMM YY HH:mm')}` : ''}`}>
+              <Tag color="gold" style={{ marginLeft: 4, fontSize: 10 }}>edited</Tag>
+            </Tooltip>
+          )}
+        </span>
+      ) },
+    { title: '', key: 'act', width: 140,
+      render: (_: unknown, r: DstvSubscription) => (
+        <Space size={4}>
+          <Button size="small" icon={<PlayCircleOutlined />} onClick={() => { setRenew(r); renewForm.setFieldsValue({ durationMonths: r.durationMonths, amountNaira: r.amountNaira }); }}>Renew</Button>
+          {canEdit && (
+            <Tooltip title="Edit record">
+              <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(r)} />
+            </Tooltip>
+          )}
+        </Space>
       ) },
   ];
 
@@ -123,8 +166,8 @@ export default function DstvPage() {
       </Card>
 
       {/* Add modal */}
-      <Modal title="Add DStv Subscription" open={open} onOk={() => form.submit()}
-        onCancel={() => { setOpen(false); form.resetFields(); }} confirmLoading={saving} okText="Save" width={540} destroyOnClose>
+      <Modal title={editing ? 'Edit DStv Subscription' : 'Add DStv Subscription'} open={open} onOk={() => form.submit()}
+        onCancel={closeModal} confirmLoading={saving} okText={editing ? 'Save Changes' : 'Save'} width={540} destroyOnClose>
         <Form form={form} layout="vertical" onFinish={handleSave}>
           <Row gutter={12}>
             <Col span={12}>

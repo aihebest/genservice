@@ -25,5 +25,21 @@ export const electricityApi = {
     notes?:                  string;
   }) => apiClient.post<ElectricityPurchase>('/electricity', data).then(r => r.data),
 
+  // Manager-only correction of an existing purchase.
+  update: (id: string, data: {
+    purchaseType:            string;
+    location:                string;
+    amountNaira:             number;
+    unitsKwh:                number;
+    purchaseDate?:           string;
+    vendor?:                 string;
+    paymentReference?:       string;
+    tokenNumber?:            string;
+    meterReadingKwh?:        number;
+    receiptAttachment?:      string;
+    lowBalanceThresholdKwh?: number;
+    notes?:                  string;
+  }) => apiClient.put<ElectricityPurchase>(`/electricity/${id}`, data).then(r => r.data),
+
   remove: (id: string) => apiClient.delete(`/electricity/${id}`),
 };

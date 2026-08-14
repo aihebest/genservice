@@ -239,6 +239,8 @@ export interface PowerMeterReading {
   loggedByEmail:                string;
   loggedByName:                 string;
   createdAt:                    string;
+  lastEditedByName?:            string;
+  lastEditedAt?:                string;
 }
 
 // ── Task Progress Logs ────────────────────────────────────────────────────────
@@ -1182,6 +1184,8 @@ export interface AccommodationLog {
   loggedByName:           string;
   createdAt:              string;
   updatedAt:              string;
+  lastEditedByName?:      string;
+  lastEditedAt?:          string;
 }
 
 export interface AccommodationListResponse {
@@ -1589,6 +1593,8 @@ export interface ElectricityPurchase {
   loggedByEmail:          string;
   loggedByName:           string;
   createdAt:              string;
+  lastEditedByName?:      string;
+  lastEditedAt?:          string;
 }
 
 export interface ElectricityBalance {
@@ -1635,6 +1641,8 @@ export interface DstvSubscription {
   loggedByEmail:     string;
   loggedByName:      string;
   createdAt:         string;
+  lastEditedByName?: string;
+  lastEditedAt?:     string;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

@@ -2,13 +2,14 @@ import { useState, useCallback } from 'react';
 import {
   Alert, Badge, Button, Col, DatePicker, Descriptions, Divider, Drawer, Form,
   Input, InputNumber, Modal, Progress, Row, Select, Space,
-  Statistic, Switch, Table, Tag, Typography,
+  Statistic, Switch, Table, Tag, Tooltip, Typography,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { PlusOutlined, WarningOutlined, ThunderboltOutlined } from '@ant-design/icons';
+import { PlusOutlined, WarningOutlined, ThunderboltOutlined, EditOutlined } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
+import { useAuthStore } from '../../../store/authStore';
 import { generatorMonitoringApi } from '../../../api/generatorMonitoring.api';
 import { GENERATOR_DAILY_STATUS_META, OFFICE_LOCATIONS } from '../../../types';
 import type { GeneratorDailyReading, GeneratorDailyStatus } from '../../../types';
@@ -20,7 +21,10 @@ const { TextArea } = Input;
 
 const GEN_STATUSES = ['Running', 'Standby', 'UnderMaintenance', 'Fault'];
 
-function buildColumns(onView: (r: GeneratorDailyReading) => void): ColumnsType<GeneratorDailyReading> {
+function buildColumns(
+  onView: (r: GeneratorDailyReading) => void,
+  onEdit?: (r: GeneratorDailyReading) => void,
+): ColumnsType<GeneratorDailyReading> {
   return [
     { title: 'Date', dataIndex: 'readingDate', key: 'date', width: 110,
       render: (v: string) => <Text strong style={{ fontSize: 13 }}>{dayjs(v).format('D MMM YY')}</Text> },
@@ -63,8 +67,17 @@ function buildColumns(onView: (r: GeneratorDailyReading) => void): ColumnsType<G
         : <Text type="secondary" style={{ fontSize: 12 }}>—</Text> },
     { title: 'Logged By', dataIndex: 'loggedByName', key: 'by', width: 140, ellipsis: true,
       render: (v: string) => <Text style={{ fontSize: 12 }}>{v}</Text> },
-    { title: '', key: 'act', width: 65,
-      render: (_: unknown, r: GeneratorDailyReading) => <Button size="small" onClick={() => onView(r)}>View</Button> },
+    { title: '', key: 'act', width: 110,
+      render: (_: unknown, r: GeneratorDailyReading) => (
+        <Space size={4}>
+          <Button size="small" onClick={() => onView(r)}>View</Button>
+          {onEdit && (
+            <Tooltip title="Edit reading">
+              <Button size="small" icon={<EditOutlined />} onClick={() => onEdit(r)} />
+            </Tooltip>
+          )}
+        </Space>
+      ) },
   ];
 }
 
@@ -73,6 +86,7 @@ export default function DailyReadingsTab() {
   const [locationFilter, setLocationFilter] = useState<string | undefined>();
   const [page,           setPage]           = useState(1);
   const [createOpen,     setCreateOpen]     = useState(false);
+  const [editing,        setEditing]        = useState<GeneratorDailyReading | null>(null);
   const [selected,       setSelected]       = useState<GeneratorDailyReading | null>(null);
   const [drawerOpen,     setDrawerOpen]     = useState(false);
   const [createLoading,  setCreateLoading]  = useState(false);
@@ -117,6 +131,43 @@ export default function DailyReadingsTab() {
     refetchInterval: 60_000,
   });
 
+  // Only managers/admins may correct existing readings (enforced server-side too).
+  const role = useAuthStore(s => s.user?.role);
+  const canEdit = role === 'DepartmentManager' || role === 'SystemAdmin';
+
+  const openEdit = (r: GeneratorDailyReading) => {
+    setEditing(r);
+    const known = (OFFICE_LOCATIONS as readonly string[]).includes(r.location);
+    setLocationSel(known ? r.location : 'Other');
+    form.setFieldsValue({
+      assetNo: r.assetNo, assetDescription: r.assetDescription,
+      locationSelect: known ? r.location : 'Other',
+      locationOther:  known ? undefined : r.location,
+      readingDate: r.readingDate ? dayjs(r.readingDate) : undefined,
+      previousEngineReading: r.previousEngineReading,
+      currentEngineReading:  r.currentEngineReading,
+      generatorStatus:       r.generatorStatus,
+      previousFuelLevelLitres: r.previousFuelLevelLitres,
+      currentFuelLevelLitres:  r.fuelLevelLitres,
+      fuelAddedLitres:   r.fuelAddedLitres,
+      fuelRemovedLitres: r.fuelRemovedLitres,
+      previousUtilityReading: r.previousUtilityReading,
+      currentUtilityReading:  r.currentUtilityReading,
+      previousGeneratorKw:    r.previousGeneratorKw,
+      currentGeneratorKw:     r.currentGeneratorKw,
+      serviceIntervalHours:   r.serviceIntervalHours,
+      serviceCompleted:       r.serviceCompleted,
+      lastServicedAtHours:    r.lastServicedAtHours,
+      notes: r.notes,
+    });
+    setCreateOpen(true);
+  };
+
+  const closeModal = () => {
+    setCreateOpen(false); setEditing(null); form.resetFields();
+    setLocationSel(null); setCreateError(null);
+  };
+
   const alertCount = summary?.filter(s => s.serviceAlertActive).length ?? 0;
   const runningCount = summary?.filter(s => s.latestStatus === 'Running').length ?? 0;
   const lowFuelCount = summary?.filter(s => s.latestFuelLevel < 100).length ?? 0;
@@ -127,7 +178,7 @@ export default function DailyReadingsTab() {
       const location = values.locationSelect === 'Other'
         ? (values.locationOther as string)?.trim() ?? 'Other'
         : values.locationSelect as string;
-      await generatorMonitoringApi.createReading({
+      const payload = {
         assetNo: (values.assetNo as string).trim(),
         assetDescription: (values.assetDescription as string).trim(),
         location,
@@ -147,8 +198,10 @@ export default function DailyReadingsTab() {
         lastServicedAtHours: values.lastServicedAtHours as number | undefined,
         notes: values.notes as string | undefined,
         readingDate: values.readingDate ? (values.readingDate as dayjs.Dayjs).format('YYYY-MM-DD') : undefined,
-      });
-      form.resetFields(); setLocationSel(null); setCreateOpen(false); refresh();
+      };
+      if (editing) await generatorMonitoringApi.updateReading(editing.id, payload);
+      else         await generatorMonitoringApi.createReading(payload);
+      closeModal(); refresh();
     } catch(e: unknown) {
       setCreateError((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Failed to save.');
     } finally { setCreateLoading(false); }
@@ -245,17 +298,20 @@ export default function DailyReadingsTab() {
       </div>
 
       <Table<GeneratorDailyReading>
-        columns={buildColumns(r => { setSelected(r); setDrawerOpen(true); })}
+        columns={buildColumns(
+          r => { setSelected(r); setDrawerOpen(true); },
+          canEdit ? openEdit : undefined,
+        )}
         dataSource={data?.items ?? []} rowKey="id" loading={isFetching}
         pagination={{ current: page, pageSize: 20, total: data?.totalCount ?? 0,
           onChange: p => setPage(p), showTotal: (t, [f, to]) => `${f}–${to} of ${t}`, showSizeChanger: false }}
         size="middle" scroll={{ x: 1050 }} />
 
       {/* Create modal */}
-      <Modal title={<><ThunderboltOutlined /> Log Daily Generator Reading</>}
+      <Modal title={<><ThunderboltOutlined /> {editing ? 'Edit Generator Reading' : 'Log Daily Generator Reading'}</>}
         open={createOpen} onOk={() => form.submit()}
-        onCancel={() => { setCreateOpen(false); form.resetFields(); setLocationSel(null); setCreateError(null); }}
-        okText="Save Reading" confirmLoading={createLoading} width={580} destroyOnClose>
+        onCancel={closeModal}
+        okText={editing ? 'Save Changes' : 'Save Reading'} confirmLoading={createLoading} width={580} destroyOnClose>
         {createError && <Alert message={createError} type="error" showIcon style={{ marginBottom: 12 }} />}
         <Form form={form} layout="vertical" onFinish={handleCreate}>
           <Row gutter={12}>
