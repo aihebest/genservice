@@ -28,11 +28,9 @@ public class DieselRequisitionsController(
     private static readonly string[] PrivilegedRoles =
         ["SystemAdmin", "DepartmentManager", "Supervisor", "StoreOfficer"];
 
-    // Approval-capable roles. Checked manually rather than via [Authorize(Roles=...)],
-    // which returns 403 for everyone under .NET 8's JsonWebTokenHandler claim mapping.
-    private static readonly string[] ApproverRoles =
-        ["SystemAdmin", "DepartmentManager", "Supervisor"];
-
+    // NOTE: role checks are done manually against these arrays rather than via
+    // [Authorize(Roles=...)], which returns 403 for every user under .NET 8's
+    // JsonWebTokenHandler claim mapping.
     private static readonly string[] ApproverRoles =
         ["SystemAdmin", "DepartmentManager", "Supervisor"];
 
