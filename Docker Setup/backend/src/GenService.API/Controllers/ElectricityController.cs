@@ -23,13 +23,19 @@ public class ElectricityController(
 {
     private string CallerEmail => User.FindFirstValue(ClaimTypes.Email) ?? "";
     private string CallerName  => User.FindFirstValue(ClaimTypes.Name)  ?? "";
+    private string CallerRole  => User.FindFirst("role")?.Value
+                               ?? User.FindFirstValue(ClaimTypes.Role)
+                               ?? "Requester";
+    /// <summary>Only managers/admins may correct or delete existing records.</summary>
+    private bool CanEditRecords => CallerRole is "DepartmentManager" or "SystemAdmin";
 
     private static ElectricityPurchaseDto ToDto(ElectricityPurchase p) => new(
         p.Id, p.PurchaseType, p.Location, p.PurchaseDate, p.Vendor,
         p.AmountNaira, p.UnitsKwh, p.PaymentReference, p.TokenNumber,
         p.MeterReadingKwh, p.ReceiptAttachment,
         p.LowBalanceThresholdKwh, p.BalanceAfterKwh, p.Status,
-        p.Notes, p.LoggedByEmail, p.LoggedByName, p.CreatedAt);
+        p.Notes, p.LoggedByEmail, p.LoggedByName, p.CreatedAt,
+        p.LastEditedByName, p.LastEditedAt);
 
     private static string StatusFor(double balance, double threshold) =>
         balance <= 0        ? ElectricityStatus.Depleted
@@ -156,9 +162,44 @@ public class ElectricityController(
     }
 
     // ── DELETE /api/v1/electricity/{id} ──────────────────────────────────────
+    // ── PUT /api/v1/electricity/{id} ────────────────────────────────────────
+    /// <summary>Manager-only correction of an electricity purchase, with edit audit stamp.</summary>
+    [HttpPut("{id:guid}")]
+    public async Task<ActionResult<ElectricityPurchaseDto>> Update(
+        Guid id, [FromBody] CreateElectricityPurchaseRequest req)
+    {
+        if (!CanEditRecords)
+            return StatusCode(403, new { message = "Only a Department Manager or System Admin can edit existing records." });
+
+        var p = await db.ElectricityPurchases.FindAsync(id);
+        if (p is null) return NotFound();
+
+        p.PurchaseType           = req.PurchaseType.Trim();
+        p.Location               = req.Location.Trim();
+        p.Vendor                 = req.Vendor?.Trim();
+        p.AmountNaira            = req.AmountNaira;
+        p.UnitsKwh               = req.UnitsKwh;
+        p.PaymentReference       = req.PaymentReference?.Trim();
+        p.TokenNumber            = req.TokenNumber?.Trim();
+        p.MeterReadingKwh        = req.MeterReadingKwh;
+        p.Notes                  = req.Notes?.Trim() ?? p.Notes;
+        if (req.PurchaseDate.HasValue) p.PurchaseDate = req.PurchaseDate.Value.Date;
+        p.LowBalanceThresholdKwh = req.LowBalanceThresholdKwh;
+        p.ReceiptAttachment      = req.ReceiptAttachment?.Trim() ?? p.ReceiptAttachment;
+        p.UpdatedAt        = DateTime.UtcNow;
+        p.LastEditedByName = CallerName;
+        p.LastEditedAt     = DateTime.UtcNow;
+
+        await db.SaveChangesAsync();
+        logger.LogInformation("Electricity purchase {Id} edited by {User}", id, CallerEmail);
+        return Ok(ToDto(p));
+    }
+
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id)
     {
+        if (!CanEditRecords)
+            return StatusCode(403, new { message = "Only a Department Manager or System Admin can delete records." });
         var p = await db.ElectricityPurchases.FindAsync(id);
         if (p is null) return NotFound();
         db.ElectricityPurchases.Remove(p);

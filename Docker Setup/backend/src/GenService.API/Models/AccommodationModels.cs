@@ -66,7 +66,9 @@ public record AccommodationDto(
     string    LoggedByEmail,
     string    LoggedByName,
     DateTime  CreatedAt,
-    DateTime  UpdatedAt
+    DateTime  UpdatedAt,
+    string?   LastEditedByName = null,
+    DateTime? LastEditedAt     = null
 );
 
 public record AccommodationStatsDto(

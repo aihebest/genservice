@@ -30,4 +30,8 @@ public class PowerMeterReading
     public string   LoggedByEmail { get; set; } = "";
     public string   LoggedByName  { get; set; } = "";
     public DateTime CreatedAt     { get; set; } = DateTime.UtcNow;
+
+    // ── Edit audit (manager corrections) ──────────────────────────────────────
+    public string?   LastEditedByName { get; set; }
+    public DateTime? LastEditedAt     { get; set; }
 }

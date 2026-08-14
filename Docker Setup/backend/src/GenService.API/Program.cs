@@ -1242,6 +1242,22 @@ static async Task ApplySchemaUpdatesAsync(
             AddColIfMissing     ("GeneratorDailyReadings", "CurrentGeneratorKw",  "float"),
             AddColIfMissing     ("GeneratorDailyReadings", "GeneratorKwConsumed", "float"),
 
+            // ── Edit audit stamps (manager-only corrections, Aug 2026) ───────
+            AddColIfMissing ("GeneratorDailyReadings", "LastEditedByName", "nvarchar(100)"),
+            AddColIfMissing ("GeneratorDailyReadings", "LastEditedAt",     "datetime2"),
+            AddColIfMissing ("PowerMeterReadings",     "LastEditedByName", "nvarchar(100)"),
+            AddColIfMissing ("PowerMeterReadings",     "LastEditedAt",     "datetime2"),
+            AddColIfMissing ("ElectricityPurchases",   "LastEditedByName", "nvarchar(100)"),
+            AddColIfMissing ("ElectricityPurchases",   "LastEditedAt",     "datetime2"),
+            AddColIfMissing ("DstvSubscriptions",      "LastEditedByName", "nvarchar(100)"),
+            AddColIfMissing ("DstvSubscriptions",      "LastEditedAt",     "datetime2"),
+            AddColIfMissing ("AccommodationLogs",      "LastEditedByName", "nvarchar(100)"),
+            AddColIfMissing ("AccommodationLogs",      "LastEditedAt",     "datetime2"),
+            AddColIfMissing ("DieselBulkSupplies",     "LastEditedByName", "nvarchar(100)"),
+            AddColIfMissing ("DieselBulkSupplies",     "LastEditedAt",     "datetime2"),
+            AddColIfMissing ("DieselDistributions",    "LastEditedByName", "nvarchar(100)"),
+            AddColIfMissing ("DieselDistributions",    "LastEditedAt",     "datetime2"),
+
             // ── PowerMeterReadings — Previous/Current meter reading columns ──
             AddFloatColIfMissing("PowerMeterReadings", "PreviousMeterReading", "0"),
             AddFloatColIfMissing("PowerMeterReadings", "CurrentMeterReading",  "0"),

@@ -968,12 +968,15 @@ public class ReportsController(GenServiceDbContext db) : ControllerBase
             {
                 var cols = new List<ExplorerColumn> {
                     Col("assetNo","Asset No."), Col("asset","Asset"), Col("location","Location"),
-                    Col("date","Date","date"), Col("fuel","Fuel Used (L)","number"), Col("status","Status") };
+                    Col("date","Date","date"), Col("runHours","Run Hours","number"),
+                    Col("fuel","Fuel Used (L)","number"), Col("genKw","Gen kW Used","number"),
+                    Col("status","Status") };
                 var data = await db.GeneratorDailyReadings.AsNoTracking().ToListAsync();
                 var rows = data.Select(r => {
                     var row = new Dictionary<string, object?> {
                         ["assetNo"] = r.AssetNo, ["asset"] = r.AssetDescription, ["location"] = r.Location,
-                        ["date"] = r.ReadingDate.ToString("yyyy-MM-dd"), ["fuel"] = r.FuelConsumedLitres,
+                        ["date"] = r.ReadingDate.ToString("yyyy-MM-dd"), ["runHours"] = r.RunHoursToday,
+                        ["fuel"] = r.FuelConsumedLitres, ["genKw"] = r.GeneratorKwConsumed,
                         ["status"] = r.GeneratorStatus };
                     return new ExplorerRowInternal(row, r.ReadingDate, r.Location, r.GeneratorStatus, null, null,
                         $"{r.AssetNo} {r.AssetDescription}");

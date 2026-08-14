@@ -17,6 +17,11 @@ public class AccommodationController(
 {
     private string CallerEmail => User.FindFirstValue(ClaimTypes.Email) ?? "";
     private string CallerName  => User.FindFirstValue(ClaimTypes.Name)  ?? "";
+    private string CallerRole  => User.FindFirst("role")?.Value
+                               ?? User.FindFirstValue(ClaimTypes.Role)
+                               ?? "Requester";
+    /// <summary>Only managers/admins may correct or delete existing records.</summary>
+    private bool CanEditRecords => CallerRole is "DepartmentManager" or "SystemAdmin";
 
     private static decimal? SumCosts(decimal? feeding, decimal? accommodation)
     {
@@ -44,7 +49,9 @@ public class AccommodationController(
         r.LoggedByEmail,
         r.LoggedByName,
         r.CreatedAt,
-        r.UpdatedAt
+        r.UpdatedAt,
+        r.LastEditedByName,
+        r.LastEditedAt
     );
 
     private async Task<string> NextReferenceAsync()
@@ -168,6 +175,9 @@ public class AccommodationController(
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<AccommodationDto>> Update(Guid id, [FromBody] UpdateAccommodationRequest req)
     {
+        if (!CanEditRecords)
+            return StatusCode(403, new { message = "Only a Department Manager or System Admin can edit existing records." });
+
         var r = await db.AccommodationLogs.FindAsync(id);
         if (r is null) return NotFound();
 
@@ -191,7 +201,9 @@ public class AccommodationController(
         r.TotalCostNaira = SumCosts(r.FeedingCostNaira, r.AccommodationCostNaira);
         if (req.Nights is null && r.CheckOutDate is not null)
             r.Nights = Math.Max(0, r.CheckOutDate.Value.DayNumber - r.CheckInDate.DayNumber);
-        r.UpdatedAt = DateTime.UtcNow;
+        r.UpdatedAt        = DateTime.UtcNow;
+        r.LastEditedByName = CallerName;
+        r.LastEditedAt     = DateTime.UtcNow;
 
         await db.SaveChangesAsync();
         return Ok(ToDto(r));
@@ -201,6 +213,8 @@ public class AccommodationController(
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id)
     {
+        if (!CanEditRecords)
+            return StatusCode(403, new { message = "Only a Department Manager or System Admin can delete records." });
         var r = await db.AccommodationLogs.FindAsync(id);
         if (r is null) return NotFound();
         db.AccommodationLogs.Remove(r);

@@ -55,7 +55,9 @@ public record GeneratorReadingDto(
     string?   Notes,
     string    LoggedByEmail,
     string    LoggedByName,
-    DateTime  CreatedAt
+    DateTime  CreatedAt,
+    string?   LastEditedByName,
+    DateTime? LastEditedAt
 );
 
 public record GeneratorReadingQuery(
@@ -105,7 +107,9 @@ public record PowerMeterReadingDto(
     string?   Notes,
     string    LoggedByEmail,
     string    LoggedByName,
-    DateTime  CreatedAt
+    DateTime  CreatedAt,
+    string?   LastEditedByName,
+    DateTime? LastEditedAt
 );
 
 public record PowerMeterQuery(

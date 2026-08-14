@@ -35,7 +35,9 @@ public record ElectricityPurchaseDto(
     string?  Notes,
     string   LoggedByEmail,
     string   LoggedByName,
-    DateTime CreatedAt
+    DateTime CreatedAt,
+    string?   LastEditedByName = null,
+    DateTime? LastEditedAt     = null
 );
 
 public record ElectricityQuery(

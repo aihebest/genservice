@@ -26,6 +26,11 @@ public class DieselSupplyController(
 
     private string CallerEmail => User.FindFirstValue(ClaimTypes.Email) ?? "";
     private string CallerName  => User.FindFirstValue(ClaimTypes.Name)  ?? "";
+    private string CallerRole  => User.FindFirst("role")?.Value
+                               ?? User.FindFirstValue(ClaimTypes.Role)
+                               ?? "Requester";
+    /// <summary>Only managers/admins may delete existing records.</summary>
+    private bool CanEditRecords => CallerRole is "DepartmentManager" or "SystemAdmin";
 
     // ── Reference number generators ───────────────────────────────────────────
     private async Task<string> NextSupplyRefAsync()
@@ -239,6 +244,8 @@ public class DieselSupplyController(
     [HttpDelete("distributions/{id:guid}")]
     public async Task<IActionResult> DeleteDistribution(Guid id)
     {
+        if (!CanEditRecords)
+            return StatusCode(403, new { message = "Only a Department Manager or System Admin can delete records." });
         var dist = await db.DieselDistributions.FindAsync(id);
         if (dist is null) return NotFound();
 

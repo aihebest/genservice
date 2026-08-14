@@ -33,6 +33,10 @@ public class DieselBulkSupply
     public string   LoggedByName  { get; set; } = "";
     public DateTime CreatedAt     { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt     { get; set; } = DateTime.UtcNow;
+
+    // ── Edit audit (manager corrections) ──────────────────────────────────────
+    public string?   LastEditedByName { get; set; }
+    public DateTime? LastEditedAt     { get; set; }
 }
 
 /// <summary>
@@ -78,6 +82,10 @@ public class DieselDistribution
     public string   LoggedByName  { get; set; } = "";
     public DateTime CreatedAt     { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt     { get; set; } = DateTime.UtcNow;
+
+    // ── Edit audit (manager corrections) ──────────────────────────────────────
+    public string?   LastEditedByName { get; set; }
+    public DateTime? LastEditedAt     { get; set; }
 }
 
 public static class DieselDistributionType

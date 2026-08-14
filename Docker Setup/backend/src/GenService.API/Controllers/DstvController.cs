@@ -21,6 +21,11 @@ public class DstvController(
 {
     private string CallerEmail => User.FindFirstValue(ClaimTypes.Email) ?? "";
     private string CallerName  => User.FindFirstValue(ClaimTypes.Name)  ?? "";
+    private string CallerRole  => User.FindFirst("role")?.Value
+                               ?? User.FindFirstValue(ClaimTypes.Role)
+                               ?? "Requester";
+    /// <summary>Only managers/admins may correct or delete existing records.</summary>
+    private bool CanEditRecords => CallerRole is "DepartmentManager" or "SystemAdmin";
 
     private static int DaysToExpiry(DateTime expiry) =>
         (int)Math.Ceiling((expiry.Date - DateTime.UtcNow.Date).TotalDays);
@@ -37,7 +42,8 @@ public class DstvController(
         s.Id, s.DecoderNumber, s.Location, s.Package, s.StartDate,
         s.DurationMonths, s.ExpiryDate, DaysToExpiry(s.ExpiryDate),
         s.AmountNaira, s.PaymentMethod, s.Vendor, s.ReceiptAttachment,
-        s.Status, s.Notes, s.LoggedByEmail, s.LoggedByName, s.CreatedAt);
+        s.Status, s.Notes, s.LoggedByEmail, s.LoggedByName, s.CreatedAt,
+        s.LastEditedByName, s.LastEditedAt);
 
     // ── GET /api/v1/dstv ─────────────────────────────────────────────────────
     [HttpGet]
@@ -160,9 +166,46 @@ public class DstvController(
     }
 
     // ── DELETE /api/v1/dstv/{id} ─────────────────────────────────────────────
+    // ── PUT /api/v1/dstv/{id} ───────────────────────────────────────────────
+    /// <summary>Manager-only correction of a DStv subscription, with edit audit stamp.</summary>
+    [HttpPut("{id:guid}")]
+    public async Task<ActionResult<DstvSubscriptionDto>> Update(
+        Guid id, [FromBody] CreateDstvSubscriptionRequest req)
+    {
+        if (!CanEditRecords)
+            return StatusCode(403, new { message = "Only a Department Manager or System Admin can edit existing records." });
+
+        var s = await db.DstvSubscriptions.FindAsync(id);
+        if (s is null) return NotFound();
+
+        s.DecoderNumber  = req.DecoderNumber.Trim();
+        s.Location       = req.Location.Trim();
+        s.Package        = req.Package.Trim();
+        s.DurationMonths = req.DurationMonths;
+        s.AmountNaira    = req.AmountNaira;
+        s.PaymentMethod  = req.PaymentMethod?.Trim();
+        s.Vendor         = req.Vendor?.Trim();
+        s.Notes          = req.Notes?.Trim() ?? s.Notes;
+        if (req.StartDate.HasValue) s.StartDate = req.StartDate.Value.Date;
+        // Explicit end date wins; otherwise derive from duration (mirrors Create).
+        if (req.EndDate.HasValue)           s.ExpiryDate = req.EndDate.Value.Date;
+        else if (req.DurationMonths > 0)    s.ExpiryDate = s.StartDate.AddMonths(req.DurationMonths);
+        s.ReceiptAttachment = req.ReceiptAttachment?.Trim() ?? s.ReceiptAttachment;
+        s.Status           = StatusFor(s.ExpiryDate);
+        s.UpdatedAt        = DateTime.UtcNow;
+        s.LastEditedByName = CallerName;
+        s.LastEditedAt     = DateTime.UtcNow;
+
+        await db.SaveChangesAsync();
+        logger.LogInformation("DStv subscription {Id} edited by {User}", id, CallerEmail);
+        return Ok(ToDto(s));
+    }
+
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id)
     {
+        if (!CanEditRecords)
+            return StatusCode(403, new { message = "Only a Department Manager or System Admin can delete records." });
         var s = await db.DstvSubscriptions.FindAsync(id);
         if (s is null) return NotFound();
         db.DstvSubscriptions.Remove(s);
