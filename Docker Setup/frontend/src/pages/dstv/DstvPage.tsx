@@ -31,6 +31,19 @@ export default function DstvPage() {
   const [form] = Form.useForm();
   const [renewForm] = Form.useForm();
 
+  // Live preview of the resulting expiry date in the Renew modal.
+  const wRenewDate   = Form.useWatch('renewalDate',    renewForm) as dayjs.Dayjs | undefined;
+  const wRenewMonths = Form.useWatch('durationMonths', renewForm) as number | undefined;
+  // Mirrors the server rule: start from the chosen date, else continue from the
+  // current expiry when still active, else from today.
+  const renewBaseDate = wRenewDate
+    ?? (renewTarget && dayjs(renewTarget.expiryDate).isAfter(dayjs(), 'day')
+          ? dayjs(renewTarget.expiryDate)
+          : dayjs());
+  const renewExpiryPreview = (renewTarget && wRenewMonths && wRenewMonths > 0)
+    ? renewBaseDate.add(wRenewMonths, 'month').format('D MMM YYYY')
+    : null;
+
   const { data, isFetching } = useQuery({
     queryKey: ['dstv', 'list', statusFilter, page],
     queryFn: () => dstvApi.list({ status: statusFilter, page }),
@@ -86,6 +99,8 @@ export default function DstvPage() {
       await dstvApi.renew(renewTarget.id, {
         durationMonths: v.durationMonths as number,
         amountNaira:    v.amountNaira as number,
+        // Actual date the subscription was paid for — expiry is calculated from this.
+        renewalDate:    v.renewalDate ? (v.renewalDate as dayjs.Dayjs).format('YYYY-MM-DD') : undefined,
         paymentMethod:  v.paymentMethod as string | undefined,
         notes:          v.notes as string | undefined,
       });
@@ -226,9 +241,17 @@ export default function DstvPage() {
       <Modal title={`Renew — ${renewTarget?.decoderNumber ?? ''}`} open={!!renewTarget} onOk={() => renewForm.submit()}
         onCancel={() => { setRenew(null); renewForm.resetFields(); }} confirmLoading={saving} okText="Renew" width={440} destroyOnClose>
         <Form form={renewForm} layout="vertical" onFinish={handleRenew}>
+          <Form.Item name="renewalDate" label="Date of Subscription"
+            tooltip="The actual date this subscription was paid for. The new expiry date is calculated from this date. Leave blank to continue from the current expiry.">
+            <DatePicker style={{ width: '100%' }} format="D MMM YYYY" />
+          </Form.Item>
           <Form.Item name="durationMonths" label="Extend by (months)" rules={[{ required: true }]}>
             <InputNumber style={{ width: '100%' }} min={1} max={24} />
           </Form.Item>
+          {renewExpiryPreview && (
+            <Alert type="info" showIcon style={{ marginBottom: 12 }}
+              message={<span>New expiry date: <strong>{renewExpiryPreview}</strong></span>} />
+          )}
           <Form.Item name="amountNaira" label="Amount Paid (₦)" rules={[{ required: true }]}>
             <InputNumber style={{ width: '100%' }} min={0} />
           </Form.Item>
