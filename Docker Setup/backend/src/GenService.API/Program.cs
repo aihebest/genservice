@@ -1242,6 +1242,46 @@ static async Task ApplySchemaUpdatesAsync(
             AddColIfMissing     ("GeneratorDailyReadings", "CurrentGeneratorKw",  "float"),
             AddColIfMissing     ("GeneratorDailyReadings", "GeneratorKwConsumed", "float"),
 
+            // ── Guest-house feeding log (replaces the JAYVIK spreadsheet) ────
+            """
+            IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = N'FeedingLogEntries')
+            CREATE TABLE FeedingLogEntries (
+                Id               uniqueidentifier NOT NULL PRIMARY KEY DEFAULT NEWID(),
+                EntryDate        date             NOT NULL,
+                StaffName        nvarchar(200)    NOT NULL,
+                ProjectCostCode  nvarchar(50)     NULL,
+                Breakfast        int              NOT NULL DEFAULT 0,
+                SoftDrink        int              NOT NULL DEFAULT 0,
+                Water            int              NOT NULL DEFAULT 0,
+                Juice            int              NOT NULL DEFAULT 0,
+                Lunch            int              NOT NULL DEFAULT 0,
+                Dinner           int              NOT NULL DEFAULT 0,
+                Tea              int              NOT NULL DEFAULT 0,
+                Snacks           int              NOT NULL DEFAULT 0,
+                TotalCostNaira   decimal(18,2)    NOT NULL DEFAULT 0,
+                Notes            nvarchar(2000)   NULL,
+                LoggedByEmail    nvarchar(150)    NOT NULL,
+                LoggedByName     nvarchar(100)    NOT NULL,
+                CreatedAt        datetime2        NOT NULL DEFAULT GETUTCDATE(),
+                UpdatedAt        datetime2        NOT NULL DEFAULT GETUTCDATE(),
+                LastEditedByName nvarchar(100)    NULL,
+                LastEditedAt     datetime2        NULL
+            );
+            """,
+            """
+            IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = N'MealRates')
+            CREATE TABLE MealRates (
+                Id               uniqueidentifier NOT NULL PRIMARY KEY DEFAULT NEWID(),
+                ItemKey          nvarchar(50)     NOT NULL,
+                Label            nvarchar(100)    NOT NULL,
+                UnitPriceNaira   decimal(18,2)    NOT NULL DEFAULT 0,
+                SortOrder        int              NOT NULL DEFAULT 0,
+                UpdatedAt        datetime2        NOT NULL DEFAULT GETUTCDATE(),
+                LastEditedByName nvarchar(100)    NULL,
+                LastEditedAt     datetime2        NULL
+            );
+            """,
+
             // ── Edit audit stamps (manager-only corrections, Aug 2026) ───────
             AddColIfMissing ("GeneratorDailyReadings", "LastEditedByName", "nvarchar(100)"),
             AddColIfMissing ("GeneratorDailyReadings", "LastEditedAt",     "datetime2"),

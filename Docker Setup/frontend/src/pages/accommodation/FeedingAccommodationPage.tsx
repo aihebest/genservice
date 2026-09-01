@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   Card, Table, Button, Form, Input, InputNumber, Select, DatePicker, Drawer,
-  Descriptions, Tag, Space, Row, Col, Statistic, message, Tooltip, Popconfirm, Typography,
+  Descriptions, Tag, Space, Row, Col, Statistic, message, Tooltip, Popconfirm, Tabs, Typography,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
@@ -12,6 +12,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import accommodationApi from '../../api/accommodation.api';
 import { useAuthStore } from '../../store/authStore';
+import FeedingLogTab from './FeedingLogTab';
 import {
   OFFICE_LOCATIONS, MEAL_PLAN_OPTIONS, ACCOMMODATION_STATUSES, ACCOMMODATION_STATUS_META,
 } from '../../types';
@@ -237,11 +238,20 @@ export default function FeedingAccommodationPage() {
 
   return (
     <div style={{ padding: 24 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <div>
-          <Title level={3} style={{ margin: 0 }}>Feeding / Accommodation</Title>
-          <Text type="secondary">Guest house log for staff on transit — feeding, stays and costs</Text>
-        </div>
+      <div style={{ marginBottom: 16 }}>
+        <Title level={3} style={{ margin: 0 }}>Feeding / Accommodation</Title>
+        <Text type="secondary">Guest house log for staff on transit — stays, feeding and costs</Text>
+      </div>
+
+      <Tabs
+        defaultActiveKey="stays"
+        items={[
+          {
+            key: 'stays',
+            label: <span><HomeOutlined /> Guest Stays</span>,
+            children: (
+              <div style={{ paddingTop: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
         <Button type="primary" icon={<PlusOutlined />}
           onClick={() => { createForm.resetFields(); createForm.setFieldsValue({ checkInDate: dayjs(), status: 'CheckedIn' }); setCreateOpen(true); }}>
           New Guest Record
@@ -291,6 +301,16 @@ export default function FeedingAccommodationPage() {
         columns={columns} dataSource={listData?.items ?? []} rowKey="id" loading={isLoading}
         scroll={{ x: 1500 }} size="small"
         pagination={{ current: page, pageSize: 20, total: listData?.totalCount ?? 0, onChange: setPage, showTotal: t => `${t} records` }}
+      />
+              </div>
+            ),
+          },
+          {
+            key: 'feeding',
+            label: <span><CoffeeOutlined /> Feeding Log</span>,
+            children: <FeedingLogTab />,
+          },
+        ]}
       />
 
       {/* Create drawer */}
