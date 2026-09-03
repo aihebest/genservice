@@ -209,6 +209,67 @@ public class AccommodationController(
         return Ok(ToDto(r));
     }
 
+    // ── POST /api/v1/accommodation/{id}/checkout ─────────────────────────────
+    /// <summary>
+    /// Closes out a guest stay: records the departure date, derives the nights and
+    /// flips the status to Checked Out.
+    ///
+    /// Deliberately NOT manager-gated — a check-out is the normal completion of the
+    /// workflow, not a correction, and it is nearly always recorded after the guest
+    /// has already left. Restricting it would stall day-to-day record keeping.
+    /// Amending a stay's details, or re-opening a closed one, remains manager-only.
+    /// </summary>
+    [HttpPost("{id:guid}/checkout")]
+    public async Task<ActionResult<AccommodationDto>> CheckOut(
+        Guid id, [FromBody] CheckOutAccommodationRequest req)
+    {
+        var r = await db.AccommodationLogs.FindAsync(id);
+        if (r is null) return NotFound();
+
+        // Re-opening / re-dating a closed stay is a correction — manager territory.
+        if (r.Status == AccommodationStatus.CheckedOut && !CanEditRecords)
+            return StatusCode(403, new
+            {
+                message = "This guest is already checked out. Only a Department Manager or System Admin can change a completed stay."
+            });
+
+        var checkOut = DateOnly.FromDateTime(DateTime.UtcNow);
+        if (!string.IsNullOrWhiteSpace(req.CheckOutDate))
+        {
+            if (!DateOnly.TryParse(req.CheckOutDate, out checkOut))
+                return BadRequest(new { message = "Invalid check-out date. Use YYYY-MM-DD." });
+        }
+
+        if (checkOut < r.CheckInDate)
+            return BadRequest(new { message = "Check-out date cannot be earlier than the check-in date." });
+
+        r.CheckOutDate = checkOut;
+        r.Nights       = Math.Max(0, checkOut.DayNumber - r.CheckInDate.DayNumber);
+        r.Status       = AccommodationStatus.CheckedOut;
+
+        // Costs are often only known at departure. Allow them to be filled in here
+        // when nothing was captured at check-in; changing an existing figure stays
+        // a manager-only action via the edit endpoint.
+        if (req.FeedingCostNaira.HasValue && (r.FeedingCostNaira is null || CanEditRecords))
+            r.FeedingCostNaira = req.FeedingCostNaira;
+        if (req.AccommodationCostNaira.HasValue && (r.AccommodationCostNaira is null || CanEditRecords))
+            r.AccommodationCostNaira = req.AccommodationCostNaira;
+        r.TotalCostNaira = SumCosts(r.FeedingCostNaira, r.AccommodationCostNaira);
+
+        if (!string.IsNullOrWhiteSpace(req.Notes))
+            r.Notes = string.IsNullOrWhiteSpace(r.Notes) ? req.Notes.Trim() : $"{r.Notes}\n{req.Notes.Trim()}";
+
+        // Stamped so it is always clear who closed the stay and when.
+        r.UpdatedAt        = DateTime.UtcNow;
+        r.LastEditedByName = CallerName;
+        r.LastEditedAt     = DateTime.UtcNow;
+
+        await db.SaveChangesAsync();
+        logger.LogInformation("Guest checked out: {Ref} {Guest} on {Date} ({Nights} nights) by {User}",
+            r.Reference, r.GuestName, checkOut, r.Nights, CallerEmail);
+        return Ok(ToDto(r));
+    }
+
     // ── DELETE /api/v1/accommodation/{id} ────────────────────────────────────
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id)

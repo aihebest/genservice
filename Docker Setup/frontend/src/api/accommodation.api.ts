@@ -42,6 +42,17 @@ const accommodationApi = {
     return res.data;
   },
 
+  // Closes out a stay. Open to all staff — workflow completion, not a correction.
+  checkOut: async (id: string, payload: {
+    checkOutDate?:           string;
+    feedingCostNaira?:       number;
+    accommodationCostNaira?: number;
+    notes?:                  string;
+  }): Promise<AccommodationLog> => {
+    const res = await apiClient.post<AccommodationLog>(`${BASE}/${id}/checkout`, payload);
+    return res.data;
+  },
+
   update: async (id: string, payload: Partial<CreateAccommodationPayload>): Promise<AccommodationLog> => {
     const res = await apiClient.put<AccommodationLog>(`${BASE}/${id}`, payload);
     return res.data;

@@ -34,6 +34,18 @@ public record UpdateAccommodationRequest(
     string?   Notes                  = null
 );
 
+/// <summary>
+/// Closes out a stay. This is normal workflow completion (not a correction), so it is
+/// open to any staff member who logs guests — unlike the manager-only edit endpoint.
+/// Costs may be supplied only where none were captured at check-in.
+/// </summary>
+public record CheckOutAccommodationRequest(
+    string?   CheckOutDate           = null,  // YYYY-MM-DD; defaults to today
+    decimal?  FeedingCostNaira       = null,
+    decimal?  AccommodationCostNaira = null,
+    string?   Notes                  = null
+);
+
 public record AccommodationQuery(
     string? GuestHouse = null,
     string? Status     = null,

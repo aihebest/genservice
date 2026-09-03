@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  Card, Table, Button, Form, Input, InputNumber, Select, DatePicker, Drawer,
+  Card, Table, Button, Form, Input, InputNumber, Select, DatePicker, Drawer, Modal,
   Descriptions, Tag, Space, Row, Col, Statistic, message, Tooltip, Popconfirm, Tabs, Typography,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
@@ -40,8 +40,16 @@ export default function FeedingAccommodationPage() {
   const [editRecord, setEditRecord] = useState<AccommodationLog | null>(null);
   const [viewRecord, setViewRecord] = useState<AccommodationLog | null>(null);
 
-  const [createForm] = Form.useForm();
-  const [editForm]   = Form.useForm();
+  const [createForm]   = Form.useForm();
+  const [editForm]     = Form.useForm();
+  const [checkOutForm] = Form.useForm();
+  const [checkOutTarget, setCheckOutTarget] = useState<AccommodationLog | null>(null);
+
+  // Live nights preview while closing out a stay.
+  const wCheckOutDate = Form.useWatch('checkOutDate', checkOutForm) as dayjs.Dayjs | undefined;
+  const checkOutNights = (checkOutTarget && wCheckOutDate)
+    ? Math.max(0, wCheckOutDate.startOf('day').diff(dayjs(checkOutTarget.checkInDate).startOf('day'), 'day'))
+    : null;
 
   const { data: stats } = useQuery({
     queryKey: ['accommodation-stats'],
@@ -79,6 +87,43 @@ export default function FeedingAccommodationPage() {
     onSuccess: () => { message.success('Record deleted'); invalidate(); },
     onError: () => message.error('Failed to delete'),
   });
+
+  const checkOutMutation = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: {
+      checkOutDate?: string; feedingCostNaira?: number; accommodationCostNaira?: number; notes?: string;
+    } }) => accommodationApi.checkOut(id, payload),
+    onSuccess: () => {
+      message.success('Guest checked out');
+      invalidate(); setCheckOutTarget(null); checkOutForm.resetFields();
+    },
+    onError: (e: { response?: { data?: { message?: string } } }) =>
+      message.error(e?.response?.data?.message ?? 'Failed to check out'),
+  });
+
+  const openCheckOut = (r: AccommodationLog) => {
+    setCheckOutTarget(r);
+    checkOutForm.setFieldsValue({
+      checkOutDate: dayjs(),
+      feedingCostNaira: r.feedingCostNaira,
+      accommodationCostNaira: r.accommodationCostNaira,
+    });
+  };
+
+  const handleCheckOut = async () => {
+    if (!checkOutTarget) return;
+    try {
+      const v = await checkOutForm.validateFields();
+      checkOutMutation.mutate({
+        id: checkOutTarget.id,
+        payload: {
+          checkOutDate: (v.checkOutDate as dayjs.Dayjs).format('YYYY-MM-DD'),
+          feedingCostNaira:       v.feedingCostNaira as number | undefined,
+          accommodationCostNaira: v.accommodationCostNaira as number | undefined,
+          notes:                  (v.notes as string | undefined)?.trim() || undefined,
+        },
+      });
+    } catch { /* validation */ }
+  };
 
   const buildPayload = (vals: Record<string, unknown>): CreateAccommodationPayload => ({
     guestName:              (vals.guestName as string)?.trim(),
@@ -141,6 +186,11 @@ export default function FeedingAccommodationPage() {
       render: (_: unknown, r: AccommodationLog) => (
         <Space size={4}>
           <Tooltip title="View"><Button size="small" icon={<EyeOutlined />} onClick={() => setViewRecord(r)} /></Tooltip>
+          {r.status !== 'CheckedOut' && (
+            <Tooltip title="Record check-out">
+              <Button size="small" type="primary" ghost onClick={() => openCheckOut(r)}>Check Out</Button>
+            </Tooltip>
+          )}
           {canEdit && (
             <>
               <Tooltip title="Edit record"><Button size="small" icon={<EditOutlined />} onClick={() => handleOpenEdit(r)} /></Tooltip>
@@ -331,6 +381,68 @@ export default function FeedingAccommodationPage() {
         </div>}>
         <Form form={editForm} layout="vertical"><FormFields /></Form>
       </Drawer>
+
+      {/* Check-out modal — open to all staff; this completes the stay, it is not a correction */}
+      <Modal
+        title={checkOutTarget ? `Check Out — ${checkOutTarget.guestName}` : 'Check Out'}
+        open={!!checkOutTarget}
+        onOk={handleCheckOut}
+        onCancel={() => { setCheckOutTarget(null); checkOutForm.resetFields(); }}
+        confirmLoading={checkOutMutation.isPending}
+        okText="Confirm Check-Out" width={520} destroyOnClose>
+        {checkOutTarget && (
+          <>
+            <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 12 }}>
+              {checkOutTarget.reference} · {checkOutTarget.guestHouse} · checked in{' '}
+              <strong>{dayjs(checkOutTarget.checkInDate).format('D MMM YYYY')}</strong>.
+              Back-date the departure if the guest has already left.
+            </Text>
+            <Form form={checkOutForm} layout="vertical">
+              <Form.Item name="checkOutDate" label="Check-Out Date"
+                rules={[{ required: true, message: 'Check-out date is required' }]}>
+                <DatePicker style={{ width: '100%' }} format="D MMM YYYY"
+                  disabledDate={d => d.isBefore(dayjs(checkOutTarget.checkInDate).startOf('day'))} />
+              </Form.Item>
+
+              {checkOutNights != null && (
+                <Card size="small" style={{ background: '#f6ffed', borderColor: '#b7eb8f', marginBottom: 12 }}>
+                  <Text>Nights stayed: </Text>
+                  <Text strong style={{ fontSize: 16, color: '#389e0d' }}>{checkOutNights}</Text>
+                </Card>
+              )}
+
+              <Row gutter={12}>
+                <Col span={12}>
+                  <Form.Item name="feedingCostNaira" label="Feeding Cost (₦)"
+                    tooltip={checkOutTarget.feedingCostNaira != null && !canEdit
+                      ? 'Already recorded — only a manager can change it.'
+                      : 'Enter if known at departure.'}>
+                    <InputNumber style={{ width: '100%' }} min={0}
+                      disabled={checkOutTarget.feedingCostNaira != null && !canEdit}
+                      formatter={v => `₦ ${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                      parser={(v: string | undefined) => parseFloat(v?.replace(/₦\s?|(,*)/g, '') ?? '0') as 0} />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item name="accommodationCostNaira" label="Accommodation Cost (₦)"
+                    tooltip={checkOutTarget.accommodationCostNaira != null && !canEdit
+                      ? 'Already recorded — only a manager can change it.'
+                      : 'Enter if known at departure.'}>
+                    <InputNumber style={{ width: '100%' }} min={0}
+                      disabled={checkOutTarget.accommodationCostNaira != null && !canEdit}
+                      formatter={v => `₦ ${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                      parser={(v: string | undefined) => parseFloat(v?.replace(/₦\s?|(,*)/g, '') ?? '0') as 0} />
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              <Form.Item name="notes" label="Check-out note (optional)">
+                <TextArea rows={2} maxLength={500} placeholder="Anything worth recording about the stay…" />
+              </Form.Item>
+            </Form>
+          </>
+        )}
+      </Modal>
 
       {/* View drawer */}
       <Drawer title={viewRecord ? `${viewRecord.reference} — ${viewRecord.guestName}` : 'Details'} open={!!viewRecord}
