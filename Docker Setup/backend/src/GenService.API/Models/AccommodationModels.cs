@@ -80,7 +80,15 @@ public record AccommodationDto(
     DateTime  CreatedAt,
     DateTime  UpdatedAt,
     string?   LastEditedByName = null,
-    DateTime? LastEditedAt     = null
+    DateTime? LastEditedAt     = null,
+    /// <summary>Feeding cost totalled from the Feeding Log for this guest across their stay dates.</summary>
+    decimal?  DerivedFeedingCostNaira = null,
+    /// <summary>How many Feeding Log entries were matched to this stay.</summary>
+    int       FeedingEntryCount       = 0,
+    /// <summary>Feeding figure actually used: the manual override if set, otherwise the derived total.</summary>
+    decimal?  EffectiveFeedingCostNaira = null,
+    /// <summary>Effective feeding + accommodation.</summary>
+    decimal?  EffectiveTotalCostNaira   = null
 );
 
 public record AccommodationStatsDto(

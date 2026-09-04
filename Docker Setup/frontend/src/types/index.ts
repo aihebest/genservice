@@ -1186,6 +1186,13 @@ export interface AccommodationLog {
   updatedAt:              string;
   lastEditedByName?:      string;
   lastEditedAt?:          string;
+  /** Feeding totalled from the Feeding Log for this guest across their stay dates. */
+  derivedFeedingCostNaira?:   number;
+  /** How many Feeding Log entries matched this stay. */
+  feedingEntryCount?:         number;
+  /** Manual override if set, otherwise the derived figure. */
+  effectiveFeedingCostNaira?: number;
+  effectiveTotalCostNaira?:   number;
 }
 
 export interface AccommodationListResponse {

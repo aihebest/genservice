@@ -29,30 +29,68 @@ public class AccommodationController(
         return (feeding ?? 0) + (accommodation ?? 0);
     }
 
-    private static AccommodationDto ToDto(AccommodationLog r) => new(
-        r.Id,
-        r.Reference,
-        r.GuestName,
-        r.Department,
-        r.GuestHouse,
-        r.Purpose,
-        r.CheckInDate.ToString("yyyy-MM-dd"),
-        r.CheckOutDate?.ToString("yyyy-MM-dd"),
-        r.Nights,
-        r.MealPlan,
-        r.NumberOfMeals,
-        r.FeedingCostNaira,
-        r.AccommodationCostNaira,
-        r.TotalCostNaira,
-        r.Status,
-        r.Notes,
-        r.LoggedByEmail,
-        r.LoggedByName,
-        r.CreatedAt,
-        r.UpdatedAt,
-        r.LastEditedByName,
-        r.LastEditedAt
-    );
+    /// <summary>
+    /// Totals the Feeding Log for a guest across the dates of their stay.
+    /// Matched on name (case/whitespace-insensitive) and an entry date falling between
+    /// check-in and check-out — or today, while the guest is still resident.
+    /// </summary>
+    private static (decimal Cost, int Count) DeriveFeeding(
+        AccommodationLog r, IReadOnlyCollection<FeedingLogEntry> feeding)
+    {
+        var name = r.GuestName.Trim();
+        var upTo = r.CheckOutDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
+        var hits = feeding.Where(f =>
+                        string.Equals(f.StaffName.Trim(), name, StringComparison.OrdinalIgnoreCase)
+                        && f.EntryDate >= r.CheckInDate
+                        && f.EntryDate <= upTo)
+                   .ToList();
+        return (hits.Sum(f => f.TotalCostNaira), hits.Count);
+    }
+
+    private static AccommodationDto ToDto(
+        AccommodationLog r, IReadOnlyCollection<FeedingLogEntry>? feeding = null)
+    {
+        decimal? derived = null; var count = 0;
+        if (feeding is not null)
+        {
+            var (cost, n) = DeriveFeeding(r, feeding);
+            count   = n;
+            derived = n > 0 ? cost : null;
+        }
+
+        // A manually entered figure always wins — it's an explicit override by a manager.
+        var effectiveFeeding = r.FeedingCostNaira ?? derived;
+        var effectiveTotal   = SumCosts(effectiveFeeding, r.AccommodationCostNaira);
+
+        return new(
+            r.Id,
+            r.Reference,
+            r.GuestName,
+            r.Department,
+            r.GuestHouse,
+            r.Purpose,
+            r.CheckInDate.ToString("yyyy-MM-dd"),
+            r.CheckOutDate?.ToString("yyyy-MM-dd"),
+            r.Nights,
+            r.MealPlan,
+            r.NumberOfMeals,
+            r.FeedingCostNaira,
+            r.AccommodationCostNaira,
+            r.TotalCostNaira,
+            r.Status,
+            r.Notes,
+            r.LoggedByEmail,
+            r.LoggedByName,
+            r.CreatedAt,
+            r.UpdatedAt,
+            r.LastEditedByName,
+            r.LastEditedAt,
+            derived,
+            count,
+            effectiveFeeding,
+            effectiveTotal
+        );
+    }
 
     private async Task<string> NextReferenceAsync()
     {
@@ -91,7 +129,12 @@ public class AccommodationController(
             .Take(q.PageSize)
             .ToListAsync();
 
-        return Ok(new AccommodationListResponse(items.Select(ToDto), total, q.Page, q.PageSize));
+        // Pull the feeding log once and match in memory — volumes here are small and it
+        // avoids a query per stay.
+        var feeding = await db.FeedingLogEntries.AsNoTracking().ToListAsync();
+
+        return Ok(new AccommodationListResponse(
+            items.Select(r => ToDto(r, feeding)), total, q.Page, q.PageSize));
     }
 
     // ── GET /api/v1/accommodation/stats ──────────────────────────────────────
@@ -102,13 +145,24 @@ public class AccommodationController(
         var monthStart = new DateOnly(now.Year, now.Month, 1);
         var all        = await db.AccommodationLogs.AsNoTracking().ToListAsync();
         var thisMonth  = all.Where(r => r.CheckInDate >= monthStart).ToList();
+        var feeding    = await db.FeedingLogEntries.AsNoTracking().ToListAsync();
+
+        // Feeding for the month is taken from the Feeding Log entries dated this month —
+        // that is the authoritative record — plus any manual per-stay figure entered for a
+        // guest who has no feeding-log entries, so nothing is double-counted or lost.
+        var feedingThisMonth = feeding.Where(f => f.EntryDate >= monthStart).Sum(f => f.TotalCostNaira);
+        var manualOnly       = thisMonth
+            .Where(r => r.FeedingCostNaira.HasValue && DeriveFeeding(r, feeding).Count == 0)
+            .Sum(r => r.FeedingCostNaira!.Value);
+        var feedingTotal     = feedingThisMonth + manualOnly;
+        var accommodation    = thisMonth.Sum(r => r.AccommodationCostNaira ?? 0);
 
         return Ok(new AccommodationStatsDto(
             GuestsThisMonth:            thisMonth.Count,
             CurrentlyCheckedIn:         all.Count(r => r.Status == AccommodationStatus.CheckedIn),
-            FeedingCostThisMonth:       thisMonth.Sum(r => r.FeedingCostNaira ?? 0),
-            AccommodationCostThisMonth: thisMonth.Sum(r => r.AccommodationCostNaira ?? 0),
-            TotalCostThisMonth:         thisMonth.Sum(r => r.TotalCostNaira ?? 0)
+            FeedingCostThisMonth:       feedingTotal,
+            AccommodationCostThisMonth: accommodation,
+            TotalCostThisMonth:         feedingTotal + accommodation
         ));
     }
 
@@ -118,7 +172,8 @@ public class AccommodationController(
     {
         var r = await db.AccommodationLogs.FindAsync(id);
         if (r is null) return NotFound();
-        return Ok(ToDto(r));
+        var feeding = await db.FeedingLogEntries.AsNoTracking().ToListAsync();
+        return Ok(ToDto(r, feeding));
     }
 
     // ── POST /api/v1/accommodation ───────────────────────────────────────────

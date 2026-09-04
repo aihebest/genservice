@@ -175,10 +175,34 @@ export default function FeedingAccommodationPage() {
     { title: 'Check-Out', dataIndex: 'checkOutDate', width: 110, render: (v?: string) => v ? dayjs(v).format('D MMM YY') : '—' },
     { title: 'Nights', dataIndex: 'nights', width: 75, render: (v?: number) => v ?? '—' },
     { title: 'Meal Plan', dataIndex: 'mealPlan', width: 110, render: (v?: string) => v ?? '—' },
-    { title: 'Feeding (₦)', dataIndex: 'feedingCostNaira', width: 115, render: (v?: number) => naira(v) },
+    { title: 'Feeding (₦)', key: 'feeding', width: 140,
+      render: (_: unknown, r: AccommodationLog) => {
+        // Prefer the manual override; otherwise show the total drawn from the Feeding Log.
+        if (r.feedingCostNaira != null) {
+          return (
+            <Tooltip title="Entered manually on this stay — overrides the Feeding Log total.">
+              <span>{naira(r.feedingCostNaira)}</span>
+            </Tooltip>
+          );
+        }
+        if ((r.feedingEntryCount ?? 0) > 0) {
+          return (
+            <Tooltip title={`From ${r.feedingEntryCount} Feeding Log entr${r.feedingEntryCount === 1 ? 'y' : 'ies'} between ${dayjs(r.checkInDate).format('D MMM')} and ${r.checkOutDate ? dayjs(r.checkOutDate).format('D MMM') : 'today'}`}>
+              <span>
+                {naira(r.derivedFeedingCostNaira)}
+                <Tag color="blue" style={{ marginLeft: 4, fontSize: 10 }}>log</Tag>
+              </span>
+            </Tooltip>
+          );
+        }
+        return <Text type="secondary">—</Text>;
+      } },
     { title: 'Accommodation (₦)', dataIndex: 'accommodationCostNaira', width: 140, render: (v?: number) => naira(v) },
-    { title: 'Total (₦)', dataIndex: 'totalCostNaira', width: 120,
-      render: (v?: number) => v != null ? <Text strong style={{ color: '#389e0d' }}>{naira(v)}</Text> : <Text type="secondary">—</Text> },
+    { title: 'Total (₦)', key: 'total', width: 120,
+      render: (_: unknown, r: AccommodationLog) => {
+        const v = r.effectiveTotalCostNaira ?? r.totalCostNaira;
+        return v != null ? <Text strong style={{ color: '#389e0d' }}>{naira(v)}</Text> : <Text type="secondary">—</Text>;
+      } },
     { title: 'Status', dataIndex: 'status', width: 115,
       render: (v: string) => { const m = ACCOMMODATION_STATUS_META[v]; return <Tag color={m?.color}>{m?.label ?? v}</Tag>; } },
     { title: 'Logged By', dataIndex: 'loggedByName', width: 130, ellipsis: true, render: (v: string) => <Text type="secondary">{v}</Text> },
@@ -461,9 +485,27 @@ export default function FeedingAccommodationPage() {
             <Descriptions.Item label="Nights">{viewRecord.nights ?? '—'}</Descriptions.Item>
             <Descriptions.Item label="Meal Plan">{viewRecord.mealPlan ?? '—'}</Descriptions.Item>
             <Descriptions.Item label="Number of Meals">{viewRecord.numberOfMeals ?? '—'}</Descriptions.Item>
-            <Descriptions.Item label="Feeding Cost">{naira(viewRecord.feedingCostNaira)}</Descriptions.Item>
+            <Descriptions.Item label="Feeding Cost">
+              {viewRecord.feedingCostNaira != null ? (
+                <>
+                  {naira(viewRecord.feedingCostNaira)}
+                  <Text type="secondary" style={{ fontSize: 11, marginLeft: 6 }}>(entered manually)</Text>
+                </>
+              ) : (viewRecord.feedingEntryCount ?? 0) > 0 ? (
+                <>
+                  {naira(viewRecord.derivedFeedingCostNaira)}
+                  <Text type="secondary" style={{ fontSize: 11, marginLeft: 6 }}>
+                    (from {viewRecord.feedingEntryCount} Feeding Log entr{viewRecord.feedingEntryCount === 1 ? 'y' : 'ies'})
+                  </Text>
+                </>
+              ) : '—'}
+            </Descriptions.Item>
             <Descriptions.Item label="Accommodation Cost">{naira(viewRecord.accommodationCostNaira)}</Descriptions.Item>
-            <Descriptions.Item label="Total Cost"><Text strong style={{ color: '#389e0d' }}>{naira(viewRecord.totalCostNaira)}</Text></Descriptions.Item>
+            <Descriptions.Item label="Total Cost">
+              <Text strong style={{ color: '#389e0d' }}>
+                {naira(viewRecord.effectiveTotalCostNaira ?? viewRecord.totalCostNaira)}
+              </Text>
+            </Descriptions.Item>
             <Descriptions.Item label="Notes" span={2}>{viewRecord.notes ?? '—'}</Descriptions.Item>
             <Descriptions.Item label="Logged By" span={2}>{viewRecord.loggedByName} · {dayjs(viewRecord.createdAt).format('D MMM YYYY HH:mm')}</Descriptions.Item>
           </Descriptions>
