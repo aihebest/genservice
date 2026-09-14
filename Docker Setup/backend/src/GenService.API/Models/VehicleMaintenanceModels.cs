@@ -15,7 +15,9 @@ public record CreateVehicleMaintenanceRequest(
     double?  RunningHours       = null,
     double?  NextServiceHour    = null,
     string?  NotificationStatus = null,
-    DateTime? DateOfRequest     = null
+    DateTime? DateOfRequest     = null,
+    /// <summary>Set when the user picked a vehicle from the Logistics fleet rather than typing a plate.</summary>
+    Guid?    LogisticsVehicleId = null
 );
 
 public record ApproveVehicleMaintenanceRequest(string? Notes);
@@ -113,7 +115,16 @@ public record VehicleMaintenanceDto(
     double?   NextServiceHour,
     string?   NotificationStatus,
     decimal?  FinalAmountNaira,
-    DateTime? DateOfRequest
+    DateTime? DateOfRequest,
+    // ── Logistics Platform link ──────────────────────────────────────────────
+    /// <summary>"GenService" if raised here, "Logistics" if the Logistics team sent the vehicle in.</summary>
+    string?   SourceSystem        = null,
+    Guid?     LogisticsVehicleId  = null,
+    Guid?     LogisticsRecordId   = null,
+    /// <summary>NotLinked | Pending | Synced | Failed — state of the last push to Logistics.</summary>
+    string?   LogisticsSyncStatus = null,
+    DateTime? LogisticsSyncedAt   = null,
+    string?   LogisticsSyncError  = null
 );
 
 public record VehicleMaintenanceStatsDto(

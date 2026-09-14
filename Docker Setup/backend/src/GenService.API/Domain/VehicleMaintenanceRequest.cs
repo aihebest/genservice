@@ -70,9 +70,48 @@ public class VehicleMaintenanceRequest
     public DateTime? CompletedAt { get; set; }
     public string?   Notes       { get; set; }
 
+    // ── Logistics Platform link ───────────────────────────────────────────────
+    // The Logistics team owns the fleet; when they report a fault it is raised
+    // here automatically and every status change is pushed back to them. These
+    // columns are the cross-reference that keeps the two records tied together.
+
+    /// <summary>Id of the matching MaintenanceRecord in the Logistics platform, when linked.</summary>
+    public Guid? LogisticsRecordId { get; set; }
+
+    /// <summary>Id of the vehicle in the Logistics fleet registry, when matched.</summary>
+    public Guid? LogisticsVehicleId { get; set; }
+
+    /// <summary>Where the request originated: GenService (raised here) or Logistics (pushed in).</summary>
+    public string SourceSystem { get; set; } = RequestSourceSystem.GenService;
+
+    /// <summary>Outcome of the last outbound push to Logistics: Pending | Synced | Failed | NotLinked.</summary>
+    public string? LogisticsSyncStatus { get; set; }
+
+    /// <summary>When this request was last successfully pushed to Logistics.</summary>
+    public DateTime? LogisticsSyncedAt { get; set; }
+
+    /// <summary>Last sync error, kept so the reconciliation screen can explain a failure.</summary>
+    public string? LogisticsSyncError { get; set; }
+
     // ── Timestamps ────────────────────────────────────────────────────────────
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+}
+
+// ── Source-system constants ───────────────────────────────────────────────────
+public static class RequestSourceSystem
+{
+    public const string GenService = "GenService";   // raised on this platform
+    public const string Logistics  = "Logistics";    // pushed in from the Logistics platform
+}
+
+// ── Logistics sync-state constants ────────────────────────────────────────────
+public static class LogisticsSyncState
+{
+    public const string NotLinked = "NotLinked";  // no matching Logistics vehicle/record yet
+    public const string Pending   = "Pending";    // queued, not yet delivered
+    public const string Synced    = "Synced";     // last push succeeded
+    public const string Failed    = "Failed";     // last push failed — see LogisticsSyncError
 }
 
 // ── Status constants ──────────────────────────────────────────────────────────

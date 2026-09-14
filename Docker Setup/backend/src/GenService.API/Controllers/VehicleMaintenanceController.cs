@@ -15,6 +15,7 @@ namespace GenService.API.Controllers;
 public class VehicleMaintenanceController(
     GenServiceDbContext db,
     NotificationService notify,
+    LogisticsSyncService logistics,
     ILogger<VehicleMaintenanceController> logger) : ControllerBase
 {
     private string CallerEmail => User.FindFirstValue(ClaimTypes.Email) ?? "";
@@ -49,9 +50,32 @@ public class VehicleMaintenanceController(
             daysOpen, daysInShop,
             r.AssetNo, r.AmountNaira,
             r.RunningHours, r.NextServiceHour, r.NotificationStatus,
-            r.FinalAmountNaira, r.DateOfRequest
+            r.FinalAmountNaira, r.DateOfRequest,
+            r.SourceSystem, r.LogisticsVehicleId, r.LogisticsRecordId,
+            r.LogisticsSyncStatus, r.LogisticsSyncedAt, r.LogisticsSyncError
         );
     }
+
+    /// <summary>
+    /// Push the request's new state to the Logistics Platform so the team that
+    /// owns the vehicle sees the change immediately.
+    ///
+    /// Never throws: a Logistics outage must not fail a General Service action.
+    /// The outcome is recorded on the request, and a failed push can be retried
+    /// from the integration screen.
+    /// </summary>
+    private async Task SyncToLogisticsAsync(VehicleMaintenanceRequest r)
+    {
+        try { await logistics.PushStatusAsync(r, HttpContext.RequestAborted); }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Logistics sync threw for {Num} — continuing.", r.RequestNumber);
+        }
+    }
+
+    /// <summary>Trim a value to a column width, so an over-long field never fails the insert.</summary>
+    private static string Truncate(string s, int max) =>
+        s.Length <= max ? s : s[..max];
 
     private async Task<string> NextRequestNumberAsync()
     {
@@ -154,9 +178,34 @@ public class VehicleMaintenanceController(
             DateOfRequest      = req.DateOfRequest?.Date ?? DateTime.UtcNow.Date,
             RequestedByEmail = CallerEmail,
             RequestedByName  = CallerName,
+            SourceSystem     = RequestSourceSystem.GenService,
+            LogisticsVehicleId = req.LogisticsVehicleId,
             CreatedAt        = DateTime.UtcNow,
             UpdatedAt        = DateTime.UtcNow,
         };
+
+        // If the user typed a plate instead of picking from the fleet list, try to
+        // match it to a real Logistics vehicle so the feedback loop still works.
+        // Unmatched requests are not blocked — they surface on the reconciliation
+        // screen for someone to bind later.
+        if (r.LogisticsVehicleId is null)
+        {
+            try
+            {
+                var match = await logistics.MatchVehicleAsync(
+                    r.VehicleRegNo, r.AssetNo, HttpContext.RequestAborted);
+                if (match is not null)
+                {
+                    r.LogisticsVehicleId = match.Id;
+                    if (string.IsNullOrWhiteSpace(r.VehicleType))
+                        r.VehicleType = $"{match.Make} {match.Model}".Trim();
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Fleet match failed for {Reg} — continuing unmatched.", r.VehicleRegNo);
+            }
+        }
 
         db.VehicleMaintenanceRequests.Add(r);
         await db.SaveChangesAsync();
@@ -164,10 +213,16 @@ public class VehicleMaintenanceController(
         logger.LogInformation("Vehicle maintenance {Num} created by {User} for {Reg}",
             r.RequestNumber, CallerEmail, r.VehicleRegNo);
 
+        // Let Logistics know one of their vehicles has been booked in.
+        await SyncToLogisticsAsync(r);
+
         // Alert management that a new request is awaiting approval.
         await notify.CreateAsync(
             title:      "🚗 Vehicle maintenance awaiting approval",
-            message:    $"{r.RequestNumber} — {r.VehicleRegNo} ({r.VehicleType}) raised by {r.RequestedByName}. {r.Description}",
+            // Notification.Message is nvarchar(500) but Description allows 2000.
+            // Without this cap a wordy fault report fails the notification insert
+            // and takes the whole request submission down with it.
+            message:    Truncate($"{r.RequestNumber} — {r.VehicleRegNo} ({r.VehicleType}) raised by {r.RequestedByName}. {r.Description}", 500),
             type:       NotificationType.MaintenancePending,
             module:     "VehicleMaintenance",
             entityId:   r.Id.ToString(),
@@ -210,6 +265,7 @@ public class VehicleMaintenanceController(
             targetRole:  NotificationTarget.Requester,
             targetEmail: r.RequestedByEmail);
 
+        await SyncToLogisticsAsync(r);
         return Ok(ToDto(r));
     }
 
@@ -246,6 +302,7 @@ public class VehicleMaintenanceController(
             targetRole:  NotificationTarget.Requester,
             targetEmail: r.RequestedByEmail);
 
+        await SyncToLogisticsAsync(r);
         return Ok(ToDto(r));
     }
 
@@ -272,6 +329,10 @@ public class VehicleMaintenanceController(
         await db.SaveChangesAsync();
         logger.LogInformation("{Num} dispatched to {Workshop} by {User}",
             r.RequestNumber, req.WorkshopName, CallerEmail);
+
+        // Vehicle is now off the road — this push flips it to InMaintenance in
+        // the Logistics fleet register and alerts their manager.
+        await SyncToLogisticsAsync(r);
         return Ok(ToDto(r));
     }
 
@@ -309,6 +370,9 @@ public class VehicleMaintenanceController(
 
         logger.LogInformation("{Num} assessed by {User}: {Fault}",
             r.RequestNumber, CallerEmail, req.FaultIdentified);
+
+        // The fault findings are exactly what Logistics wants to see.
+        await SyncToLogisticsAsync(r);
         return Ok(ToDto(r));
     }
 
@@ -343,6 +407,10 @@ public class VehicleMaintenanceController(
 
         await db.SaveChangesAsync();
         logger.LogInformation("{Num} completed by {User}", r.RequestNumber, CallerEmail);
+
+        // Completion is the feedback Logistics cares about most: work done, final
+        // cost, and the vehicle coming back into service.
+        await SyncToLogisticsAsync(r);
         return Ok(ToDto(r));
     }
 
@@ -365,6 +433,9 @@ public class VehicleMaintenanceController(
         await db.SaveChangesAsync();
         logger.LogInformation("{Num} handed over by {Staff} on {Date}",
             r.RequestNumber, req.HandedOverBy, r.DateHandedOver);
+
+        // Handover date becomes "Date Returned" on the Logistics record.
+        await SyncToLogisticsAsync(r);
         return Ok(ToDto(r));
     }
 }

@@ -840,6 +840,15 @@ export interface VehicleMaintenance {
   notificationStatus?: string;
   finalAmountNaira?:   number;
   dateOfRequest?:      string;
+  // ── Logistics platform link ────────────────────────────────────────────────
+  /** 'GenService' if raised here, 'Logistics' if their team sent the vehicle in. */
+  sourceSystem?:        string;
+  logisticsVehicleId?:  string;
+  logisticsRecordId?:   string;
+  /** NotLinked | Pending | Synced | Failed */
+  logisticsSyncStatus?: string;
+  logisticsSyncedAt?:   string;
+  logisticsSyncError?:  string;
 }
 
 export interface VehicleMaintenanceStats {

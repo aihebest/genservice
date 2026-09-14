@@ -12,6 +12,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { vehicleMaintenanceApi } from '../../api/vehicleMaintenance.api';
+import { integrationApi } from '../../api/integration.api';
 import ProgressLogSection from '../../components/shared/ProgressLogSection';
 import { VM_STATUS_META, VM_TYPE_META, PRIORITY_META, OFFICE_LOCATIONS, VEHICLE_LIST, VEHICLE_ASSET_NO } from '../../types';
 import type { VehicleMaintenance, VehicleMaintenanceStatus } from '../../types';
@@ -33,6 +34,47 @@ const STATUS_TABS = [
 ];
 
 const VM_TYPES = ['Servicing','Repair','Inspection','Bodywork','TyreChange','Battery','Other'];
+
+/**
+ * Shows whether this request is feeding back to the Logistics platform.
+ *
+ * Logistics own the vehicles, so an unlinked request means their team is blind
+ * to a vehicle that is sitting with us — worth surfacing on the list, not just
+ * buried in a detail pane.
+ */
+function LogisticsSyncTag({ record }: { record: VehicleMaintenance }) {
+  const fromLogistics = record.sourceSystem === 'Logistics';
+
+  if (!record.logisticsVehicleId && !record.logisticsRecordId) {
+    return (
+      <Tooltip title={record.logisticsSyncError
+        ?? 'This registration does not match a vehicle in the Logistics fleet register, so their team is not being updated. A manager can link it from the request.'}>
+        <Tag color="warning" style={{ fontSize: 11 }}>Not linked</Tag>
+      </Tooltip>
+    );
+  }
+
+  if (record.logisticsSyncStatus === 'Failed') {
+    return (
+      <Tooltip title={record.logisticsSyncError ?? 'The last update did not reach Logistics.'}>
+        <Tag color="error" style={{ fontSize: 11 }}>Sync failed</Tag>
+      </Tooltip>
+    );
+  }
+
+  return (
+    <Tooltip title={
+      (fromLogistics ? 'Sent in by the Logistics team. ' : '') +
+      (record.logisticsSyncedAt
+        ? `Logistics last updated ${dayjs(record.logisticsSyncedAt).fromNow()}.`
+        : 'Linked to the Logistics fleet register.')
+    }>
+      <Tag color={fromLogistics ? 'purple' : 'green'} style={{ fontSize: 11 }}>
+        {fromLogistics ? 'From Logistics' : 'Synced'}
+      </Tag>
+    </Tooltip>
+  );
+}
 
 // ── Table columns ─────────────────────────────────────────────────────────────
 function buildColumns(onView: (r: VehicleMaintenance) => void): ColumnsType<VehicleMaintenance> {
@@ -114,6 +156,10 @@ function buildColumns(onView: (r: VehicleMaintenance) => void): ColumnsType<Vehi
         : <Text type="secondary" style={{ fontSize: 12 }}>Not dispatched</Text>,
     },
     {
+      title: 'Logistics', key: 'logistics', width: 130,
+      render: (_: unknown, r: VehicleMaintenance) => <LogisticsSyncTag record={r} />,
+    },
+    {
       title: '', key: 'action', width: 65,
       render: (_: unknown, r: VehicleMaintenance) => (
         <Button size="small" onClick={() => onView(r)}>View</Button>
@@ -149,6 +195,9 @@ export default function FleetPage() {
   const [createLoading, setCreateLoading] = useState(false);
   const [createError,   setCreateError]   = useState<string | null>(null);
   const [locationSel,   setLocationSel]   = useState<string | null>(null);
+  // Set when the user picks a vehicle out of the live Logistics fleet, so the
+  // request links to their record without depending on the plate matching.
+  const [logisticsVehicleId, setLogisticsVehicleId] = useState<string | null>(null);
 
   const isApprover = role === 'DepartmentManager' || role === 'Supervisor' || role === 'SystemAdmin';
 
@@ -164,6 +213,31 @@ export default function FleetPage() {
     queryFn:  vehicleMaintenanceApi.stats,
     refetchInterval: 30_000,
   });
+
+  // Live fleet from the Logistics platform. The API returns [] rather than an
+  // error when Logistics is unreachable, so the form degrades to the built-in
+  // list and free text instead of blocking the user.
+  const { data: logisticsFleet } = useQuery({
+    queryKey: ['vm', 'logistics-fleet'],
+    queryFn:  integrationApi.fleet,
+    staleTime: 10 * 60_000,
+    retry: false,
+  });
+
+  // Live Logistics vehicles first, then any from the built-in list they don't
+  // already cover — matching on the plate with spacing and case ignored.
+  const vehicleOptions = (() => {
+    const norm = (s: string) => s.replace(/[^a-z0-9]/gi, '').toUpperCase();
+    const live = (logisticsFleet ?? []).map(v => ({
+      value: v.registrationNo,
+      label: `${v.registrationNo} — ${[v.make, v.model].filter(Boolean).join(' ') || 'Vehicle'}`,
+    }));
+    const seen = new Set(live.map(o => norm(o.value)));
+    const fallback = VEHICLE_LIST
+      .filter(v => !seen.has(norm(v.regNo)))
+      .map(v => ({ value: v.regNo, label: `${v.regNo} - ${v.description}` }));
+    return [...live, ...fallback];
+  })();
 
   const openDetail = (r: VehicleMaintenance) => { setSelected(r); setDrawerOpen(true); setActionError(null); };
 
@@ -181,7 +255,17 @@ export default function FleetPage() {
     setCreateLoading(true); setCreateError(null);
     try {
       const location = values.locationSelect === 'Other' ? (values.locationOther?.trim() ?? 'Other') : values.locationSelect;
+
+      // Only send the Logistics id if the registration still matches what was
+      // picked. If the user typed over it afterwards, let the server re-match by
+      // plate rather than linking to the wrong vehicle.
+      const [pickedId, pickedReg] = (logisticsVehicleId ?? '').split('|');
+      const stillMatches = pickedReg &&
+        pickedReg.replace(/[^a-z0-9]/gi, '').toUpperCase() ===
+        values.vehicleRegNo.replace(/[^a-z0-9]/gi, '').toUpperCase();
+
       await vehicleMaintenanceApi.create({
+        logisticsVehicleId: stillMatches ? pickedId : undefined,
         vehicleRegNo: values.vehicleRegNo.toUpperCase(), vehicleType: values.vehicleType,
         maintenanceType: values.maintenanceType, description: values.description,
         priority: values.priority, currentLocation: location,
@@ -193,7 +277,8 @@ export default function FleetPage() {
         notificationStatus: values.notificationStatus || undefined,
         dateOfRequest: values.dateOfRequest ? (values.dateOfRequest as unknown as dayjs.Dayjs).format('YYYY-MM-DD') : undefined,
       });
-      createForm.resetFields(); setLocationSel(null); setCreateOpen(false); refresh();
+      createForm.resetFields(); setLocationSel(null); setLogisticsVehicleId(null);
+      setCreateOpen(false); refresh();
     } catch (e: unknown) {
       setCreateError((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Failed to submit.');
     } finally { setCreateLoading(false); }
@@ -282,15 +367,23 @@ export default function FleetPage() {
                 <AutoComplete
                   placeholder="Select or type e.g. PHC 185 AM"
                   onSelect={(val: string) => {
+                    const fleetHit = (logisticsFleet ?? []).find(x => x.registrationNo === val);
                     const v = VEHICLE_LIST.find(x => x.regNo === val);
+                    // Remember the Logistics id so the request links to their
+                    // record even if the plate is typed differently later.
+                    setLogisticsVehicleId(fleetHit ? `${fleetHit.id}|${fleetHit.registrationNo}` : null);
+                    const typeFromFleet = [fleetHit?.make, fleetHit?.model].filter(Boolean).join(' ');
                     createForm.setFieldsValue({
-                      ...(v ? { vehicleType: v.description } : {}),
-                      ...(VEHICLE_ASSET_NO[val] ? { assetNo: VEHICLE_ASSET_NO[val] } : {}),
+                      ...(typeFromFleet ? { vehicleType: typeFromFleet }
+                                        : v ? { vehicleType: v.description } : {}),
+                      ...(fleetHit?.assetTagNo ? { assetNo: fleetHit.assetTagNo }
+                          : VEHICLE_ASSET_NO[val] ? { assetNo: VEHICLE_ASSET_NO[val] } : {}),
+                      ...(fleetHit?.odometerKm ? { odometerReading: String(fleetHit.odometerKm) } : {}),
                     });
                   }}
                   filterOption={(input, option) =>
                     String(option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
-                  options={VEHICLE_LIST.map(v => ({ value: v.regNo, label: `${v.regNo} - ${v.description}` }))} />
+                  options={vehicleOptions} />
               </Form.Item>
             </Col>
             <Col span={12}>
@@ -423,6 +516,17 @@ export default function FleetPage() {
             <Descriptions.Item label="Request #">{selected.requestNumber}</Descriptions.Item>
             <Descriptions.Item label="Vehicle Reg">{selected.vehicleRegNo}</Descriptions.Item>
             <Descriptions.Item label="Vehicle Type">{selected.vehicleType}</Descriptions.Item>
+            <Descriptions.Item label="Logistics">
+              <Space size={6}>
+                <LogisticsSyncTag record={selected} />
+                {isApprover && (selected.logisticsSyncStatus === 'Failed' || !selected.logisticsVehicleId) && (
+                  <Button size="small" loading={actionLoading}
+                    onClick={() => act(() => integrationApi.resync(selected.id))}>
+                    Retry sync
+                  </Button>
+                )}
+              </Space>
+            </Descriptions.Item>
             {selected.assetNo && <Descriptions.Item label="Asset No.">{selected.assetNo}</Descriptions.Item>}
             {selected.amountNaira != null && (
               <Descriptions.Item label="Amount (estimated)">₦{Number(selected.amountNaira).toLocaleString()}</Descriptions.Item>

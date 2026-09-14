@@ -84,6 +84,13 @@ builder.Services.AddScoped<IEmailService, SmtpEmailService>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<AuditService>();
 
+// ── Logistics Platform integration ────────────────────────────────────────────
+// Outbound pushes to logistics.desiconapp.com. Base URL and API key come from
+// configuration (Azure App Service settings) — never committed to the repo.
+// With nothing configured the service no-ops, so local and Docker runs are fine.
+builder.Services.AddHttpClient(LogisticsSyncService.HttpClientName);
+builder.Services.AddScoped<LogisticsSyncService>();
+
 // ── Background services ────────────────────────────────────────────────────────
 builder.Services.AddHostedService<MaintenanceReminderService>();
 
@@ -1169,6 +1176,21 @@ static async Task ApplySchemaUpdatesAsync(
             AddColIfMissing ("VehicleMaintenanceRequests", "NextServiceHour",            "float"),
             AddColIfMissing ("VehicleMaintenanceRequests", "NotificationStatus",         "nvarchar(50)"),
             AddColIfMissing ("VehicleMaintenanceRequests", "DateOfRequest",              "datetime2"),
+            // Logistics Platform link — cross-reference + outbound sync state.
+            AddColIfMissing ("VehicleMaintenanceRequests", "LogisticsRecordId",          "uniqueidentifier"),
+            AddColIfMissing ("VehicleMaintenanceRequests", "LogisticsVehicleId",         "uniqueidentifier"),
+            AddColIfMissing ("VehicleMaintenanceRequests", "SourceSystem",               "nvarchar(30)"),
+            AddColIfMissing ("VehicleMaintenanceRequests", "LogisticsSyncStatus",        "nvarchar(30)"),
+            AddColIfMissing ("VehicleMaintenanceRequests", "LogisticsSyncedAt",          "datetime2"),
+            AddColIfMissing ("VehicleMaintenanceRequests", "LogisticsSyncError",         "nvarchar(1000)"),
+            // Backfill: every pre-existing request was raised on this platform.
+            // Runs as its own batch, so the column above already exists. Idempotent.
+            """
+            IF EXISTS (
+                SELECT 1 FROM sys.columns
+                WHERE object_id = OBJECT_ID(N'VehicleMaintenanceRequests') AND name = N'SourceSystem')
+            UPDATE VehicleMaintenanceRequests SET SourceSystem = 'GenService' WHERE SourceSystem IS NULL;
+            """,
 
             // ── EquipmentMaintenanceRequests ────────────────────────────────
             AddColIfMissing ("EquipmentMaintenanceRequests", "FaultIdentified",         "nvarchar(2000)"),

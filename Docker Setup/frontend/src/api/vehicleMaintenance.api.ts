@@ -33,6 +33,8 @@ export const vehicleMaintenanceApi = {
     nextServiceHour?:    number;
     notificationStatus?: string;
     dateOfRequest?:      string;
+    /** Set when the vehicle was picked from the Logistics fleet rather than typed. */
+    logisticsVehicleId?: string;
   }) => apiClient.post<VehicleMaintenance>('/vehicle-maintenance', data).then(r => r.data),
 
   approve: (id: string, notes?: string) =>
