@@ -26,8 +26,25 @@ public class LogisticsSyncService(
 {
     public const string HttpClientName = "LogisticsApi";
 
-    private string? BaseUrl => cfg["Integration:Logistics:BaseUrl"]?.TrimEnd('/');
+    private string? BaseUrl => NormaliseBaseUrl(cfg["Integration:Logistics:BaseUrl"]);
     private string? ApiKey  => cfg["Integration:Logistics:ApiKey"];
+
+    /// <summary>
+    /// Accept the URL however it was typed into App Service configuration.
+    /// Azure's Overview blade shows the default domain without a scheme, so it
+    /// gets pasted in verbatim — and a value with no scheme builds a relative
+    /// URI, which HttpClient rejects with a confusing "invalid request URI"
+    /// error. Default to https rather than making the operator pay for that.
+    /// </summary>
+    internal static string? NormaliseBaseUrl(string? raw)
+    {
+        var v = raw?.Trim().TrimEnd('/');
+        if (string.IsNullOrWhiteSpace(v)) return null;
+        return v.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+            || v.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
+                ? v
+                : $"https://{v}";
+    }
 
     public bool IsConfigured => !string.IsNullOrWhiteSpace(BaseUrl) && !string.IsNullOrWhiteSpace(ApiKey);
 
