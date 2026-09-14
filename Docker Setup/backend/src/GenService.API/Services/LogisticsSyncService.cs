@@ -128,8 +128,16 @@ public class LogisticsSyncService(
     /// </summary>
     public async Task<LogisticsVehicleDto?> MatchVehicleAsync(
         string regNo, string? assetNo = null, CancellationToken ct = default)
+        => MatchIn(await GetFleetAsync(ct), regNo, assetNo);
+
+    /// <summary>
+    /// Match against an already-fetched fleet list. Used when matching many
+    /// requests at once, so the fleet is pulled from Logistics once rather than
+    /// once per request.
+    /// </summary>
+    public static LogisticsVehicleDto? MatchIn(
+        IReadOnlyList<LogisticsVehicleDto> fleet, string regNo, string? assetNo = null)
     {
-        var fleet = await GetFleetAsync(ct);
         if (fleet.Count == 0) return null;
 
         var key = Normalise(regNo);

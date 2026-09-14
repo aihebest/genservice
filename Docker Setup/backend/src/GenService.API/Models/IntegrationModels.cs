@@ -109,6 +109,19 @@ public record ResolveVehicleMatchRequest(
     string LogisticsRegistrationNo
 );
 
+/// <summary>Outcome of a bulk back-population run.</summary>
+public record ResyncAllResultDto(
+    int Considered,
+    /// <summary>Newly bound to a Logistics vehicle during this run.</summary>
+    int NewlyMatched,
+    /// <summary>Successfully delivered to Logistics.</summary>
+    int Synced,
+    /// <summary>Skipped — registration matches no vehicle in the Logistics register.</summary>
+    int Unmatched,
+    int Failed,
+    string Message
+);
+
 public record IntegrationHealthDto(
     bool     LogisticsConfigured,
     bool     LogisticsReachable,

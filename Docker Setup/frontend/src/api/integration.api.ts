@@ -34,6 +34,15 @@ export interface UnmatchedVehicleRequest {
   createdAt:     string;
 }
 
+export interface ResyncAllResult {
+  considered:   number;
+  newlyMatched: number;
+  synced:       number;
+  unmatched:    number;
+  failed:       number;
+  message:      string;
+}
+
 export interface IntegrationHealth {
   logisticsConfigured: boolean;
   logisticsReachable:  boolean;
@@ -67,6 +76,14 @@ export const integrationApi = {
   /** Re-send a request that previously failed to reach Logistics (manager only). */
   resync: (id: string) =>
     apiClient.post<UnmatchedVehicleRequest>(`${BASE}/requests/${id}/resync`).then(r => r.data),
+
+  /**
+   * Push every existing request to Logistics in one pass (manager only).
+   * Run once after go-live — status pushes only fire on change, so anything
+   * raised before the link existed would otherwise never reach Logistics.
+   */
+  resyncAll: () =>
+    apiClient.post<ResyncAllResult>(`${BASE}/resync-all`).then(r => r.data),
 
   health: () =>
     apiClient.get<IntegrationHealth>(`${BASE}/health`).then(r => r.data),

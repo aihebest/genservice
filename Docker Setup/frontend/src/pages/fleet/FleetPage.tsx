@@ -6,7 +6,7 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import {
   PlusOutlined, ReloadOutlined, CheckOutlined, CloseOutlined,
-  CarOutlined, ToolOutlined, WarningOutlined,
+  CarOutlined, ToolOutlined, WarningOutlined, SyncOutlined,
 } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
@@ -201,6 +201,33 @@ export default function FleetPage() {
 
   const isApprover = role === 'DepartmentManager' || role === 'Supervisor' || role === 'SystemAdmin';
 
+  // One-shot back-population of everything raised before the Logistics link existed.
+  const [resyncing, setResyncing] = useState(false);
+
+  const handleResyncAll = () => {
+    Modal.confirm({
+      title: 'Send all requests to Logistics?',
+      content:
+        'Every request that matches a vehicle in the Logistics fleet register will be pushed to their maintenance register. '
+        + 'Existing records there are updated, not duplicated, so this is safe to run more than once.',
+      okText: 'Send',
+      onOk: async () => {
+        setResyncing(true);
+        try {
+          const res = await integrationApi.resyncAll();
+          refresh();
+          Modal.info({ title: 'Sync complete', content: res.message });
+        } catch (e: unknown) {
+          Modal.error({
+            title: 'Sync failed',
+            content: (e as { response?: { data?: { message?: string } } })?.response?.data?.message
+              ?? 'Could not reach the Logistics platform.',
+          });
+        } finally { setResyncing(false); }
+      },
+    });
+  };
+
   const refresh = useCallback(() => { qc.invalidateQueries({ queryKey: ['vm'] }); }, [qc]);
 
   const { data, isFetching } = useQuery({
@@ -296,6 +323,13 @@ export default function FleetPage() {
         <Col>
           <Space>
             <Tooltip title="Refresh"><Button icon={<ReloadOutlined />} onClick={refresh} loading={isFetching} /></Tooltip>
+            {isApprover && (
+              <Tooltip title="Send every request to the Logistics platform. Use once after go-live — from then on each status change syncs by itself.">
+                <Button icon={<SyncOutlined />} loading={resyncing} onClick={handleResyncAll}>
+                  Sync to Logistics
+                </Button>
+              </Tooltip>
+            )}
             <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>New Request</Button>
           </Space>
         </Col>

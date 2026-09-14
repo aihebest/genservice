@@ -256,6 +256,69 @@ public class IntegrationController(
             r.LogisticsSyncStatus, r.LogisticsSyncError, r.CreatedAt));
     }
 
+    /// <summary>
+    /// Push every existing request to Logistics in one pass.
+    ///
+    /// Needed because status pushes only fire when a request changes, so anything
+    /// raised before the two platforms were linked would never reach Logistics.
+    /// Run once after go-live; safe to run again, since Logistics matches on our
+    /// request id and updates rather than duplicating.
+    /// </summary>
+    [HttpPost("resync-all")]
+    [Authorize]
+    public async Task<ActionResult<ResyncAllResultDto>> ResyncAll()
+    {
+        if (!IsManagerOrAbove) return Forbid();
+
+        if (!logistics.IsConfigured)
+            return StatusCode(503, new { message = "The Logistics link is not configured on this server." });
+
+        // Pull the fleet once and match in memory — otherwise this is one HTTP
+        // round-trip to Logistics per request just to resolve the vehicle.
+        var fleet = await logistics.GetFleetAsync(HttpContext.RequestAborted);
+        if (fleet.Count == 0)
+            return StatusCode(502, new { message = "Could not read the Logistics fleet register. Check the link, then try again." });
+
+        var rows = await db.VehicleMaintenanceRequests
+            .Where(r => r.Status != VehicleMaintenanceStatus.Rejected)
+            .OrderBy(r => r.CreatedAt)
+            .ToListAsync();
+
+        int matched = 0, synced = 0, unmatched = 0, failed = 0;
+
+        foreach (var r in rows)
+        {
+            if (HttpContext.RequestAborted.IsCancellationRequested) break;
+
+            if (r.LogisticsVehicleId is null)
+            {
+                var hit = LogisticsSyncService.MatchIn(fleet, r.VehicleRegNo, r.AssetNo);
+                if (hit is not null) { r.LogisticsVehicleId = hit.Id; matched++; }
+            }
+
+            if (r.LogisticsVehicleId is null && r.LogisticsRecordId is null)
+            {
+                unmatched++;
+                continue;   // nothing to push to — surfaced on the unmatched list
+            }
+
+            await logistics.PushStatusAsync(r, HttpContext.RequestAborted);
+
+            if (r.LogisticsSyncStatus == LogisticsSyncState.Synced) synced++;
+            else failed++;
+        }
+
+        logger.LogInformation(
+            "Back-population: {Considered} considered, {Matched} newly matched, {Synced} synced, {Unmatched} unmatched, {Failed} failed.",
+            rows.Count, matched, synced, unmatched, failed);
+
+        var message = unmatched > 0
+            ? $"{synced} sent to Logistics. {unmatched} could not be matched to a vehicle in their register — see the unmatched list."
+            : $"{synced} sent to Logistics.";
+
+        return Ok(new ResyncAllResultDto(rows.Count, matched, synced, unmatched, failed, message));
+    }
+
     /// <summary>Is the link to Logistics configured and working? Shown on the admin screen.</summary>
     [HttpGet("health")]
     [Authorize]
