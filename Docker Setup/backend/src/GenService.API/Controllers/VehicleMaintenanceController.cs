@@ -52,7 +52,8 @@ public class VehicleMaintenanceController(
             r.RunningHours, r.NextServiceHour, r.NotificationStatus,
             r.FinalAmountNaira, r.DateOfRequest,
             r.SourceSystem, r.LogisticsVehicleId, r.LogisticsRecordId,
-            r.LogisticsSyncStatus, r.LogisticsSyncedAt, r.LogisticsSyncError
+            r.LogisticsSyncStatus, r.LogisticsSyncedAt, r.LogisticsSyncError,
+            r.JustificationEvaluation
         );
     }
 
@@ -175,6 +176,7 @@ public class VehicleMaintenanceController(
             RunningHours       = req.RunningHours,
             NextServiceHour    = req.NextServiceHour,
             NotificationStatus = string.IsNullOrWhiteSpace(req.NotificationStatus) ? "Open" : req.NotificationStatus.Trim(),
+            JustificationEvaluation = req.JustificationEvaluation?.Trim(),
             DateOfRequest      = req.DateOfRequest?.Date ?? DateTime.UtcNow.Date,
             RequestedByEmail = CallerEmail,
             RequestedByName  = CallerName,
@@ -402,6 +404,9 @@ public class VehicleMaintenanceController(
         r.SparesCostNaira = req.SparesCostNaira ?? r.SparesCostNaira;
         r.Notes           = req.Notes ?? r.Notes;
         r.FinalAmountNaira = req.FinalAmountNaira ?? r.FinalAmountNaira;
+        r.JustificationEvaluation = string.IsNullOrWhiteSpace(req.JustificationEvaluation)
+            ? r.JustificationEvaluation
+            : req.JustificationEvaluation.Trim();
         r.CompletedAt     = DateTime.UtcNow;
         r.UpdatedAt       = DateTime.UtcNow;
 

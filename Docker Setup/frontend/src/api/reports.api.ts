@@ -149,8 +149,38 @@ export async function downloadExplorerExport(params: ExplorerParams): Promise<vo
   const res = await apiClient.get('/reports/explorer/export', {
     params: cleanExplorerParams(params), responseType: 'blob', timeout: 60_000,
   });
+  saveBlob(res, `Report_${params.dataset}.xlsx`);
+}
+
+/**
+ * The department's own Repairs & Maintenance Register workbook, filled with
+ * live data — the three register sheets in their existing layout plus the
+ * DashBoard of pivots, charts and slicers. Opening it refreshes the pivots.
+ */
+export interface RegisterExportParams {
+  from?:     string;   // YYYY-MM-DD
+  to?:       string;
+  location?: string;
+}
+
+export async function downloadMaintenanceRegister(p: RegisterExportParams = {}): Promise<void> {
+  const params: Record<string, string> = {};
+  if (p.from)     params.from     = p.from;
+  if (p.to)       params.to       = p.to;
+  if (p.location) params.location = p.location;
+
+  const res = await apiClient.get('/reports/maintenance-register/export', {
+    // The whole workbook is rebuilt server-side, so allow more headroom than a
+    // plain table export.
+    params, responseType: 'blob', timeout: 120_000,
+  });
+  saveBlob(res, 'REPAIRS AND MAINTENANCE REGISTER.xlsx');
+}
+
+/** Shared download plumbing — reads the server's filename when it sends one. */
+function saveBlob(res: { data: unknown; headers: Record<string, unknown> }, fallback: string): void {
   const cd = res.headers['content-disposition'] as string | undefined;
-  let filename = `Report_${params.dataset}.xlsx`;
+  let filename = fallback;
   if (cd) { const m = cd.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/); if (m?.[1]) filename = m[1].replace(/['"]/g, ''); }
   const url = URL.createObjectURL(new Blob([res.data as BlobPart]));
   const link = document.createElement('a');

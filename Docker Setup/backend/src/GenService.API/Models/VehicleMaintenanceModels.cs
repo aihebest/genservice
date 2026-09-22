@@ -17,7 +17,9 @@ public record CreateVehicleMaintenanceRequest(
     string?  NotificationStatus = null,
     DateTime? DateOfRequest     = null,
     /// <summary>Set when the user picked a vehicle from the Logistics fleet rather than typing a plate.</summary>
-    Guid?    LogisticsVehicleId = null
+    Guid?    LogisticsVehicleId = null,
+    /// <summary>"JUSTIFICATION / EVALUATION" on the MRSF register.</summary>
+    string?  JustificationEvaluation = null
 );
 
 public record ApproveVehicleMaintenanceRequest(string? Notes);
@@ -46,7 +48,9 @@ public record CompleteVehicleMaintenanceRequest(
     string?  ActionedBy,
     decimal? SparesCostNaira  = null,
     string?  Notes            = null,
-    decimal? FinalAmountNaira = null
+    decimal? FinalAmountNaira = null,
+    /// <summary>"JUSTIFICATION / EVALUATION" — can also be captured at completion.</summary>
+    string?  JustificationEvaluation = null
 );
 
 public record VehicleHandoverRequest(
@@ -124,7 +128,9 @@ public record VehicleMaintenanceDto(
     /// <summary>NotLinked | Pending | Synced | Failed — state of the last push to Logistics.</summary>
     string?   LogisticsSyncStatus = null,
     DateTime? LogisticsSyncedAt   = null,
-    string?   LogisticsSyncError  = null
+    string?   LogisticsSyncError  = null,
+    /// <summary>"JUSTIFICATION / EVALUATION" on the MRSF register.</summary>
+    string?   JustificationEvaluation = null
 );
 
 public record VehicleMaintenanceStatsDto(

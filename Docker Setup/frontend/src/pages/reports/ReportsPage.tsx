@@ -9,7 +9,7 @@ import {
   ClockCircleOutlined, FireOutlined, CarOutlined,
   HomeOutlined, TeamOutlined, BankOutlined,
   BulbOutlined, PlaySquareOutlined, SafetyCertificateOutlined, DropboxOutlined,
-  FilterOutlined,
+  FilterOutlined, FileExcelOutlined,
 } from '@ant-design/icons';
 import {
   exportVehicleRegister,
@@ -26,7 +26,7 @@ import {
 } from 'recharts';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
-import { reportsApi, downloadExplorerExport } from '../../api/reports.api';
+import { reportsApi, downloadExplorerExport, downloadMaintenanceRegister } from '../../api/reports.api';
 import type { ReportPeriod, PeriodBreakdownItem, ExplorerColumn, ExplorerParams } from '../../api/reports.api';
 import {
   CATEGORY_META, STATUS_META,
@@ -248,11 +248,34 @@ function MaintenanceReportTab({ period }: { period: ReportPeriod }) {
 
   const freqData = data.byFrequency.map(b => ({ name: b.label, count: b.count }));
 
+  // Rebuilding the whole workbook server-side takes longer than a table dump,
+  // so the button shows progress rather than appearing to do nothing.
+  const [registerBusy, setRegisterBusy] = useState(false);
+
+  const handleRegisterDownload = async () => {
+    setRegisterBusy(true);
+    try {
+      await downloadMaintenanceRegister();
+    } catch {
+      message.error('Could not build the register. Please try again.');
+    } finally {
+      setRegisterBusy(false);
+    }
+  };
+
   return (
     <div>
       {/* ── Export toolbar ─────────────────────────────────────────────────── */}
       <Row justify="end" style={{ marginBottom: 12 }}>
         <Space>
+          {/* The department's own workbook, not a table dump — three register
+              sheets plus their DashBoard of pivots, charts and slicers. */}
+          <Tooltip title="Downloads the full Repairs & Maintenance Register in the department's existing format, including the DashBoard. Pivots refresh when you open it.">
+            <Button type="primary" icon={<FileExcelOutlined />} loading={registerBusy}
+              onClick={handleRegisterDownload}>
+              Repairs &amp; Maintenance Register
+            </Button>
+          </Tooltip>
           <Dropdown menu={{ items: [
             { key: 'eq-excel', label: 'Equipment Register (Excel)', icon: <DownloadOutlined />,
               onClick: () => exportEquipmentMaintenance({ format: 'excel' }) },

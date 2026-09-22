@@ -1,6 +1,8 @@
+using System.Globalization;
 using GenService.API.Data;
 using GenService.API.Domain;
 using GenService.API.Models;
+using GenService.API.Services;
 using ClosedXML.Excel;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -23,8 +25,59 @@ public record ExplorerRowInternal(
 [ApiController]
 [Route("api/v1/reports")]
 [Authorize]
-public class ReportsController(GenServiceDbContext db) : ControllerBase
+public class ReportsController(
+    GenServiceDbContext db,
+    MaintenanceRegisterExportService registerExport,
+    ILogger<ReportsController> logger) : ControllerBase
 {
+    // ── GET /api/v1/reports/maintenance-register/export ──────────────────────
+    /// <summary>
+    /// The department's Repairs &amp; Maintenance Register, filled with live data.
+    ///
+    /// This is their own workbook — same three register sheets, same columns,
+    /// and the same DashBoard of pivots, charts and slicers — not a generic
+    /// table dump. Opening it refreshes the pivots automatically.
+    /// </summary>
+    [HttpGet("maintenance-register/export")]
+    public async Task<IActionResult> MaintenanceRegisterExport(
+        [FromQuery] string? from     = null,   // YYYY-MM-DD
+        [FromQuery] string? to       = null,
+        [FromQuery] string? location = null)
+    {
+        var fromDate = ParseDay(from);
+        var toDate   = ParseDay(to);
+
+        if (fromDate is not null && toDate is not null && fromDate > toDate)
+            return BadRequest(new { message = "The 'from' date cannot be after the 'to' date." });
+
+        try
+        {
+            var bytes = await registerExport.BuildAsync(
+                fromDate, toDate, location, HttpContext.RequestAborted);
+
+            return File(
+                bytes,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                registerExport.FileName(fromDate, toDate));
+        }
+        catch (FileNotFoundException ex)
+        {
+            // The template ships with the build; if it is missing the deployment
+            // is broken, and saying so is more use than a generic 500.
+            logger.LogError(ex, "Register template missing from the deployment.");
+            return StatusCode(500, new
+            {
+                message = "The register template is missing from this deployment. Redeploy the API and try again."
+            });
+        }
+    }
+
+    private static DateOnly? ParseDay(string? s) =>
+        DateOnly.TryParseExact(s, "yyyy-MM-dd", CultureInfo.InvariantCulture,
+                               DateTimeStyles.None, out var d)
+            ? d
+            : null;
+
     // ── Period helper ─────────────────────────────────────────────────────────
     private static (DateTime From, string Label) ResolvePeriod(string period) => period switch
     {

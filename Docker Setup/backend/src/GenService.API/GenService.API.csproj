@@ -22,6 +22,12 @@
 
     <!-- Excel export -->
     <PackageReference Include="ClosedXML" Version="0.102.*" />
+    <!-- Pinned to the version ClosedXML 0.102 already resolves, so adding it
+         explicitly cannot introduce a binding conflict. Needed because the
+         maintenance-register export fills the department's own workbook, and
+         only the raw OpenXML SDK can rewrite worksheet rows while leaving the
+         pivot tables, charts and slicers byte-for-byte intact. -->
+    <PackageReference Include="DocumentFormat.OpenXml" Version="2.16.0" />
 
     <!-- PDF export (Community license — free for revenue < $1M USD) -->
     <PackageReference Include="QuestPDF" Version="2024.*" />
@@ -29,6 +35,14 @@
     <!-- API / Swagger -->
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.*" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The General Service department's own Repairs & Maintenance Register,
+         stripped of data. The export fills it with live records so their
+         DashBoard, pivots and slicers come through unchanged. -->
+    <!-- Forward slashes: the build runs on Linux in CI. -->
+    <None Update="Templates/**/*.xlsx" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

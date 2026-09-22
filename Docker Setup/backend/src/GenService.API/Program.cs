@@ -91,6 +91,10 @@ builder.Services.AddScoped<AuditService>();
 builder.Services.AddHttpClient(LogisticsSyncService.HttpClientName);
 builder.Services.AddScoped<LogisticsSyncService>();
 
+// Fills the department's own Repairs & Maintenance Register workbook with live
+// data, preserving their DashBoard, pivots and slicers.
+builder.Services.AddScoped<MaintenanceRegisterExportService>();
+
 // ── Background services ────────────────────────────────────────────────────────
 builder.Services.AddHostedService<MaintenanceReminderService>();
 
@@ -1183,6 +1187,8 @@ static async Task ApplySchemaUpdatesAsync(
             AddColIfMissing ("VehicleMaintenanceRequests", "LogisticsSyncStatus",        "nvarchar(30)"),
             AddColIfMissing ("VehicleMaintenanceRequests", "LogisticsSyncedAt",          "datetime2"),
             AddColIfMissing ("VehicleMaintenanceRequests", "LogisticsSyncError",         "nvarchar(1000)"),
+            // MRSF register column that Equipment and Facility already had.
+            AddColIfMissing ("VehicleMaintenanceRequests", "JustificationEvaluation",    "nvarchar(2000)"),
             // Backfill: every pre-existing request was raised on this platform.
             // Runs as its own batch, so the column above already exists. Idempotent.
             """

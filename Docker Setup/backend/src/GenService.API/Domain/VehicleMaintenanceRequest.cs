@@ -70,6 +70,14 @@ public class VehicleMaintenanceRequest
     public DateTime? CompletedAt { get; set; }
     public string?   Notes       { get; set; }
 
+    /// <summary>
+    /// "JUSTIFICATION / EVALUATION" on the MRSF register — why the work was
+    /// needed (routine servicing, reported fault, breakdown). Equipment and
+    /// Facility have always captured this; Vehicle did not, which left a blank
+    /// column in the register export.
+    /// </summary>
+    public string? JustificationEvaluation { get; set; }
+
     // ── Logistics Platform link ───────────────────────────────────────────────
     // The Logistics team owns the fleet; when they report a fault it is raised
     // here automatically and every status change is pushed back to them. These
