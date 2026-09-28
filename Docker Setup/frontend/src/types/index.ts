@@ -849,6 +849,11 @@ export interface VehicleMaintenance {
   logisticsSyncStatus?: string;
   logisticsSyncedAt?:   string;
   logisticsSyncError?:  string;
+  // ── MRSF register columns ──────────────────────────────────────────────────
+  /** "JUSTIFICATION / EVALUATION" on the register. */
+  justificationEvaluation?: string;
+  /** "NEXT SERVICE MILEAGE" — odometer reading the next service falls due at. */
+  nextServiceMileage?:      number;
 }
 
 export interface VehicleMaintenanceStats {

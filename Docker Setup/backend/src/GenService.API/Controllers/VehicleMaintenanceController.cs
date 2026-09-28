@@ -53,7 +53,7 @@ public class VehicleMaintenanceController(
             r.FinalAmountNaira, r.DateOfRequest,
             r.SourceSystem, r.LogisticsVehicleId, r.LogisticsRecordId,
             r.LogisticsSyncStatus, r.LogisticsSyncedAt, r.LogisticsSyncError,
-            r.JustificationEvaluation
+            r.JustificationEvaluation, r.NextServiceMileage
         );
     }
 
@@ -177,6 +177,7 @@ public class VehicleMaintenanceController(
             NextServiceHour    = req.NextServiceHour,
             NotificationStatus = string.IsNullOrWhiteSpace(req.NotificationStatus) ? "Open" : req.NotificationStatus.Trim(),
             JustificationEvaluation = req.JustificationEvaluation?.Trim(),
+            NextServiceMileage      = req.NextServiceMileage,
             DateOfRequest      = req.DateOfRequest?.Date ?? DateTime.UtcNow.Date,
             RequestedByEmail = CallerEmail,
             RequestedByName  = CallerName,

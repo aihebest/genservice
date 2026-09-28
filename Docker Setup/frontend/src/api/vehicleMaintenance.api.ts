@@ -35,6 +35,10 @@ export const vehicleMaintenanceApi = {
     dateOfRequest?:      string;
     /** Set when the vehicle was picked from the Logistics fleet rather than typed. */
     logisticsVehicleId?: string;
+    /** "NEXT SERVICE MILEAGE" on the MRSF register. */
+    nextServiceMileage?:      number;
+    /** "JUSTIFICATION / EVALUATION" on the MRSF register. */
+    justificationEvaluation?: string;
   }) => apiClient.post<VehicleMaintenance>('/vehicle-maintenance', data).then(r => r.data),
 
   approve: (id: string, notes?: string) =>

@@ -19,7 +19,9 @@ public record CreateVehicleMaintenanceRequest(
     /// <summary>Set when the user picked a vehicle from the Logistics fleet rather than typing a plate.</summary>
     Guid?    LogisticsVehicleId = null,
     /// <summary>"JUSTIFICATION / EVALUATION" on the MRSF register.</summary>
-    string?  JustificationEvaluation = null
+    string?  JustificationEvaluation = null,
+    /// <summary>"NEXT SERVICE MILEAGE" — odometer reading the next service is due at.</summary>
+    double?  NextServiceMileage = null
 );
 
 public record ApproveVehicleMaintenanceRequest(string? Notes);
@@ -130,7 +132,9 @@ public record VehicleMaintenanceDto(
     DateTime? LogisticsSyncedAt   = null,
     string?   LogisticsSyncError  = null,
     /// <summary>"JUSTIFICATION / EVALUATION" on the MRSF register.</summary>
-    string?   JustificationEvaluation = null
+    string?   JustificationEvaluation = null,
+    /// <summary>"NEXT SERVICE MILEAGE" — odometer reading the next service is due at.</summary>
+    double?   NextServiceMileage = null
 );
 
 public record VehicleMaintenanceStatsDto(

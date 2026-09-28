@@ -80,7 +80,10 @@ public class IntegrationController(
             Description        = Cap(BuildDescription(p), 2000),
             Priority           = NormalisePriority(p.Priority),
             Status             = VehicleMaintenanceStatus.Pending,
-            CurrentLocation    = Cap((p.CurrentLocation ?? "").Trim(), 200),
+            // Never store a blank location. It reads as missing data on the
+            // register and in the tracker, and the coordinators reported exactly
+            // that against the first batch of Logistics-raised requests.
+            CurrentLocation    = Cap(FallbackLocation(p.CurrentLocation), 200),
             OdometerReading    = p.OdometerKm?.ToString(CultureInfo.InvariantCulture),
             NotificationStatus = "Open",
             DateOfRequest      = ParseDay(p.DateReported) ?? DateTime.UtcNow.Date,
@@ -373,6 +376,15 @@ public class IntegrationController(
             ? string.Join(" — ", parts)
             : "Reported by Logistics (no description supplied).";
     }
+
+    /// <summary>
+    /// A location we can show. Logistics does not hold a location against a
+    /// vehicle, so when it sends none we label the request by where it came from
+    /// rather than leaving the field empty — a manager can correct it, and an
+    /// obviously-provisional value is easier to spot and fix than a blank.
+    /// </summary>
+    private static string FallbackLocation(string? supplied)
+        => string.IsNullOrWhiteSpace(supplied) ? "Logistics (unspecified)" : supplied.Trim();
 
     private static string NormalisePriority(string? p) =>
         string.IsNullOrWhiteSpace(p) ? RequestPriority.Normal : Cap(p.Trim(), 20);

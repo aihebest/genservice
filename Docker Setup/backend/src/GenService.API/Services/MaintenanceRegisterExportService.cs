@@ -38,8 +38,10 @@ public class MaintenanceRegisterExportService(
     private const uint FirstDataRow = 9;
 
     // Sheet name → (Excel Table name, first column, last column)
+    // Vehicle runs to W, not V: the register gained a NEXT SERVICE MILEAGE column
+    // at M, shifting everything after it one to the right.
     private static readonly (string Sheet, string Table, string First, string Last) VehicleSpec
-        = ("Vehicle", "Vehicle", "C", "V");
+        = ("Vehicle", "Vehicle", "C", "W");
     private static readonly (string Sheet, string Table, string First, string Last) EquipmentSpec
         = ("Equipment", "Equipment", "C", "U");
     private static readonly (string Sheet, string Table, string First, string Last) FacilitySpec
@@ -257,6 +259,7 @@ public class MaintenanceRegisterExportService(
                         : $"{r.VehicleRegNo} - {r.VehicleType}",           // VEHICLE REG NO.
                     r.VehicleType,                                         // VEHICLE DESCRIPTION
                     Numeric(r.OdometerReading),                            // ODOMETER READING
+                    r.NextServiceMileage,                                  // NEXT SERVICE MILEAGE
                     r.Description,                                         // DESCRIPTION OF REQUEST
                     r.WorkDone,                                            // DESCRIPTION OF WORK DONE
                     r.PartsSuppliedBy,                                     // PARTS SUPPLIED BY

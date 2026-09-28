@@ -1189,6 +1189,20 @@ static async Task ApplySchemaUpdatesAsync(
             AddColIfMissing ("VehicleMaintenanceRequests", "LogisticsSyncError",         "nvarchar(1000)"),
             // MRSF register column that Equipment and Facility already had.
             AddColIfMissing ("VehicleMaintenanceRequests", "JustificationEvaluation",    "nvarchar(2000)"),
+            AddColIfMissing ("VehicleMaintenanceRequests", "NextServiceMileage",         "float"),
+            // Requests pushed in from Logistics before that integration sent a
+            // location landed with the field empty, which the coordinators
+            // reported as missing data. Label them so they are visible and
+            // correctable rather than silently blank. Idempotent.
+            """
+            IF EXISTS (
+                SELECT 1 FROM sys.columns
+                WHERE object_id = OBJECT_ID(N'VehicleMaintenanceRequests') AND name = N'SourceSystem')
+            UPDATE VehicleMaintenanceRequests
+               SET CurrentLocation = 'Logistics (unspecified)'
+             WHERE SourceSystem = 'Logistics'
+               AND (CurrentLocation IS NULL OR LTRIM(RTRIM(CurrentLocation)) = '');
+            """,
             // Backfill: every pre-existing request was raised on this platform.
             // Runs as its own batch, so the column above already exists. Idempotent.
             """

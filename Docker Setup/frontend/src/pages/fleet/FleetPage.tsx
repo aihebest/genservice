@@ -1,12 +1,12 @@
 import { useState, useCallback } from 'react';
 import {
-  Alert, AutoComplete, Badge, Button, Card, Col, DatePicker, Descriptions, Divider, Drawer,
-  Form, Input, InputNumber, Modal, Row, Select, Space, Statistic, Table, Tag, Tooltip, Typography,
+  Alert, AutoComplete, Badge, Button, Card, Checkbox, Col, DatePicker, Descriptions, Divider, Drawer,
+  Dropdown, Form, Input, InputNumber, Modal, Row, Select, Space, Statistic, Table, Tag, Tooltip, Typography,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
   PlusOutlined, ReloadOutlined, CheckOutlined, CloseOutlined,
-  CarOutlined, ToolOutlined, WarningOutlined, SyncOutlined,
+  CarOutlined, ToolOutlined, WarningOutlined, SyncOutlined, SettingOutlined,
 } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
@@ -77,65 +77,216 @@ function LogisticsSyncTag({ record }: { record: VehicleMaintenance }) {
 }
 
 // ── Table columns ─────────────────────────────────────────────────────────────
-function buildColumns(onView: (r: VehicleMaintenance) => void): ColumnsType<VehicleMaintenance> {
+
+/**
+ * Every column on the department's MRSF vehicle register, in register order,
+ * plus the platform-only columns the team relies on.
+ *
+ * Two things the coordinators asked for are handled here:
+ *  • all 21 register columns are available, not just the dozen that fitted on
+ *    screen — the rest are hidden by default and switched on from the Columns
+ *    menu, so the default view stays readable;
+ *  • headers filter and sort, mirroring the slicers they use in Excel.
+ *
+ * `defaultHidden` marks the register columns that are off until asked for.
+ */
+type VmColumn = ColumnsType<VehicleMaintenance>[number] & { key: string };
+
+/** Distinct values in the loaded rows, as antd column filters. */
+function valueFilters(rows: VehicleMaintenance[], pick: (r: VehicleMaintenance) => string | undefined) {
+  const seen = Array.from(new Set(rows.map(pick).filter((v): v is string => !!v && v.trim() !== '')));
+  return seen.sort((a, b) => a.localeCompare(b)).map(v => ({ text: v, value: v }));
+}
+
+const txt = (v?: string | null) =>
+  v && String(v).trim() !== ''
+    ? <Text style={{ fontSize: 12 }}>{v}</Text>
+    : <Text type="secondary" style={{ fontSize: 12 }}>—</Text>;
+
+const money = (v?: number | null, strong = false) =>
+  v != null
+    ? <Text strong={strong} style={{ fontSize: 12, color: strong ? '#389e0d' : undefined }}>
+        ₦{Number(v).toLocaleString()}
+      </Text>
+    : <Text type="secondary" style={{ fontSize: 12 }}>—</Text>;
+
+const num = (v?: number | null) =>
+  v != null
+    ? <Text style={{ fontSize: 12 }}>{Number(v).toLocaleString()}</Text>
+    : <Text type="secondary" style={{ fontSize: 12 }}>—</Text>;
+
+const day = (v?: string | null) =>
+  v ? <Text style={{ fontSize: 12 }}>{dayjs(v).format('D MMM YYYY')}</Text>
+    : <Text type="secondary" style={{ fontSize: 12 }}>—</Text>;
+
+/** Register columns that stay hidden until switched on. */
+const DEFAULT_HIDDEN = new Set([
+  'month', 'notificationStatus', 'odometerReading', 'nextServiceMileage',
+  'description', 'workDone', 'partsSuppliedBy', 'dateDeliveredToWorkshop',
+  'completedAt', 'daysTaken', 'sparesCostNaira', 'justificationEvaluation',
+]);
+
+function buildColumns(
+  onView: (r: VehicleMaintenance) => void,
+  rows: VehicleMaintenance[],
+): VmColumn[] {
   return [
     {
-      title: 'Ref #', dataIndex: 'requestNumber', key: 'requestNumber', width: 120,
+      title: 'Ref #', dataIndex: 'requestNumber', key: 'requestNumber', width: 120, fixed: 'left',
+      sorter: (a, b) => a.requestNumber.localeCompare(b.requestNumber),
       render: (v: string) => <Text code style={{ fontSize: 12 }}>{v}</Text>,
     },
     {
+      title: 'Month', key: 'month', width: 80,
+      render: (_: unknown, r) => txt(dayjs(r.dateOfRequest ?? r.createdAt).format('MMM')),
+      filters: valueFilters(rows, r => dayjs(r.dateOfRequest ?? r.createdAt).format('MMM')),
+      onFilter: (v, r) => dayjs(r.dateOfRequest ?? r.createdAt).format('MMM') === v,
+    },
+    {
       title: 'Date of Request', dataIndex: 'dateOfRequest', key: 'dateOfRequest', width: 130,
-      render: (_: unknown, r: VehicleMaintenance) => <Text style={{ fontSize: 12 }}>{dayjs(r.dateOfRequest ?? r.createdAt).format('D MMM YYYY')}</Text>,
+      defaultSortOrder: 'descend',
+      sorter: (a, b) =>
+        dayjs(a.dateOfRequest ?? a.createdAt).valueOf() - dayjs(b.dateOfRequest ?? b.createdAt).valueOf(),
+      render: (_: unknown, r) => day(r.dateOfRequest ?? r.createdAt),
     },
     {
-      title: 'Vehicle Reg', dataIndex: 'vehicleRegNo', key: 'vehicleRegNo', width: 120,
-      render: (v: string) => <Tag icon={<CarOutlined />} color="blue">{v}</Tag>,
+      title: 'Raised By', dataIndex: 'requestedByName', key: 'requestedByName', width: 140, ellipsis: true,
+      filters: valueFilters(rows, r => r.requestedByName),
+      onFilter: (v, r) => r.requestedByName === v,
+      sorter: (a, b) => (a.requestedByName ?? '').localeCompare(b.requestedByName ?? ''),
+      render: (v: string) => txt(v),
     },
     {
-      title: 'Vehicle Type', dataIndex: 'vehicleType', key: 'vehicleType', width: 150, ellipsis: true,
+      title: 'Notification', dataIndex: 'notificationStatus', key: 'notificationStatus', width: 110,
+      filters: valueFilters(rows, r => r.notificationStatus),
+      onFilter: (v, r) => r.notificationStatus === v,
+      render: (v?: string) =>
+        v ? <Tag color={v === 'Closed' ? 'default' : 'gold'}>{v}</Tag> : txt(null),
+    },
+    {
+      title: 'Location', dataIndex: 'currentLocation', key: 'currentLocation', width: 150, ellipsis: true,
+      filters: valueFilters(rows, r => r.currentLocation),
+      onFilter: (v, r) => r.currentLocation === v,
+      sorter: (a, b) => (a.currentLocation ?? '').localeCompare(b.currentLocation ?? ''),
+      render: (v?: string) => txt(v),
     },
     {
       title: 'Asset No.', dataIndex: 'assetNo', key: 'assetNo', width: 110, ellipsis: true,
-      render: (v?: string) => <Text style={{ fontSize: 12 }}>{v ?? '—'}</Text>,
+      sorter: (a, b) => (a.assetNo ?? '').localeCompare(b.assetNo ?? ''),
+      render: (v?: string) => txt(v),
     },
     {
-      title: 'Maintenance', dataIndex: 'maintenanceType', key: 'maintenanceType', width: 130,
+      title: 'Vehicle Reg', dataIndex: 'vehicleRegNo', key: 'vehicleRegNo', width: 130,
+      filters: valueFilters(rows, r => r.vehicleRegNo),
+      onFilter: (v, r) => r.vehicleRegNo === v,
+      filterSearch: true,
+      sorter: (a, b) => a.vehicleRegNo.localeCompare(b.vehicleRegNo),
+      render: (v: string) => <Tag icon={<CarOutlined />} color="blue">{v}</Tag>,
+    },
+    {
+      title: 'Vehicle Type', dataIndex: 'vehicleType', key: 'vehicleType', width: 160, ellipsis: true,
+      filters: valueFilters(rows, r => r.vehicleType),
+      onFilter: (v, r) => r.vehicleType === v,
+      filterSearch: true,
+      render: (v?: string) => txt(v),
+    },
+    {
+      title: 'Odometer', dataIndex: 'odometerReading', key: 'odometerReading', width: 110,
+      render: (v?: string) => txt(v),
+    },
+    {
+      title: 'Next Service Mileage', dataIndex: 'nextServiceMileage', key: 'nextServiceMileage', width: 150,
+      sorter: (a, b) => (a.nextServiceMileage ?? 0) - (b.nextServiceMileage ?? 0),
+      render: (v?: number) => num(v),
+    },
+    {
+      // Widened and ellipsised: at 130px the type tag spilled over the status
+      // column, which is what the coordinators saw in their screenshot.
+      title: 'Maintenance', dataIndex: 'maintenanceType', key: 'maintenanceType', width: 190, ellipsis: true,
+      filters: valueFilters(rows, r => r.maintenanceType),
+      onFilter: (v, r) => r.maintenanceType === v,
       render: (v: string) => {
         const m = VM_TYPE_META[v as keyof typeof VM_TYPE_META];
-        return <Tag color={m?.color}>{m?.label ?? v}</Tag>;
+        return <Tag color={m?.color} style={{ whiteSpace: 'normal' }}>{m?.label ?? v}</Tag>;
       },
     },
     {
-      title: 'Status', dataIndex: 'status', key: 'status', width: 130,
+      title: 'Description of Request', dataIndex: 'description', key: 'description', width: 220, ellipsis: true,
+      render: (v?: string) => <Tooltip title={v}>{txt(v)}</Tooltip>,
+    },
+    {
+      title: 'Work Done', dataIndex: 'workDone', key: 'workDone', width: 220, ellipsis: true,
+      render: (v?: string) => <Tooltip title={v}>{txt(v)}</Tooltip>,
+    },
+    {
+      title: 'Parts Supplied By', dataIndex: 'partsSuppliedBy', key: 'partsSuppliedBy', width: 150, ellipsis: true,
+      filters: valueFilters(rows, r => r.partsSuppliedBy),
+      onFilter: (v, r) => r.partsSuppliedBy === v,
+      render: (v?: string) => txt(v),
+    },
+    {
+      title: 'Work Done At', dataIndex: 'workshopName', key: 'workshopName', width: 150, ellipsis: true,
+      filters: valueFilters(rows, r => r.workshopName),
+      onFilter: (v, r) => r.workshopName === v,
+      render: (v?: string) => v ? txt(v) : <Text type="secondary" style={{ fontSize: 12 }}>Not dispatched</Text>,
+    },
+    {
+      title: 'Date to Workshop', dataIndex: 'dateDeliveredToWorkshop', key: 'dateDeliveredToWorkshop', width: 145,
+      sorter: (a, b) =>
+        dayjs(a.dateDeliveredToWorkshop ?? 0).valueOf() - dayjs(b.dateDeliveredToWorkshop ?? 0).valueOf(),
+      render: (v?: string) => day(v),
+    },
+    {
+      title: 'Status', dataIndex: 'status', key: 'status', width: 140,
+      filters: valueFilters(rows, r => r.status),
+      onFilter: (v, r) => r.status === v,
       render: (v: VehicleMaintenanceStatus) => {
         const m = VM_STATUS_META[v];
         return <Badge status={m?.badge as any} text={m?.label ?? v} />;
       },
     },
     {
-      title: 'Priority', dataIndex: 'priority', key: 'priority', width: 90,
+      title: 'Date Completed', dataIndex: 'completedAt', key: 'completedAt', width: 145,
+      sorter: (a, b) => dayjs(a.completedAt ?? 0).valueOf() - dayjs(b.completedAt ?? 0).valueOf(),
+      render: (v?: string) => day(v),
+    },
+    {
+      title: 'Days Taken', key: 'daysTaken', width: 105,
+      sorter: (a, b) => (a.daysInWorkshop ?? 0) - (b.daysInWorkshop ?? 0),
+      render: (_: unknown, r) => num(r.daysInWorkshop),
+    },
+    {
+      title: 'Spares Cost (₦)', dataIndex: 'sparesCostNaira', key: 'sparesCostNaira', width: 140,
+      sorter: (a, b) => (a.sparesCostNaira ?? 0) - (b.sparesCostNaira ?? 0),
+      render: (v?: number) => money(v),
+    },
+    {
+      title: 'Justification / Evaluation', dataIndex: 'justificationEvaluation', key: 'justificationEvaluation',
+      width: 220, ellipsis: true,
+      render: (v?: string) => <Tooltip title={v}>{txt(v)}</Tooltip>,
+    },
+    {
+      title: 'Priority', dataIndex: 'priority', key: 'priority', width: 100,
+      filters: valueFilters(rows, r => r.priority),
+      onFilter: (v, r) => r.priority === v,
       render: (v: string) => {
         const m = PRIORITY_META[v as keyof typeof PRIORITY_META];
         return <Tag color={m?.color}>{m?.label ?? v}</Tag>;
       },
     },
     {
-      title: 'Location', dataIndex: 'currentLocation', key: 'currentLocation', width: 150, ellipsis: true,
-    },
-    {
       title: 'Amount (₦)', dataIndex: 'amountNaira', key: 'amountNaira', width: 120,
-      render: (v?: number) => v != null
-        ? <Text style={{ fontSize: 12 }}>₦{Number(v).toLocaleString()}</Text>
-        : <Text type="secondary" style={{ fontSize: 12 }}>—</Text>,
+      sorter: (a, b) => (a.amountNaira ?? 0) - (b.amountNaira ?? 0),
+      render: (v?: number) => money(v),
     },
     {
-      title: 'Final Amount (₦)', dataIndex: 'finalAmountNaira', key: 'finalAmountNaira', width: 130,
-      render: (v?: number) => v != null
-        ? <Text strong style={{ fontSize: 12, color: '#389e0d' }}>₦{Number(v).toLocaleString()}</Text>
-        : <Text type="secondary" style={{ fontSize: 12 }}>—</Text>,
+      title: 'Final Amount (₦)', dataIndex: 'finalAmountNaira', key: 'finalAmountNaira', width: 140,
+      sorter: (a, b) => (a.finalAmountNaira ?? 0) - (b.finalAmountNaira ?? 0),
+      render: (v?: number) => money(v, true),
     },
     {
-      title: 'Days Open', dataIndex: 'daysOpen', key: 'daysOpen', width: 95,
+      title: 'Days Open', dataIndex: 'daysOpen', key: 'daysOpen', width: 100,
+      sorter: (a, b) => (a.daysOpen ?? 0) - (b.daysOpen ?? 0),
       render: (v: number, r) => {
         const isLong = r.status === 'InWorkshop' && (r.daysInWorkshop ?? 0) > 7;
         return (
@@ -146,21 +297,23 @@ function buildColumns(onView: (r: VehicleMaintenance) => void): ColumnsType<Vehi
       },
     },
     {
-      title: 'Raised By', dataIndex: 'requestedByName', key: 'requestedByName', width: 140, ellipsis: true,
-      render: (v: string) => <Text style={{ fontSize: 13 }}>{v}</Text>,
-    },
-    {
-      title: 'Workshop', dataIndex: 'workshopName', key: 'workshopName', width: 150, ellipsis: true,
-      render: (v?: string) => v
-        ? <Text style={{ fontSize: 13 }}>{v}</Text>
-        : <Text type="secondary" style={{ fontSize: 12 }}>Not dispatched</Text>,
-    },
-    {
       title: 'Logistics', key: 'logistics', width: 130,
+      filters: [
+        { text: 'From Logistics', value: 'from' },
+        { text: 'Synced',         value: 'synced' },
+        { text: 'Not linked',     value: 'unlinked' },
+        { text: 'Sync failed',    value: 'failed' },
+      ],
+      onFilter: (v, r) => {
+        if (v === 'from')     return r.sourceSystem === 'Logistics';
+        if (v === 'failed')   return r.logisticsSyncStatus === 'Failed';
+        if (v === 'unlinked') return !r.logisticsVehicleId && !r.logisticsRecordId;
+        return !!(r.logisticsVehicleId || r.logisticsRecordId) && r.logisticsSyncStatus !== 'Failed';
+      },
       render: (_: unknown, r: VehicleMaintenance) => <LogisticsSyncTag record={r} />,
     },
     {
-      title: '', key: 'action', width: 65,
+      title: '', key: 'action', width: 70, fixed: 'right',
       render: (_: unknown, r: VehicleMaintenance) => (
         <Button size="small" onClick={() => onView(r)}>View</Button>
       ),
@@ -200,6 +353,19 @@ export default function FleetPage() {
   const [logisticsVehicleId, setLogisticsVehicleId] = useState<string | null>(null);
 
   const isApprover = role === 'DepartmentManager' || role === 'Supervisor' || role === 'SystemAdmin';
+
+  // All 21 register columns are available; the detail-heavy ones start hidden so
+  // the default view stays readable, and the Columns menu switches them on.
+  const rows = data?.items ?? [];
+  const allColumns = buildColumns(openDetail, rows);
+  const [hiddenCols, setHiddenCols] = useState<Set<string>>(new Set(DEFAULT_HIDDEN));
+  const visibleColumns = allColumns.filter(c => !hiddenCols.has(c.key));
+
+  const toggleCol = (key: string) => setHiddenCols(prev => {
+    const next = new Set(prev);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    return next;
+  });
 
   // One-shot back-population of everything raised before the Logistics link existed.
   const [resyncing, setResyncing] = useState(false);
@@ -301,6 +467,8 @@ export default function FleetPage() {
         odometerReading: values.odometerReading?.trim() || undefined,
         runningHours: values.runningHours ? Number(values.runningHours) : undefined,
         nextServiceHour: values.nextServiceHour ? Number(values.nextServiceHour) : undefined,
+        nextServiceMileage: values.nextServiceMileage ? Number(values.nextServiceMileage) : undefined,
+        justificationEvaluation: values.justificationEvaluation?.trim() || undefined,
         notificationStatus: values.notificationStatus || undefined,
         dateOfRequest: values.dateOfRequest ? (values.dateOfRequest as unknown as dayjs.Dayjs).format('YYYY-MM-DD') : undefined,
       });
@@ -372,16 +540,50 @@ export default function FleetPage() {
             </Button>
           ))}
         </div>
-        <div style={{ padding: '12px 24px', borderBottom: '1px solid #f0f0f0' }}>
+        <div style={{ padding: '12px 24px', borderBottom: '1px solid #f0f0f0',
+                      display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
           <Input.Search placeholder="Search by reg number, vehicle type, description…" style={{ width: 340 }}
             allowClear onSearch={v => { setSearch(v); setPage(1); }} onChange={e => !e.target.value && setSearch('')} />
+
+          {/* All 21 register columns, switchable — the register is wider than any
+              screen, so the alternative to this is horizontal scrolling forever. */}
+          <Dropdown
+            trigger={['click']}
+            menu={{
+              items: allColumns
+                .filter(c => c.key !== 'action')
+                .map(c => ({
+                  key: c.key,
+                  label: (
+                    <Checkbox checked={!hiddenCols.has(c.key)} onClick={e => e.preventDefault()}>
+                      {typeof c.title === 'string' && c.title ? c.title : c.key}
+                    </Checkbox>
+                  ),
+                })),
+              onClick: ({ key }) => toggleCol(key),
+            }}
+          >
+            <Button icon={<SettingOutlined />}>
+              Columns ({visibleColumns.length}/{allColumns.length})
+            </Button>
+          </Dropdown>
+
+          <Button size="small" type="link" onClick={() => setHiddenCols(new Set())}>
+            Show all register columns
+          </Button>
+          <Button size="small" type="link" onClick={() => setHiddenCols(new Set(DEFAULT_HIDDEN))}>
+            Reset
+          </Button>
         </div>
         <Table<VehicleMaintenance>
-          columns={buildColumns(openDetail)} dataSource={data?.items ?? []} rowKey="id" loading={isFetching}
+          columns={visibleColumns} dataSource={rows} rowKey="id" loading={isFetching}
           pagination={{ current: page, pageSize: 15, total: data?.totalCount ?? 0, onChange: p => setPage(p),
             showTotal: (t, [f, to]) => `${f}–${to} of ${t} requests`, showSizeChanger: false }}
           onRow={r => ({ onClick: () => openDetail(r), style: { cursor: 'pointer' } })}
-          size="middle" style={{ padding: '0 8px' }} scroll={{ x: 1350 }}
+          size="middle" style={{ padding: '0 8px' }}
+          // Sum of the visible widths, so the fixed Ref # and View columns pin
+          // correctly however many register columns are switched on.
+          scroll={{ x: visibleColumns.reduce((w, c) => w + (Number(c.width) || 120), 0) }}
         />
       </Card>
 
@@ -484,6 +686,22 @@ export default function FleetPage() {
             <Col span={12}>
               <Form.Item name="nextServiceHour" label="Next Service Due At">
                 <InputNumber style={{ width: '100%' }} placeholder="e.g. 13852" min={0} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={12}>
+            <Col span={12}>
+              {/* NEXT SERVICE MILEAGE on the register — the odometer the next
+                  service falls due at, as opposed to the hour reading above. */}
+              <Form.Item name="nextServiceMileage" label="Next Service Mileage"
+                tooltip="Odometer reading at which the next service becomes due.">
+                <InputNumber style={{ width: '100%' }} placeholder="e.g. 170000" min={0} />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="justificationEvaluation" label="Justification / Evaluation"
+                tooltip="Why the work is needed — routine servicing, reported fault, breakdown.">
+                <Input placeholder="e.g. Routine servicing required" />
               </Form.Item>
             </Col>
           </Row>

@@ -21,6 +21,12 @@ public class VehicleMaintenanceRequest
     public decimal? FinalAmountNaira { get; set; }         // actual final cost captured at completion (₦)
     public double?  RunningHours       { get; set; }       // current running hours (hour-metered assets)
     public double?  NextServiceHour    { get; set; }       // next service due at (hour reading)
+    /// <summary>
+    /// "NEXT SERVICE MILEAGE" on the register — the odometer reading the next
+    /// service falls due at. Distinct from NextServiceHour, which covers
+    /// hour-metered assets such as generators rather than vehicles.
+    /// </summary>
+    public double?  NextServiceMileage { get; set; }
     public string?  NotificationStatus { get; set; }       // Open | Notified | Closed
     public DateTime? DateOfRequest     { get; set; }       // date the request was raised (user-selectable)
 
