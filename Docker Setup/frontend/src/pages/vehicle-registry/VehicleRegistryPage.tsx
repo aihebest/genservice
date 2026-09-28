@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   Alert, AutoComplete, Button, Card, Col, Form, Input, InputNumber, Modal, Row,
-  Select, Space, Table, Tag, Tabs, Typography, DatePicker, message,
+  Select, Space, Tag, Tabs, Typography, DatePicker, message,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { PlusOutlined, ReloadOutlined, CarOutlined, FileProtectOutlined, EditOutlined } from '@ant-design/icons';
@@ -17,6 +17,7 @@ import type {
   VehicleRegistryRecord, VehicleDocument, VehicleOperationalStatus, VehicleDocumentStatus, VehicleDocumentType,
 } from '../../types';
 
+import FilterableTable from '../../components/shared/FilterableTable';
 const { Title, Text } = Typography;
 const { TextArea } = Input;
 
@@ -225,7 +226,7 @@ export default function VehicleRegistryPage() {
         </div>
 
         {tab === 'vehicles' && (
-          <Table<VehicleRegistryRecord>
+          <FilterableTable<VehicleRegistryRecord>
             columns={vehicleColumns} dataSource={vehicles?.items ?? []} rowKey="id" loading={vFetch}
             pagination={{ current: vPage, pageSize: 20, total: vehicles?.totalCount ?? 0, onChange: setVPage, showSizeChanger: false }}
             size="middle" scroll={{ x: 1100 }} style={{ padding: '0 8px' }} />
@@ -238,7 +239,7 @@ export default function VehicleRegistryPage() {
                 onChange={v => { setDocStatus(v); setDPage(1); }}
                 options={Object.entries(VEHICLE_DOCUMENT_STATUS_META).map(([k, m]) => ({ value: k, label: m.label }))} />
             </div>
-            <Table<VehicleDocument>
+            <FilterableTable<VehicleDocument>
               columns={docColumns} dataSource={docs?.items ?? []} rowKey="id" loading={dFetch}
               pagination={{ current: dPage, pageSize: 20, total: docs?.totalCount ?? 0, onChange: setDPage, showSizeChanger: false }}
               size="middle" scroll={{ x: 1150 }} style={{ padding: '0 8px' }} />

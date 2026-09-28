@@ -1,7 +1,6 @@
 import { useState, useCallback } from 'react';
 import {
-  Button, Card, Col, Progress, Row, Select, Space, Statistic,
-  Table, Tag, Badge, Tabs, Tooltip, Typography,
+  Button, Card, Col, Progress, Row, Select, Space, Statistic, Tag, Badge, Tabs, Tooltip, Typography,
 } from 'antd';
 import type { ColumnsType as AntColumnsType } from 'antd/es/table';
 import type { ColumnsType } from 'antd/es/table';
@@ -22,6 +21,7 @@ import { useAuthStore } from '../../store/authStore';
 import LogActivityModal from './components/LogActivityModal';
 import ActivityFeed     from './components/ActivityFeed';
 
+import FilterableTable from '../../components/shared/FilterableTable';
 dayjs.extend(relativeTime);
 
 const { Title, Text } = Typography;
@@ -287,7 +287,7 @@ export default function ActivitiesPage() {
               </Space>
             </div>
 
-            <Table<StaffActivity>
+            <FilterableTable<StaffActivity>
               columns={columns}
               dataSource={listData?.items ?? []}
               rowKey="id"
@@ -413,7 +413,7 @@ function PerformanceDashboard({ data, loading }: { data: TechnicianSummary[]; lo
         ))}
       </Row>
 
-      <Table<TechnicianSummary>
+      <FilterableTable<TechnicianSummary>
         columns={perfColumns}
         dataSource={data}
         rowKey="email"

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   Alert, AutoComplete, Button, Card, Col, Form, Input, InputNumber, Modal, Row,
-  Select, Space, Table, Tag, Tabs, Tooltip, Typography, DatePicker, message, Switch,
+  Select, Space, Tag, Tabs, Tooltip, Typography, DatePicker, message, Switch,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { PlusOutlined, ReloadOutlined, DropboxOutlined, SendOutlined } from '@ant-design/icons';
@@ -11,6 +11,7 @@ import { dieselSupplyApi } from '../../api/dieselSupply.api';
 import { DIESEL_DISTRIBUTION_TYPES, OFFICE_LOCATIONS, VEHICLE_LIST } from '../../types';
 import type { DieselSupply, DieselDistribution } from '../../types';
 
+import FilterableTable from '../../components/shared/FilterableTable';
 const { Title, Text } = Typography;
 const { TextArea } = Input;
 
@@ -169,12 +170,12 @@ export default function DieselSupplyPage() {
             ]} />
         </div>
         {tab === 'supplies' && (
-          <Table<DieselSupply> columns={supplyColumns} dataSource={supplies?.items ?? []} rowKey="id" loading={sFetch}
+          <FilterableTable<DieselSupply> columns={supplyColumns} dataSource={supplies?.items ?? []} rowKey="id" loading={sFetch}
             pagination={{ current: sPage, pageSize: 20, total: supplies?.totalCount ?? 0, onChange: setSPage, showSizeChanger: false }}
             size="middle" scroll={{ x: 1350 }} style={{ padding: '0 8px' }} />
         )}
         {tab === 'distributions' && (
-          <Table<DieselDistribution> columns={distColumns} dataSource={dists?.items ?? []} rowKey="id" loading={dFetch}
+          <FilterableTable<DieselDistribution> columns={distColumns} dataSource={dists?.items ?? []} rowKey="id" loading={dFetch}
             pagination={{ current: dPage, pageSize: 20, total: dists?.totalCount ?? 0, onChange: setDPage, showSizeChanger: false }}
             size="middle" scroll={{ x: 1300 }} style={{ padding: '0 8px' }} />
         )}

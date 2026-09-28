@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import {
   Alert, Badge, Button, Col, DatePicker, Descriptions, Divider, Drawer,
   Form, Input, InputNumber, Modal, Radio, Row, Select, Space, Statistic, Switch,
-  Table, Tag, Tooltip, Typography,
+  Tag, Tooltip, Typography,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
@@ -19,6 +19,7 @@ import {
 import type { EquipmentMaintenance, MaintenanceRequestStatus, RequestPriority } from '../../../types';
 import { useAuthStore } from '../../../store/authStore';
 
+import FilterableTable from '../../../components/shared/FilterableTable';
 dayjs.extend(relativeTime);
 
 
@@ -274,7 +275,7 @@ export default function EquipmentTab() {
         </div>
       </div>
 
-      <Table<EquipmentMaintenance>
+      <FilterableTable<EquipmentMaintenance>
         columns={buildColumns(openDetail)} dataSource={data?.items ?? []} rowKey="id" loading={isFetching}
         pagination={{ current: page, pageSize: 15, total: data?.totalCount ?? 0, onChange: p => setPage(p),
           showTotal: (t, [f, to]) => `${f}–${to} of ${t}`, showSizeChanger: false }}

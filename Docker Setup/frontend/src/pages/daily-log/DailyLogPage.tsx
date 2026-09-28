@@ -1,9 +1,6 @@
 import { useState } from 'react';
 import {
-  Card, Table, Button, Form, Input, InputNumber, Select,
-  DatePicker, Switch, Drawer, Descriptions, Tag, Space,
-  Row, Col, Statistic, Alert, Divider, message, Tooltip,
-  Badge, Typography,
+  Card, Button, Form, Input, InputNumber, Select, DatePicker, Switch, Drawer, Descriptions, Tag, Space, Row, Col, Statistic, Alert, Divider, message, Tooltip, Badge, Typography,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
@@ -21,6 +18,7 @@ import type {
 import { OFFICE_LOCATIONS } from '../../types';
 
 
+import FilterableTable from '../../components/shared/FilterableTable';
 const { Title, Text } = Typography;
 const { Option } = Select;
 const { TextArea } = Input;
@@ -532,7 +530,7 @@ export default function DailyLogPage() {
       </Card>
 
       {/* Table */}
-      <Table
+      <FilterableTable
         columns={columns}
         dataSource={listData?.items ?? []}
         rowKey="id"

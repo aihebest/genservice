@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   Alert, Button, Card, Col, Form, Input, InputNumber, Modal, Popconfirm, Row,
-  Select, Space, Table, Tag, Tooltip, Typography, DatePicker, message,
+  Select, Space, Tag, Tooltip, Typography, DatePicker, message,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { PlusOutlined, ReloadOutlined, ThunderboltOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons';
@@ -14,6 +14,7 @@ import {
 } from '../../types';
 import type { ElectricityPurchase, ElectricityBalance, ElectricityStatus } from '../../types';
 
+import FilterableTable from '../../components/shared/FilterableTable';
 const { Title, Text } = Typography;
 const { TextArea } = Input;
 
@@ -189,7 +190,7 @@ export default function ElectricityPage() {
             onChange={v => { setLoc(v); setPage(1); }}
             options={ELECTRICITY_LOCATIONS.map(l => ({ value: l, label: l }))} />
         </div>
-        <Table<ElectricityPurchase>
+        <FilterableTable<ElectricityPurchase>
           columns={columns} dataSource={data?.items ?? []} rowKey="id" loading={isFetching}
           pagination={{ current: page, pageSize: 20, total: data?.totalCount ?? 0,
             onChange: setPage, showSizeChanger: false }}

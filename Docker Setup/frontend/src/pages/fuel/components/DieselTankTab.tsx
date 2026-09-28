@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import {
   Alert, Button, Col, Descriptions, Divider, Drawer,
   Form, Input, InputNumber, Modal, Row, Select, Space,
-  Statistic, Table, Tag, Typography,
+  Statistic, Tag, Typography,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { PlusOutlined, ArrowDownOutlined, CheckCircleOutlined } from '@ant-design/icons';
@@ -13,6 +13,7 @@ import { dieselTankApi } from '../../../api/dieselTank.api';
 import { OFFICE_LOCATIONS } from '../../../types';
 import type { DieselTankReading } from '../../../types';
 
+import FilterableTable from '../../../components/shared/FilterableTable';
 dayjs.extend(relativeTime);
 
 const { Text } = Typography;
@@ -245,7 +246,7 @@ export default function DieselTankTab() {
         </div>
       </div>
 
-      <Table<DieselTankReading>
+      <FilterableTable<DieselTankReading>
         columns={buildColumns(r => { setSelected(r); setDrawerOpen(true); })}
         dataSource={data?.items ?? []} rowKey="id" loading={isFetching}
         pagination={{

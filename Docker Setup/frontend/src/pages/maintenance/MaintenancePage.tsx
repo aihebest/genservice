@@ -54,7 +54,7 @@ import { useCallback } from 'react';
 import {
   Alert, Button, Card, Descriptions, Divider, Drawer, Dropdown,
   Form, InputNumber, Modal, Select, Space,
-  Table, Tag, Timeline, Tooltip, message,
+  Tag, Timeline, Tooltip, message,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
@@ -74,6 +74,7 @@ import type { MaintenanceSchedule, MaintenanceCategory } from '../../types';
 import { useAuthStore } from '../../store/authStore';
 import NewScheduleModal from './components/NewScheduleModal';
 
+import FilterableTable from '../../components/shared/FilterableTable';
 dayjs.extend(relativeTime);
 
 // ── Escalation badge ──────────────────────────────────────────────────────────
@@ -452,7 +453,7 @@ function SchedulerContent() {
           </Dropdown>
         </div>
 
-        <Table<MaintenanceSchedule>
+        <FilterableTable<MaintenanceSchedule>
           columns={columns}
           dataSource={data?.items ?? []}
           rowKey="id"

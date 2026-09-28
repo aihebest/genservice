@@ -7,9 +7,7 @@
  */
 import { useState } from 'react';
 import {
-  Alert, Badge, Button, Col, Descriptions, Divider, Drawer, Form, InputNumber,
-  Modal, Row, Select, Space, Statistic, Table, Tag, Tooltip, Typography,
-  message, Input, Dropdown,
+  Alert, Badge, Button, Col, Descriptions, Divider, Drawer, Form, InputNumber, Modal, Row, Select, Space, Statistic, Tag, Tooltip, Typography, message, Input, Dropdown,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
@@ -28,6 +26,7 @@ import type {
 import { DIESEL_REQUISITION_STATUSES } from '../../types';
 import dayjs from 'dayjs';
 
+import FilterableTable from '../../components/shared/FilterableTable';
 const { Text } = Typography;
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -371,7 +370,7 @@ export default function DieselRequisitionsTab() {
       </div>
 
       {/* Table */}
-      <Table<DieselRequisition>
+      <FilterableTable<DieselRequisition>
         columns={columns}
         dataSource={data?.items ?? []}
         rowKey="id"

@@ -1,8 +1,6 @@
 import { useState } from 'react';
 import {
-  Alert, Badge, Button, Card, Col, Descriptions, Drawer,
-  Form, Input, Modal, Popconfirm, Row, Select, Space,
-  Statistic, Table, Tag, Tooltip, Typography, message,
+  Alert, Badge, Button, Card, Col, Descriptions, Drawer, Form, Input, Modal, Popconfirm, Row, Select, Space, Statistic, Tag, Tooltip, Typography, message,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
@@ -22,6 +20,7 @@ import type { UserSummary,
 } from '../../types';
 import { ALL_ROLES, ROLE_META } from '../../types';
 
+import FilterableTable from '../../components/shared/FilterableTable';
 dayjs.extend(relativeTime);
 
 const { Title, Text, Paragraph } = Typography;
@@ -364,7 +363,7 @@ export default function UserManagementPage() {
       </Card>
 
       {/* Table */}
-      <Table
+      <FilterableTable
         columns={columns}
         dataSource={listData?.items ?? []}
         rowKey="id"

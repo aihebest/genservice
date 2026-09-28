@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   Alert, Button, Card, Col, Form, Input, InputNumber, Modal, Row,
-  Select, Space, Table, Tag, Tooltip, Typography, DatePicker, message,
+  Select, Space, Tag, Tooltip, Typography, DatePicker, message,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { PlusOutlined, ReloadOutlined, PlayCircleOutlined, EditOutlined } from '@ant-design/icons';
@@ -12,6 +12,7 @@ import { dstvApi } from '../../api/dstv.api';
 import { DSTV_PACKAGES, DSTV_STATUS_META } from '../../types';
 import type { DstvSubscription, DstvStatus } from '../../types';
 
+import FilterableTable from '../../components/shared/FilterableTable';
 const { Title, Text } = Typography;
 const { TextArea } = Input;
 
@@ -174,7 +175,7 @@ export default function DstvPage() {
             onChange={v => { setStatus(v); setPage(1); }}
             options={Object.entries(DSTV_STATUS_META).map(([k, m]) => ({ value: k, label: m.label }))} />
         </div>
-        <Table<DstvSubscription>
+        <FilterableTable<DstvSubscription>
           columns={columns} dataSource={data?.items ?? []} rowKey="id" loading={isFetching}
           pagination={{ current: page, pageSize: 20, total: data?.totalCount ?? 0, onChange: setPage, showSizeChanger: false }}
           size="middle" scroll={{ x: 1150 }} style={{ padding: '0 8px' }} />

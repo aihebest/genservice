@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import {
   Alert, Button, Col, DatePicker, Form, Input, InputNumber, Modal, Row,
-  Select, Statistic, Table, Tag, Typography,
+  Select, Statistic, Tag, Typography,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { PlusOutlined, BulbOutlined } from '@ant-design/icons';
@@ -11,6 +11,7 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import { generatorMonitoringApi } from '../../../api/generatorMonitoring.api';
 import type { PowerMeterReading } from '../../../types';
 
+import FilterableTable from '../../../components/shared/FilterableTable';
 dayjs.extend(relativeTime);
 const { Text } = Typography;
 const { TextArea } = Input;
@@ -131,7 +132,7 @@ export default function PowerMeterTab() {
         </div>
       </div>
 
-      <Table<PowerMeterReading>
+      <FilterableTable<PowerMeterReading>
         columns={columns}
         dataSource={data?.items ?? []} rowKey="id" loading={isFetching}
         pagination={{ current: page, pageSize: 20, total: data?.totalCount ?? 0,

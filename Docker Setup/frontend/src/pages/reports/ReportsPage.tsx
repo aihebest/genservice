@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   Alert, Badge, Button, Card, Col, DatePicker, Dropdown, Input, InputNumber, List, Progress, Row,
-  Select, Space, Statistic, Table, Tabs, Tag, Tooltip, Typography, message,
+  Select, Space, Statistic, Tabs, Tag, Tooltip, Typography, message,
 } from 'antd';
 import {
   BarChartOutlined, DownloadOutlined, ToolOutlined, ThunderboltOutlined,
@@ -35,6 +35,7 @@ import {
 } from '../../types';
 import type { RequestCategory, RequestStatus, MaintenanceCategory, GeneratorRunReason } from '../../types';
 
+import FilterableTable from '../../components/shared/FilterableTable';
 const { Title, Text } = Typography;
 
 // ── Colour palettes ────────────────────────────────────────────────────────────
@@ -710,7 +711,7 @@ function ReportExplorerTab() {
         )}
       </Row>
 
-      <Table
+      <FilterableTable
         columns={columns}
         dataSource={data?.rows ?? []}
         rowKey={(_, i) => String(i)}
@@ -1077,7 +1078,7 @@ function VehicleReportTab({ period }: { period: ReportPeriod }) {
         size="small"
         style={{ marginBottom: 16 }}
       >
-        <Table
+        <FilterableTable
           dataSource={statusByType}
           rowKey="type"
           size="small"
@@ -1108,7 +1109,7 @@ function VehicleReportTab({ period }: { period: ReportPeriod }) {
           size="small"
           style={{ marginBottom: 16 }}
         >
-          <Table
+          <FilterableTable
             dataSource={longStanding}
             rowKey="requestNumber"
             size="small"
@@ -1128,7 +1129,7 @@ function VehicleReportTab({ period }: { period: ReportPeriod }) {
           ? <Button size="small" onClick={() => setFilterReg(undefined)}>Show All Vehicles</Button>
           : null}
       >
-        <Table
+        <FilterableTable
           dataSource={perVehicle}
           rowKey="vehicleRegNo"
           size="small"
@@ -1150,7 +1151,7 @@ function VehicleReportTab({ period }: { period: ReportPeriod }) {
           ? <Button size="small" onClick={() => setFilterReg(undefined)}>Clear Filter</Button>
           : <Text type="secondary">Click "History" on a vehicle above to filter</Text>}
       >
-        <Table
+        <FilterableTable
           dataSource={history}
           rowKey="requestNumber"
           size="small"

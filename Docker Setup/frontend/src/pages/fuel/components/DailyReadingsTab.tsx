@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import {
   Alert, Badge, Button, Col, DatePicker, Descriptions, Divider, Drawer, Form,
   Input, InputNumber, Modal, Progress, Row, Select, Space,
-  Statistic, Switch, Table, Tag, Tooltip, Typography,
+  Statistic, Switch, Tag, Tooltip, Typography,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { PlusOutlined, WarningOutlined, ThunderboltOutlined, EditOutlined } from '@ant-design/icons';
@@ -14,6 +14,7 @@ import { generatorMonitoringApi } from '../../../api/generatorMonitoring.api';
 import { GENERATOR_DAILY_STATUS_META, OFFICE_LOCATIONS } from '../../../types';
 import type { GeneratorDailyReading, GeneratorDailyStatus } from '../../../types';
 
+import FilterableTable from '../../../components/shared/FilterableTable';
 dayjs.extend(relativeTime);
 
 const { Text } = Typography;
@@ -297,7 +298,7 @@ export default function DailyReadingsTab() {
         </div>
       </div>
 
-      <Table<GeneratorDailyReading>
+      <FilterableTable<GeneratorDailyReading>
         columns={buildColumns(
           r => { setSelected(r); setDrawerOpen(true); },
           canEdit ? openEdit : undefined,

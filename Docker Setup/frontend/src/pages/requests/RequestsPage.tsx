@@ -1,8 +1,5 @@
 import { useState, useCallback } from 'react';
-import {
-  Button, Card, Input, Select, Space, Table, Tag, Badge,
-  Typography, Tooltip, Tabs, Row, Col,
-} from 'antd';
+import { Button, Card, Input, Select, Space, Tag, Badge, Typography, Tooltip, Tabs, Row, Col } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { PlusOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -18,6 +15,7 @@ import RequestStats        from './components/RequestStats';
 import NewRequestModal     from './components/NewRequestModal';
 import RequestDetailDrawer from './components/RequestDetailDrawer';
 
+import FilterableTable from '../../components/shared/FilterableTable';
 dayjs.extend(relativeTime);
 
 const { Title, Text } = Typography;
@@ -266,7 +264,7 @@ export default function RequestsPage() {
         </div>
 
         {/* Table */}
-        <Table<ServiceRequest>
+        <FilterableTable<ServiceRequest>
           columns={columns}
           dataSource={data?.items ?? []}
           rowKey="id"

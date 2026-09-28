@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import {
   Alert, Badge, Button, Card, Col, Row, Select, Space,
-  Table, Tag, Tooltip, Tabs, Typography,
+  Tag, Tooltip, Tabs, Typography,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
@@ -25,6 +25,7 @@ import { useAuthStore } from '../../store/authStore';
 import LogGeneratorModal from './components/LogGeneratorModal';
 import AddDieselModal    from './components/AddDieselModal';
 
+import FilterableTable from '../../components/shared/FilterableTable';
 dayjs.extend(relativeTime);
 dayjs.extend(duration);
 
@@ -397,7 +398,7 @@ export default function FuelPage() {
 
         {/* ── Generator Log tab ──────────────────────────────────── */}
         {activeTab === 'generator' && (
-          <Table<GeneratorLog>
+          <FilterableTable<GeneratorLog>
             columns={genColumns(canManage, openStop)}
             dataSource={genData?.items ?? []}
             rowKey="id"
@@ -446,7 +447,7 @@ export default function FuelPage() {
                 }))}
               />
             </div>
-            <Table<DieselRecord>
+            <FilterableTable<DieselRecord>
               columns={dieselColumns()}
               dataSource={dieselData?.items ?? []}
               rowKey="id"

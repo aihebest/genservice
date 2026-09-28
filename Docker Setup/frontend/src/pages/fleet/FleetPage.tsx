@@ -1,7 +1,6 @@
 import { useState, useCallback } from 'react';
 import {
-  Alert, AutoComplete, Badge, Button, Card, Checkbox, Col, DatePicker, Descriptions, Divider, Drawer,
-  Dropdown, Form, Input, InputNumber, Modal, Row, Select, Space, Statistic, Table, Tag, Tooltip, Typography,
+  Alert, AutoComplete, Badge, Button, Card, Checkbox, Col, DatePicker, Descriptions, Divider, Drawer, Dropdown, Form, Input, InputNumber, Modal, Row, Select, Space, Statistic, Tag, Tooltip, Typography,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
@@ -18,6 +17,7 @@ import { VM_STATUS_META, VM_TYPE_META, PRIORITY_META, OFFICE_LOCATIONS, VEHICLE_
 import type { VehicleMaintenance, VehicleMaintenanceStatus } from '../../types';
 import { useAuthStore } from '../../store/authStore';
 
+import FilterableTable from '../../components/shared/FilterableTable';
 dayjs.extend(relativeTime);
 
 
@@ -576,7 +576,7 @@ export default function FleetPage() {
             Reset
           </Button>
         </div>
-        <Table<VehicleMaintenance>
+        <FilterableTable<VehicleMaintenance>
           columns={visibleColumns} dataSource={rows} rowKey="id" loading={isFetching}
           pagination={{ current: page, pageSize: 15, total: data?.totalCount ?? 0, onChange: p => setPage(p),
             showTotal: (t, [f, to]) => `${f}–${to} of ${t} requests`, showSizeChanger: false }}

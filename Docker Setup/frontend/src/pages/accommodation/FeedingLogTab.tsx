@@ -17,6 +17,7 @@ import type {
   FeedingLogEntry, FeedingLogPayload, FeedingSummaryRow, MealRate,
 } from '../../api/feedingLog.api';
 
+import FilterableTable from '../../components/shared/FilterableTable';
 const { Text } = Typography;
 const { TextArea } = Input;
 
@@ -266,7 +267,7 @@ export default function FeedingLogTab() {
             label: 'Feeding Log',
             children: (
               <>
-                <Table<FeedingLogEntry>
+                <FilterableTable<FeedingLogEntry>
                   columns={columns} dataSource={data?.items ?? []} rowKey="id" loading={isFetching}
                   size="small" scroll={{ x: 1500 }}
                   pagination={{ current: page, pageSize: 50, total: data?.totalCount ?? 0,
@@ -285,7 +286,7 @@ export default function FeedingLogTab() {
             key: 'cost',
             label: 'Summary by Cost Centre',
             children: (
-              <Table<FeedingSummaryRow>
+              <FilterableTable<FeedingSummaryRow>
                 columns={summaryColumns('Project No / Cost Code')}
                 dataSource={summary?.byCostCentre ?? []} rowKey="key"
                 size="small" scroll={{ x: 1200 }} pagination={false}
@@ -309,7 +310,7 @@ export default function FeedingLogTab() {
             key: 'head',
             label: 'Summary by Head Count',
             children: (
-              <Table<FeedingSummaryRow>
+              <FilterableTable<FeedingSummaryRow>
                 columns={summaryColumns('Name')}
                 dataSource={summary?.byHeadCount ?? []} rowKey="key"
                 size="small" scroll={{ x: 1200 }} pagination={false}
