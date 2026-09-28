@@ -354,19 +354,6 @@ export default function FleetPage() {
 
   const isApprover = role === 'DepartmentManager' || role === 'Supervisor' || role === 'SystemAdmin';
 
-  // All 21 register columns are available; the detail-heavy ones start hidden so
-  // the default view stays readable, and the Columns menu switches them on.
-  const rows = data?.items ?? [];
-  const allColumns = buildColumns(openDetail, rows);
-  const [hiddenCols, setHiddenCols] = useState<Set<string>>(new Set(DEFAULT_HIDDEN));
-  const visibleColumns = allColumns.filter(c => !hiddenCols.has(c.key));
-
-  const toggleCol = (key: string) => setHiddenCols(prev => {
-    const next = new Set(prev);
-    if (next.has(key)) next.delete(key); else next.add(key);
-    return next;
-  });
-
   // One-shot back-population of everything raised before the Logistics link existed.
   const [resyncing, setResyncing] = useState(false);
 
@@ -433,6 +420,20 @@ export default function FleetPage() {
   })();
 
   const openDetail = (r: VehicleMaintenance) => { setSelected(r); setDrawerOpen(true); setActionError(null); };
+
+  // All 21 register columns are available; the detail-heavy ones start hidden so
+  // the default view stays readable, and the Columns menu switches them on.
+  const rows = data?.items ?? [];
+  const allColumns = buildColumns(openDetail, rows);
+  const [hiddenCols, setHiddenCols] = useState<Set<string>>(new Set(DEFAULT_HIDDEN));
+  const visibleColumns = allColumns.filter(c => !hiddenCols.has(c.key));
+
+  const toggleCol = (key: string) => setHiddenCols(prev => {
+    const next = new Set(prev);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    return next;
+  });
+
 
   const act = async (fn: () => Promise<unknown>) => {
     setActionLoading(true); setActionError(null);
