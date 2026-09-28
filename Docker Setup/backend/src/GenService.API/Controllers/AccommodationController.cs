@@ -1,6 +1,7 @@
 using GenService.API.Data;
 using GenService.API.Domain;
 using GenService.API.Models;
+using GenService.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -230,11 +231,13 @@ public class AccommodationController(
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<AccommodationDto>> Update(Guid id, [FromBody] UpdateAccommodationRequest req)
     {
-        if (!CanEditRecords)
-            return StatusCode(403, new { message = "Only a Department Manager or System Admin can edit existing records." });
-
         var r = await db.AccommodationLogs.FindAsync(id);
         if (r is null) return NotFound();
+
+        // Manager can edit anything; whoever logged the stay can correct their
+        // own mistakes for a short window.
+        if (!CanEditRecords && !EditWindow.IsOwnRecent(r.LoggedByEmail, r.CreatedAt, CallerEmail))
+            return StatusCode(403, new { message = EditWindow.DeniedMessage });
 
         if (!string.IsNullOrWhiteSpace(req.GuestName))  r.GuestName  = req.GuestName.Trim();
         if (!string.IsNullOrWhiteSpace(req.GuestHouse)) r.GuestHouse = req.GuestHouse.Trim();

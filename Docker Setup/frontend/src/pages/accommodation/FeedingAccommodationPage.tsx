@@ -12,6 +12,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import accommodationApi from '../../api/accommodation.api';
 import { useAuthStore } from '../../store/authStore';
+import { canEditRecord, editHoursLeft, isManagerRole } from '../../utils/editWindow';
 import FeedingLogTab from './FeedingLogTab';
 import {
   OFFICE_LOCATIONS, MEAL_PLAN_OPTIONS, ACCOMMODATION_STATUSES, ACCOMMODATION_STATUS_META,
@@ -25,9 +26,11 @@ const naira = (v?: number) => v != null ? `₦${Number(v).toLocaleString()}` : '
 
 export default function FeedingAccommodationPage() {
   const qc = useQueryClient();
-  // Only managers/admins may correct existing records (enforced server-side too).
-  const role = useAuthStore(s => s.user?.role);
-  const canEdit = role === 'DepartmentManager' || role === 'SystemAdmin';
+  // Managers/admins may correct any record; others may correct stays they logged
+  // themselves within the edit window. Enforced server-side too.
+  const role      = useAuthStore(s => s.user?.role);
+  const userEmail = useAuthStore(s => s.user?.email);
+  const canEdit   = isManagerRole(role);
 
   const [filterHouse,  setFilterHouse]  = useState<string | undefined>();
   const [filterStatus, setFilterStatus] = useState<string | undefined>();
@@ -215,13 +218,17 @@ export default function FeedingAccommodationPage() {
               <Button size="small" type="primary" ghost onClick={() => openCheckOut(r)}>Check Out</Button>
             </Tooltip>
           )}
+          {canEditRecord(role, userEmail, r) && (
+            <Tooltip title={canEdit ? 'Edit record'
+              : `Edit your record — ${editHoursLeft(r.createdAt) ?? 0}h left to correct it`}>
+              <Button size="small" icon={<EditOutlined />} onClick={() => handleOpenEdit(r)} />
+            </Tooltip>
+          )}
+          {/* Deleting stays with the manager. */}
           {canEdit && (
-            <>
-              <Tooltip title="Edit record"><Button size="small" icon={<EditOutlined />} onClick={() => handleOpenEdit(r)} /></Tooltip>
-              <Popconfirm title="Delete this record?" okText="Delete" okButtonProps={{ danger: true }} onConfirm={() => deleteMutation.mutate(r.id)}>
-                <Button size="small" danger icon={<DeleteOutlined />} />
-              </Popconfirm>
-            </>
+            <Popconfirm title="Delete this record?" okText="Delete" okButtonProps={{ danger: true }} onConfirm={() => deleteMutation.mutate(r.id)}>
+              <Button size="small" danger icon={<DeleteOutlined />} />
+            </Popconfirm>
           )}
         </Space>
       ) },

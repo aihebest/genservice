@@ -50,7 +50,9 @@ public record FeedingLogDto(
     string    LoggedByName,
     DateTime  CreatedAt,
     string?   LastEditedByName,
-    DateTime? LastEditedAt
+    DateTime? LastEditedAt,
+    /// <summary>Who entered the row — lets the UI offer self-correction within the edit window.</summary>
+    string?   LoggedByEmail = null
 );
 
 public record FeedingLogListResponse(

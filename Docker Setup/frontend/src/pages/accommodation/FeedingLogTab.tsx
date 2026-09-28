@@ -11,6 +11,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { useAuthStore } from '../../store/authStore';
+import { canEditRecord, editHoursLeft, isManagerRole } from '../../utils/editWindow';
 import { feedingLogApi, downloadFeedingLogExport } from '../../api/feedingLog.api';
 import type {
   FeedingLogEntry, FeedingLogPayload, FeedingSummaryRow, MealRate,
@@ -35,8 +36,11 @@ const ITEMS: { key: keyof FeedingLogPayload; field: keyof FeedingLogEntry; label
 
 export default function FeedingLogTab() {
   const qc = useQueryClient();
-  const role = useAuthStore(s => s.user?.role);
-  const canEdit = role === 'DepartmentManager' || role === 'SystemAdmin';
+  const role      = useAuthStore(s => s.user?.role);
+  const userEmail = useAuthStore(s => s.user?.email);
+  // Manager/admin: edit and delete anything, and set meal rates.
+  // Everyone else: correct their own entries within the edit window.
+  const canEdit = isManagerRole(role);
 
   const [from, setFrom]         = useState<string | undefined>();
   const [to, setTo]             = useState<string | undefined>();
@@ -174,15 +178,26 @@ export default function FeedingLogTab() {
         </span>
       ) },
     { title: '', key: 'act', width: 90, fixed: 'right' as const,
-      render: (_: unknown, r: FeedingLogEntry) => canEdit ? (
-        <Space size={4}>
-          <Tooltip title="Edit entry"><Button size="small" icon={<EditOutlined />} onClick={() => openEdit(r)} /></Tooltip>
-          <Popconfirm title="Delete this entry?" okText="Delete" okButtonProps={{ danger: true }}
-            onConfirm={() => deleteMut.mutate(r.id)}>
-            <Button size="small" danger icon={<DeleteOutlined />} />
-          </Popconfirm>
-        </Space>
-      ) : <Text type="secondary" style={{ fontSize: 11 }}>—</Text> },
+      render: (_: unknown, r: FeedingLogEntry) => {
+        const mayEdit = canEditRecord(role, userEmail, r);
+        if (!mayEdit) return <Text type="secondary" style={{ fontSize: 11 }}>—</Text>;
+        const left = editHoursLeft(r.createdAt);
+        return (
+          <Space size={4}>
+            <Tooltip title={canEdit ? 'Edit entry'
+              : `Edit your entry — ${left ?? 0}h left to correct it`}>
+              <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(r)} />
+            </Tooltip>
+            {/* Deleting stays with the manager — a correction, not a removal. */}
+            {canEdit && (
+              <Popconfirm title="Delete this entry?" okText="Delete" okButtonProps={{ danger: true }}
+                onConfirm={() => deleteMut.mutate(r.id)}>
+                <Button size="small" danger icon={<DeleteOutlined />} />
+              </Popconfirm>
+            )}
+          </Space>
+        );
+      } },
   ];
 
   const summaryColumns = (keyTitle: string): ColumnsType<FeedingSummaryRow> => [

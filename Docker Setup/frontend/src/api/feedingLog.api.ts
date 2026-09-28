@@ -24,6 +24,8 @@ export interface FeedingLogEntry {
   totalCostNaira:   number;
   notes?:           string;
   loggedByName:     string;
+  /** Who entered the row — used for the 48-hour self-correction window. */
+  loggedByEmail?:   string;
   createdAt:        string;
   lastEditedByName?:string;
   lastEditedAt?:    string;

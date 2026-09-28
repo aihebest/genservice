@@ -1,6 +1,7 @@
 using GenService.API.Data;
 using GenService.API.Domain;
 using GenService.API.Models;
+using GenService.API.Services;
 using ClosedXML.Excel;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -34,7 +35,7 @@ public class FeedingLogController(
         e.Id, e.EntryDate.ToString("yyyy-MM-dd"), e.StaffName, e.ProjectCostCode,
         e.Breakfast, e.SoftDrink, e.Water, e.Juice, e.Lunch, e.Dinner, e.Tea, e.Snacks,
         e.TotalItems, e.TotalCostNaira, e.Notes,
-        e.LoggedByName, e.CreatedAt, e.LastEditedByName, e.LastEditedAt);
+        e.LoggedByName, e.CreatedAt, e.LastEditedByName, e.LastEditedAt, e.LoggedByEmail);
 
     /// <summary>Loads current rates, seeding defaults on first use.</summary>
     private async Task<Dictionary<string, decimal>> GetRateMapAsync()
@@ -225,11 +226,14 @@ public class FeedingLogController(
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<FeedingLogDto>> Update(Guid id, [FromBody] CreateFeedingLogRequest req)
     {
-        if (!CanEditRecords)
-            return StatusCode(403, new { message = "Only a Department Manager or System Admin can edit existing records." });
-
         var e = await db.FeedingLogEntries.FindAsync(id);
         if (e is null) return NotFound();
+
+        // Manager can edit anything; whoever entered a row can correct their own
+        // mistakes for a short window. Checked after loading, since the rule
+        // depends on who created this particular entry.
+        if (!CanEditRecords && !EditWindow.IsOwnRecent(e.LoggedByEmail, e.CreatedAt, CallerEmail))
+            return StatusCode(403, new { message = EditWindow.DeniedMessage });
 
         if (DateOnly.TryParse(req.EntryDate, out var date)) e.EntryDate = date;
         if (!string.IsNullOrWhiteSpace(req.StaffName)) e.StaffName = req.StaffName.Trim();
