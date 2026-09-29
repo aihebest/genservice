@@ -765,6 +765,8 @@ export const GENERATOR_LIST: Array<{ assetNo: string; description: string; locat
   { assetNo: '01346', description: 'GML PERKINS 50KVA GENERATOR',           location: 'GML' },
   { assetNo: 'GML-M',  description: 'GML M SALEH 50KVA GENERATOR',          location: 'GML' },
   { assetNo: '00017', description: 'WOJI YARD FG WILSON 40KVA GENERATOR',   location: 'Woji' },
+  // New purchase, Sep 2026 — MRSF of 23/09/2026 (asset 6660002251).
+  { assetNo: '02251', description: 'WOJI MILLER WELDING GENERATOR',         location: 'Woji' },
   { assetNo: 'LGOS1', description: 'LAGOS OFFICE PERKINS 100KVA GENERATOR', location: 'Lagos Office' },
   { assetNo: 'LGOS2', description: 'LAGOS OFFICE CUMMINS 135KVA GENERATOR', location: 'Lagos Office' },
   { assetNo: 'AKLG1', description: 'AK LAGOS 80KVA GENERATOR',              location: 'AK Lagos' },

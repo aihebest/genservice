@@ -41,6 +41,13 @@ const STATUS_LABELS: Record<string, string> = {
 
 const GENERATOR_TYPES = ['GeneratorService', 'GeneratorRepair'];
 
+/**
+ * Picker value meaning "this generator isn't in the fleet list yet" — e.g. a
+ * new purchase. Choosing it opens the typed asset / description / location
+ * fields instead of auto-filling them from GENERATOR_LIST.
+ */
+const MANUAL_GEN = '__manual__';
+
 function buildColumns(onView: (r: EquipmentMaintenance) => void): ColumnsType<EquipmentMaintenance> {
   return [
     { title: 'Ref #', dataIndex: 'requestNumber', key: 'ref', width: 110,
@@ -235,7 +242,11 @@ export default function EquipmentTab() {
     setHandoverOpen(false); handoverForm.resetFields();
   };
 
-  const isGenType = GENERATOR_TYPES.includes(selectedType ?? '');
+  const isGenType   = GENERATOR_TYPES.includes(selectedType ?? '');
+  // Generator not on the fleet list: behave like non-generator equipment and
+  // let the user type the asset details and pick the location.
+  const isManualGen = isGenType && selectedGen === MANUAL_GEN;
+  const showTypedAsset = !isGenType || isManualGen;
 
   return (
     <div>
@@ -304,20 +315,32 @@ export default function EquipmentTab() {
             </Col>
           </Row>
 
-          {isGenType ? (
-            <Form.Item name="generatorSelect" label="Select Generator" rules={[{ required: true }]}>
+          {isGenType && (
+            <Form.Item name="generatorSelect" label="Select Generator" rules={[{ required: true }]}
+              extra={isManualGen ? 'Enter the new generator’s details below.' : undefined}>
               <Select showSearch optionFilterProp="label" placeholder="Select generator from fleet…"
+                notFoundContent="Not on the list? Choose “+ Not on the list — enter manually”."
                 onChange={(v: string) => {
                   setSelectedGen(v);
                   const g = GENERATOR_LIST.find(x => x.assetNo === v);
-                  if (g) createForm.setFieldsValue({ assetNo: g.assetNo, assetDescription: g.description });
+                  createForm.setFieldsValue(g
+                    ? { assetNo: g.assetNo, assetDescription: g.description }
+                    : { assetNo: '', assetDescription: '' });
                 }}
-                options={GENERATOR_LIST.map(g => ({
-                  value: g.assetNo,
-                  label: `${g.assetNo} — ${g.description} (${g.location})`,
-                }))} />
+                options={[
+                  ...GENERATOR_LIST.map(g => ({
+                    value: g.assetNo,
+                    label: `${g.assetNo} — ${g.description} (${g.location})`,
+                  })),
+                  // Last, and always visible — even when a search matches nothing.
+                  { value: MANUAL_GEN, label: '+ Not on the list — enter manually (e.g. new purchase)' },
+                ]}
+                filterOption={(input, option) =>
+                  option?.value === MANUAL_GEN ||
+                  String(option?.label ?? '').toLowerCase().includes(input.toLowerCase())} />
             </Form.Item>
-          ) : (
+          )}
+          {showTypedAsset && (
             <Row gutter={12}>
               <Col span={10}>
                 <Form.Item name="assetNo" label="Asset / Tag Number" rules={[{ required: true }]}>
@@ -358,7 +381,7 @@ export default function EquipmentTab() {
                 <Input placeholder="e.g. DR, PHC Office, Woji" />
               </Form.Item>
             </Col>
-            {!isGenType && (
+            {showTypedAsset && (
               <Col span={12}>
                 <Form.Item name="locationSelect" label="Location" rules={[{ required: true }]}>
                   <Select placeholder="Select…" onChange={(v: string) => setLocationSel(v)}
@@ -367,12 +390,12 @@ export default function EquipmentTab() {
               </Col>
             )}
           </Row>
-          {!isGenType && locationSel === 'Other' && (
+          {showTypedAsset && locationSel === 'Other' && (
             <Form.Item name="locationOther" label="Specify Location" rules={[{ required: true }]}>
               <Input placeholder="Enter specific location…" />
             </Form.Item>
           )}
-          {selectedGen && (
+          {selectedGen && !isManualGen && (
             <Alert message={`Location auto-set: ${GENERATOR_LIST.find(g => g.assetNo === selectedGen)?.location}`}
               type="info" showIcon style={{ marginBottom: 8 }} />
           )}
