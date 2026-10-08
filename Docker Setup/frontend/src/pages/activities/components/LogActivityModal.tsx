@@ -7,16 +7,10 @@ import { ACTIVITY_CATEGORY_META } from '../../../types';
 import type { ActivityCategory } from '../../../types';
 import { useAuthStore } from '../../../store/authStore';
 
+import { useGsStaff } from '../../../components/shared/StaffPicker';
 const { TextArea } = Input;
 const { Text }     = Typography;
 
-// Demo staff for proxy selection
-const STAFF_LIST = [
-  { email: 'technician@demo.local', name: 'Chukwudi Nwosu' },
-  { email: 'tech2@demo.local',      name: 'Grace Obi'       },
-  { email: 'driver@demo.local',     name: 'Bola Adeyemi'    },
-  { email: 'driver2@demo.local',    name: 'Kwame Asante'    },
-];
 
 interface Props {
   open:      boolean;
@@ -39,6 +33,8 @@ export default function LogActivityModal({ open, onClose, onCreated }: Props) {
   const canProxy = role === 'DepartmentManager' || role === 'Supervisor' || role === 'SystemAdmin';
 
   const [form]        = Form.useForm<FormValues>();
+  // Real GS staff (replaces the prototype's demo names); names can still be typed.
+  const staffList = useGsStaff();
   const [loading,  setLoading]  = useState(false);
   const [error,    setError]    = useState<string | null>(null);
   const [isProxy,  setIsProxy]  = useState(false);
@@ -57,7 +53,7 @@ export default function LogActivityModal({ open, onClose, onCreated }: Props) {
       setError(null);
 
       const typedName = (vals.staffName ?? '').trim();
-      const matched   = STAFF_LIST.find(s => s.name.toLowerCase() === typedName.toLowerCase());
+      const matched   = staffList.find(s => s.name.toLowerCase() === typedName.toLowerCase());
       const req = {
         // For a typed (non-listed) staff member we key the record on their name so
         // proxy activities still group correctly even when they aren't a system user.
@@ -122,7 +118,7 @@ export default function LogActivityModal({ open, onClose, onCreated }: Props) {
               placeholder="Type or select staff name"
               filterOption={(input, option) =>
                 String(option?.value ?? '').toLowerCase().includes(input.toLowerCase())}
-              options={STAFF_LIST.map(s => ({ value: s.name }))}
+              options={staffList.map(s => ({ value: s.name }))}
             />
           </Form.Item>
         )}

@@ -867,6 +867,10 @@ export interface VehicleMaintenanceStats {
   completedThisMonth: number;
   rejected:           number;
   longStanding:       number;
+  /** In progress — not completed or rejected. All time, or raised in the chosen month. */
+  open?:              number;
+  /** Work completed. All time, or raised in the chosen month. */
+  closed?:            number;
 }
 
 export interface VehicleMaintenanceListResponse {
@@ -1618,6 +1622,11 @@ export interface ElectricityPurchase {
   createdAt:              string;
   lastEditedByName?:      string;
   lastEditedAt?:          string;
+  /** PHED meter log. */
+  previousMeterReading?:  number;
+  currentMeterReading?:   number;
+  /** ₦ per kWh for this purchase (amount ÷ units). */
+  unitRateNaira?:         number;
 }
 
 export interface ElectricityBalance {

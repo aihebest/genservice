@@ -217,8 +217,19 @@ public class GeneratorMonitoringController(
         db.GeneratorDailyReadings.Add(reading);
         await db.SaveChangesAsync();
 
-        // Raise an in-app maintenance notification when approaching the service interval.
-        if (alertActive)
+        // Raise an in-app maintenance notification when approaching the service
+        // interval — but once per service cycle, not on every reading. Readings
+        // are logged daily, so alerting on each one buried the manager under the
+        // same "MIKANO due soon" message (341 notifications at last count).
+        // Alert when the generator first enters the warning band, and once more
+        // when it actually reaches its service point. Logging the service resets
+        // the cycle.
+        var alreadyWarned = last is not null && last.ServiceAlertActive && !last.ServiceCompleted;
+        var nowDue        = remaining <= 0;
+        var wasDue        = last is not null && last.RemainingServiceHours <= 0 && !last.ServiceCompleted;
+        var shouldNotify  = alertActive && (!alreadyWarned || (nowDue && !wasDue));
+
+        if (shouldNotify)
         {
             await notify.CreateAsync(
                 title:      $"⚠️ Generator service due soon: {reading.AssetDescription}",

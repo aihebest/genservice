@@ -19,7 +19,15 @@ export interface UserListQuery {
   pageSize?:  number;
 }
 
+/** Active General Service staff, for "Assign to" pickers. Open to any signed-in user. */
+export interface StaffOption { email: string; name: string; role: string; }
+
 const usersApi = {
+  staff: async (): Promise<StaffOption[]> => {
+    const res = await apiClient.get<StaffOption[]>(`${BASE}/staff`);
+    return res.data;
+  },
+
   list: async (params: UserListQuery = {}): Promise<UserListResponse> => {
     const q = new URLSearchParams();
     if (params.role)       q.set('role',       params.role);

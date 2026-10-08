@@ -17,7 +17,25 @@ public record CreateScheduleRequest(
 public record CompleteScheduleRequest(
     string?  Notes,
     string   CompletedByEmail,
-    string   CompletedByName
+    string   CompletedByName,
+    /// <summary>YYYY-MM-DD — when the work was actually done. Defaults to today.</summary>
+    string?  CompletedOn = null,
+    /// <summary>Who carried it out — staff member or vendor.</summary>
+    string?  DoneBy      = null
+);
+
+/// <summary>One entry in the scheduler's completion history.</summary>
+public record ScheduleCompletionDto(
+    Guid     Id,
+    Guid     ScheduleId,
+    string   TaskName,
+    string   Category,
+    string?  Location,
+    string   CompletedOn,     // YYYY-MM-DD
+    string?  DoneBy,
+    string?  Notes,
+    string   LoggedByName,
+    DateTime CreatedAt
 );
 
 public record UpdateScheduleRequest(

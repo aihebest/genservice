@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Alert, Button, Card, Col, Form, Input, InputNumber, Modal, Popconfirm, Row,
   Select, Space, Tag, Tooltip, Typography, DatePicker, message,
@@ -28,6 +28,30 @@ export default function ElectricityPage() {
   const [editing, setEditing]   = useState<ElectricityPurchase | null>(null);
   const [form] = Form.useForm();
   const purchaseType = Form.useWatch('purchaseType', form) as string | undefined;
+  // PHED meter log — live consumption and unit-rate preview.
+  const formLocation = Form.useWatch('location', form) as string | undefined;
+  const prevReading  = Form.useWatch('previousMeterReading', form) as number | undefined;
+  const currReading  = Form.useWatch('currentMeterReading', form) as number | undefined;
+  const amountWatch  = Form.useWatch('amountNaira', form) as number | undefined;
+  const unitsWatch   = Form.useWatch('unitsKwh', form) as number | undefined;
+  const isPhed = purchaseType === 'PHED';
+  const consumed = isPhed && prevReading != null && currReading != null && currReading >= prevReading
+    ? currReading - prevReading : undefined;
+  const rateUnits = unitsWatch || consumed;
+  const unitRate  = amountWatch && rateUnits ? amountWatch / rateUnits : undefined;
+
+  // New PHED record: pre-fill "Previous reading" from the last one at this location.
+  useEffect(() => {
+    if (!open || editing || !isPhed || !formLocation) return;
+    electricityApi.lastPhedReading(formLocation)
+      .then(r => form.setFieldsValue({ previousMeterReading: r.reading ?? undefined }))
+      .catch(() => { /* leave it for the user to type */ });
+  }, [open, editing, isPhed, formLocation, form]);
+
+  // Units consumed follow the two readings unless the user typed units themselves.
+  useEffect(() => {
+    if (consumed != null && !form.isFieldTouched('unitsKwh')) form.setFieldsValue({ unitsKwh: consumed });
+  }, [consumed, form]);
 
   // Only managers/admins may correct existing records (enforced server-side too).
   const role = useAuthStore(s => s.user?.role);
@@ -54,6 +78,7 @@ export default function ElectricityPage() {
       vendor: r.vendor, paymentReference: r.paymentReference, tokenNumber: r.tokenNumber,
       meterReadingKwh: r.meterReadingKwh, lowBalanceThresholdKwh: r.lowBalanceThresholdKwh,
       notes: r.notes,
+      previousMeterReading: r.previousMeterReading, currentMeterReading: r.currentMeterReading,
     });
     setOpen(true);
   };
@@ -75,6 +100,8 @@ export default function ElectricityPage() {
         meterReadingKwh:        v.meterReadingKwh as number | undefined,
         lowBalanceThresholdKwh: v.lowBalanceThresholdKwh as number | undefined,
         notes:                  v.notes as string | undefined,
+        previousMeterReading:   v.previousMeterReading as number | undefined,
+        currentMeterReading:    v.currentMeterReading as number | undefined,
       };
       if (editing) {
         await electricityApi.update(editing.id, payload);
@@ -110,6 +137,13 @@ export default function ElectricityPage() {
       render: (v: number) => `₦${v.toLocaleString()}` },
     { title: 'Units', dataIndex: 'unitsKwh', width: 100,
       render: (v: number) => `${v.toLocaleString()} kWh` },
+    // PHED meter log: previous → current reading, and the effective tariff.
+    { title: 'Prev. Reading', dataIndex: 'previousMeterReading', width: 115,
+      render: (v?: number) => v != null ? v.toLocaleString() : '—' },
+    { title: 'Current Reading', dataIndex: 'currentMeterReading', width: 125,
+      render: (v?: number) => v != null ? v.toLocaleString() : '—' },
+    { title: 'Unit Rate', dataIndex: 'unitRateNaira', width: 115,
+      render: (v?: number) => v != null ? `₦${v.toLocaleString(undefined, { maximumFractionDigits: 2 })}/kWh` : '—' },
     { title: 'Status', dataIndex: 'status', width: 110,
       render: (v: ElectricityStatus) => {
         const m = ELECTRICITY_STATUS_META[v];
@@ -221,11 +255,40 @@ export default function ElectricityPage() {
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="unitsKwh" label="Units (kWh)" rules={[{ required: true }]}>
+              <Form.Item name="unitsKwh" label={isPhed ? 'Units Consumed (kWh)' : 'Units (kWh)'} rules={[{ required: true }]}
+                tooltip={isPhed ? 'Filled in from current − previous reading; you can override it.' : undefined}>
                 <InputNumber style={{ width: '100%' }} min={0} placeholder="e.g. 250" />
               </Form.Item>
             </Col>
           </Row>
+          {isPhed && (
+            <Row gutter={12}>
+              <Col span={8}>
+                <Form.Item name="previousMeterReading" label="Previous Reading"
+                  tooltip="Meter reading at the last bill — pre-filled from the last PHED record for this location.">
+                  <InputNumber style={{ width: '100%' }} min={0} placeholder="e.g. 48210" />
+                </Form.Item>
+              </Col>
+              <Col span={8}>
+                <Form.Item name="currentMeterReading" label="Current Reading"
+                  rules={[({ getFieldValue }) => ({
+                    validator: (_, v) => v == null || getFieldValue('previousMeterReading') == null
+                      || v >= getFieldValue('previousMeterReading')
+                      ? Promise.resolve()
+                      : Promise.reject(new Error('Lower than the previous reading')),
+                  })]}>
+                  <InputNumber style={{ width: '100%' }} min={0} placeholder="e.g. 49570" />
+                </Form.Item>
+              </Col>
+              <Col span={8}>
+                <Form.Item label="Unit Rate (₦/kWh)" tooltip="Amount ÷ units. PHED's tariff changes from time to time.">
+                  <Text strong style={{ fontSize: 16 }}>
+                    {unitRate ? `₦${unitRate.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '—'}
+                  </Text>
+                </Form.Item>
+              </Col>
+            </Row>
+          )}
           <Row gutter={12}>
             <Col span={12}>
               <Form.Item name="purchaseDate" label="Purchase Date">

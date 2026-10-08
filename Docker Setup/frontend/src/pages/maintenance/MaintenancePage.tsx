@@ -52,8 +52,8 @@ export default function MaintenancePage() {
 
 import { useCallback } from 'react';
 import {
-  Alert, Button, Card, Descriptions, Divider, Drawer, Dropdown,
-  Form, InputNumber, Modal, Select, Space,
+  Alert, Button, Card, DatePicker, Descriptions, Divider, Drawer, Dropdown,
+  Form, Input, InputNumber, Modal, Select, Space,
   Tag, Timeline, Tooltip, message,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
@@ -61,7 +61,7 @@ import {
   BellOutlined, EditOutlined,
   PlusOutlined, ReloadOutlined, WarningOutlined,
   ClockCircleOutlined, CheckCircleOutlined,
-  ThunderboltOutlined, DownloadOutlined,
+  ThunderboltOutlined, DownloadOutlined, HistoryOutlined,
 } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import { exportMaintenanceSchedules } from '../../api/export.api';
@@ -73,6 +73,8 @@ import { MAINTENANCE_CATEGORY_META } from '../../types';
 import type { MaintenanceSchedule, MaintenanceCategory } from '../../types';
 import { useAuthStore } from '../../store/authStore';
 import NewScheduleModal from './components/NewScheduleModal';
+import ScheduleCompletionLog from './components/ScheduleCompletionLog';
+import StaffPicker, { useGsStaff, emailForName } from '../../components/shared/StaffPicker';
 
 import FilterableTable from '../../components/shared/FilterableTable';
 dayjs.extend(relativeTime);
@@ -222,6 +224,16 @@ function SchedulerContent() {
   // Complete
   const [completeTarget, setCompleteTarget] = useState<MaintenanceSchedule | null>(null);
   const [completeNotes,  setCompleteNotes]  = useState('');
+  // When the work actually happened (often logged a day or two later) and who did it.
+  const [completeDate,   setCompleteDate]   = useState<dayjs.Dayjs>(dayjs());
+  const [completeDoneBy, setCompleteDoneBy] = useState('');
+  const resetComplete = () => {
+    setCompleteTarget(null); setCompleteNotes(''); setCompleteDate(dayjs()); setCompleteDoneBy('');
+  };
+
+  // Completion history drawer
+  const [logOpen, setLogOpen] = useState(false);
+  const gsStaff = useGsStaff();
 
   // Edit
   const [editTarget, setEditTarget] = useState<MaintenanceSchedule | null>(null);
@@ -264,8 +276,13 @@ function SchedulerContent() {
   // ── Mutations ──────────────────────────────────────────────────────────────
   const completeMut = useMutation({
     mutationFn: ({ id, notes }: { id: string; notes: string }) =>
-      maintenanceApi.complete(id, user!.email, user!.fullName, notes),
-    onSuccess: () => { message.success('Task marked complete. Next due date recalculated.'); setCompleteTarget(null); setCompleteNotes(''); refresh(); },
+      maintenanceApi.complete(id, user!.email, user!.fullName, notes,
+        completeDate.format('YYYY-MM-DD'), completeDoneBy.trim() || undefined),
+    onSuccess: () => {
+      message.success('Task marked complete and added to the Completion Log.');
+      resetComplete(); refresh();
+      qc.invalidateQueries({ queryKey: ['maintenance', 'completions'] });
+    },
     onError:   () => message.error('Failed to mark complete.'),
   });
 
@@ -292,6 +309,7 @@ function SchedulerContent() {
       location:       r.location,
       frequencyLabel: r.frequencyLabel,
       frequencyDays:  r.frequencyDays,
+      assignedToName: r.assignedToName,
     });
   }, setSnoozeTarget);
 
@@ -309,6 +327,9 @@ function SchedulerContent() {
           <Space>
             <Tooltip title="Refresh">
               <Button icon={<ReloadOutlined />} onClick={refresh} loading={isFetching} />
+            </Tooltip>
+            <Tooltip title="Every date a scheduled task was actually carried out">
+              <Button icon={<HistoryOutlined />} onClick={() => setLogOpen(true)}>Completion Log</Button>
             </Tooltip>
             {canManage && (
               <Button type="primary" icon={<PlusOutlined />} onClick={() => setNewModalOpen(true)}>
@@ -493,7 +514,7 @@ function SchedulerContent() {
         title="Mark as Completed"
         open={!!completeTarget}
         onOk={() => completeMut.mutate({ id: completeTarget!.id, notes: completeNotes })}
-        onCancel={() => { setCompleteTarget(null); setCompleteNotes(''); }}
+        onCancel={resetComplete}
         okText="Confirm Completion"
         okButtonProps={{ style: { background: '#52c41a', borderColor: '#52c41a' } }}
         confirmLoading={completeMut.isPending}
@@ -508,10 +529,23 @@ function SchedulerContent() {
               <Descriptions.Item label="Location">{completeTarget.location || '—'}</Descriptions.Item>
               <Descriptions.Item label="Frequency">{completeTarget.frequencyLabel} ({completeTarget.frequencyDays} days)</Descriptions.Item>
               <Descriptions.Item label="Next Due">
-                {dayjs().add(completeTarget.frequencyDays, 'day').format('D MMM YYYY')} (auto-calculated)
+                {completeDate.add(completeTarget.frequencyDays, 'day').format('D MMM YYYY')} (counted from the date done)
               </Descriptions.Item>
             </Descriptions>
             <Form layout="vertical">
+              <Space style={{ display: 'flex' }} align="start">
+                <Form.Item label="Date actually done" required style={{ minWidth: 180 }}
+                  tooltip="The day the work was carried out — it can be earlier than today.">
+                  <DatePicker value={completeDate} format="D MMM YYYY" allowClear={false}
+                    disabledDate={d => d.isAfter(dayjs(), 'day')}
+                    onChange={d => d && setCompleteDate(d)} />
+                </Form.Item>
+                <Form.Item label="Done by" style={{ flex: 1, minWidth: 220 }}
+                  tooltip="Staff member or vendor who carried out the work.">
+                  <Input value={completeDoneBy} onChange={e => setCompleteDoneBy(e.target.value)}
+                    placeholder="e.g. Rentokil, or Emeka (GS)" />
+                </Form.Item>
+              </Space>
               <Form.Item label="Completion Notes (optional)">
                 <Form.Item name="notes" noStyle>
                   <textarea
@@ -541,9 +575,14 @@ function SchedulerContent() {
               type="primary"
               loading={editMut.isPending}
               onClick={() =>
-                editForm.validateFields().then(vals =>
-                  editMut.mutate({ id: editTarget!.id, patch: vals })
-                )
+                editForm.validateFields().then(vals => {
+                  // Assignee: keep the typed/picked name; attach the email when the
+                  // name is a known GS user, and send '' to clear an assignment.
+                  const name  = (vals.assignedToName ?? '').trim();
+                  const patch = { ...vals, assignedToName: name,
+                                  assignedToEmail: emailForName(gsStaff, name) ?? '' };
+                  editMut.mutate({ id: editTarget!.id, patch });
+                })
               }
             >
               Save Changes
@@ -567,11 +606,18 @@ function SchedulerContent() {
           <Form.Item name="frequencyDays" label="Frequency (days)">
             <InputNumber min={1} max={365} style={{ width: '100%' }} />
           </Form.Item>
+          <Form.Item name="assignedToName" label="Assigned To"
+            tooltip="Pick a General Service staff member, or type a name.">
+            <StaffPicker />
+          </Form.Item>
           <Form.Item name="description" label="Description">
             <textarea rows={3} style={{ width: '100%', padding: 8, border: '1px solid #d9d9d9', borderRadius: 6 }} />
           </Form.Item>
         </Form>
       </Drawer>
+
+      {/* ── Completion Log ──────────────────────────────────────── */}
+      <ScheduleCompletionLog open={logOpen} onClose={() => setLogOpen(false)} />
 
       {/* ── Snooze Reminder Modal ───────────────────────────────── */}
       <Modal

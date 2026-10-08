@@ -245,6 +245,28 @@ public class UserManagementController(
         ));
     }
 
+    // ── GET /api/v1/users/staff ───────────────────────────────────────────────
+    /// <summary>
+    /// Active General Service staff, for "Assign to" pickers. Open to any signed-in
+    /// user (the full user list is management-only) and deliberately minimal —
+    /// name, email and role, nothing else.
+    ///
+    /// Replaces the hard-coded demo names the scheduler shipped with, which is
+    /// why people outside the GS team appeared as assignees.
+    /// </summary>
+    [HttpGet("staff")]
+    public async Task<ActionResult<IEnumerable<StaffOptionDto>>> Staff()
+    {
+        var staff = await db.AppUsers.AsNoTracking()
+            .Where(u => u.IsActive && u.Department.StartsWith("General"))
+            .OrderBy(u => u.FullName)
+            .Select(u => new StaffOptionDto(u.Email, u.FullName, u.Role))
+            .ToListAsync();
+        return Ok(staff);
+    }
+
+    public record StaffOptionDto(string Email, string Name, string Role);
+
     // ── POST /api/v1/users/me/change-password ─────────────────────────────────
     /// <summary>Any authenticated user can change their own password.</summary>
     [HttpPost("me/change-password")]

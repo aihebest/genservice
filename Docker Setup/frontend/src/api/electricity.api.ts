@@ -23,6 +23,8 @@ export const electricityApi = {
     receiptAttachment?:      string;
     lowBalanceThresholdKwh?: number;
     notes?:                  string;
+    previousMeterReading?:   number;
+    currentMeterReading?:    number;
   }) => apiClient.post<ElectricityPurchase>('/electricity', data).then(r => r.data),
 
   // Manager-only correction of an existing purchase.
@@ -39,7 +41,14 @@ export const electricityApi = {
     receiptAttachment?:      string;
     lowBalanceThresholdKwh?: number;
     notes?:                  string;
+    previousMeterReading?:   number;
+    currentMeterReading?:    number;
   }) => apiClient.put<ElectricityPurchase>(`/electricity/${id}`, data).then(r => r.data),
 
   remove: (id: string) => apiClient.delete(`/electricity/${id}`),
+
+  /** Latest PHED meter reading at a location — pre-fills "Previous reading". */
+  lastPhedReading: (location: string) =>
+    apiClient.get<{ reading?: number | null; date?: string | null }>('/electricity/last-phed-reading', { params: { location } })
+      .then(r => r.data),
 };

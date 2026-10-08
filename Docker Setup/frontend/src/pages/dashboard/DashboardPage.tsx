@@ -8,7 +8,7 @@ import {
   WarningOutlined, ClockCircleOutlined, CheckCircleOutlined,
   ReloadOutlined, ArrowRightOutlined, ThunderboltOutlined,
   EnvironmentOutlined, UserOutlined, ShopOutlined,
-  FireOutlined, FileProtectOutlined, CalendarOutlined,
+  FireOutlined, FileProtectOutlined, CalendarOutlined, InfoCircleOutlined,
 } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
@@ -48,6 +48,8 @@ function getAvatarColor(name: string) {
 
 // ── KPI Card ───────────────────────────────────────────────────────────────────
 interface KpiProps {
+  /** Plain-English explanation shown on hover — what this number counts. */
+  hint?: string;
   title:      string;
   value:      number | string | undefined;
   suffix?:    string;
@@ -58,7 +60,7 @@ interface KpiProps {
   alert?:     boolean;
   precision?: number;
 }
-function KpiCard({ title, value, suffix, icon, color, loading, onClick, alert, precision }: KpiProps) {
+function KpiCard({ title, value, suffix, icon, color, loading, onClick, alert, precision, hint }: KpiProps) {
   const numVal = typeof value === 'number' ? value : Number(value ?? 0);
   return (
     <Card
@@ -83,7 +85,12 @@ function KpiCard({ title, value, suffix, icon, color, loading, onClick, alert, p
         {loading
           ? <Skeleton.Button active style={{ width: 80, height: 40 }} />
           : <Statistic
-              title={<span style={{ fontSize: 11, color: '#8c8c8c' }}>{title}</span>}
+              title={
+                <Tooltip title={hint}>
+                  <span style={{ fontSize: 11, color: '#8c8c8c', cursor: hint ? 'help' : undefined }}>
+                    {title}{hint && <InfoCircleOutlined style={{ marginLeft: 4, fontSize: 10 }} />}
+                  </span>
+                </Tooltip>}
               value={precision !== undefined ? numVal.toFixed(precision) : numVal}
               suffix={suffix && <span style={{ fontSize: 14 }}>{suffix}</span>}
               valueStyle={{
@@ -275,18 +282,21 @@ export default function DashboardPage() {
         <Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>
           Requests &amp; Operations
         </Text>
+        <Text type="secondary" style={{ fontSize: 11, marginLeft: 8 }}>
+          — day-to-day service requests and staff activity. Hover a card for what it counts.
+        </Text>
       </div>
       <Row gutter={[12, 12]} style={{ marginBottom: 20 }}>
         <Col xs={12} sm={8} md={8} lg={4}>
           <KpiCard
-            title="Open Requests" value={data?.requestsOpen} loading={isLoading}
+            title="Open Requests" hint="Service requests (Requests page) submitted and not yet finished — all open statuses." value={data?.requestsOpen} loading={isLoading}
             icon={<FormOutlined />} color="#1677ff"
             onClick={() => navigate('/requests')}
           />
         </Col>
         <Col xs={12} sm={8} md={8} lg={4}>
           <KpiCard
-            title="Pending Approval" value={data?.requestsPendingApproval} loading={isLoading}
+            title="Pending Approval" hint="Service requests waiting for a Line Manager or General Service approval." value={data?.requestsPendingApproval} loading={isLoading}
             icon={<ClockCircleOutlined />} color="#fa8c16"
             onClick={() => navigate('/requests')}
             alert={isApprover && (data?.requestsPendingApproval ?? 0) > 0}
@@ -294,21 +304,21 @@ export default function DashboardPage() {
         </Col>
         <Col xs={12} sm={8} md={8} lg={4}>
           <KpiCard
-            title="In Progress" value={data?.requestsInProgress} loading={isLoading}
+            title="In Progress" hint="Approved service requests a technician is currently working on." value={data?.requestsInProgress} loading={isLoading}
             icon={<ThunderboltOutlined />} color="#722ed1"
             onClick={() => navigate('/requests')}
           />
         </Col>
         <Col xs={12} sm={8} md={8} lg={4}>
           <KpiCard
-            title="Staff Active Now" value={data?.staffActiveNow} loading={isLoading}
+            title="Staff Active Now" hint="GS staff with an activity logged as in progress right now (Team Activities)." value={data?.staffActiveNow} loading={isLoading}
             icon={<TeamOutlined />} color="#52c41a"
             onClick={() => navigate('/activities')}
           />
         </Col>
         <Col xs={12} sm={8} md={8} lg={4}>
           <KpiCard
-            title="Overdue Maint." value={data?.maintenanceOverdue} loading={isLoading}
+            title="Overdue Maint." hint="Scheduled maintenance tasks (Maintenance → Scheduler) past their due date." value={data?.maintenanceOverdue} loading={isLoading}
             icon={<ToolOutlined />} color="#ff4d4f"
             onClick={() => navigate('/maintenance')}
             alert={(data?.maintenanceOverdue ?? 0) > 0}
@@ -316,7 +326,7 @@ export default function DashboardPage() {
         </Col>
         <Col xs={12} sm={8} md={8} lg={4}>
           <KpiCard
-            title="Done Today" value={data?.requestsCompletedToday} loading={isLoading}
+            title="Done Today" hint="Service requests completed today." value={data?.requestsCompletedToday} loading={isLoading}
             icon={<CheckCircleOutlined />} color="#13c2c2"
           />
         </Col>
@@ -327,11 +337,14 @@ export default function DashboardPage() {
         <Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>
           Module Overview
         </Text>
+        <Text type="secondary" style={{ fontSize: 11, marginLeft: 8 }}>
+          — headline figures from Fuel &amp; Power and the Maintenance Scheduler.
+        </Text>
       </div>
       <Row gutter={[12, 12]} style={{ marginBottom: 24 }}>
         <Col xs={12} sm={8} md={8} lg={4}>
           <KpiCard
-            title="Diesel Reqs Pending" value={data?.dieselReqsPending} loading={isLoading}
+            title="Diesel Reqs Pending" hint="Diesel requisitions waiting for approval (Fuel & Power → Diesel Records)." value={data?.dieselReqsPending} loading={isLoading}
             icon={<FileProtectOutlined />} color="#d4b106"
             onClick={() => navigate('/fuel')}
             alert={(data?.dieselReqsPending ?? 0) > 0}
@@ -339,7 +352,7 @@ export default function DashboardPage() {
         </Col>
         <Col xs={12} sm={8} md={8} lg={4}>
           <KpiCard
-            title="Diesel MTD" value={data?.dieselDispensedThisMonthLitres} loading={isLoading}
+            title="Diesel MTD" hint="Litres of diesel dispensed so far this month (month-to-date)." value={data?.dieselDispensedThisMonthLitres} loading={isLoading}
             icon={<FireOutlined />} color="#ff7a45"
             suffix="L"
             precision={0}
@@ -348,7 +361,7 @@ export default function DashboardPage() {
         </Col>
         <Col xs={12} sm={8} md={8} lg={4}>
           <KpiCard
-            title="Maint. Escalations" value={data?.maintenanceEscalations} loading={isLoading}
+            title="Maint. Escalations" hint="Scheduled tasks so overdue they have been escalated to the Supervisor or Department Manager." value={data?.maintenanceEscalations} loading={isLoading}
             icon={<CalendarOutlined />} color="#ff4d4f"
             onClick={() => navigate('/maintenance')}
             alert={(data?.maintenanceEscalations ?? 0) > 0}
@@ -356,7 +369,7 @@ export default function DashboardPage() {
         </Col>
         <Col xs={12} sm={8} md={8} lg={4}>
           <KpiCard
-            title="Due in 7 Days" value={data?.maintenanceDueSoon} loading={isLoading}
+            title="Due in 7 Days" hint="Scheduled maintenance tasks falling due within the next 7 days." value={data?.maintenanceDueSoon} loading={isLoading}
             icon={<ClockCircleOutlined />} color="#1677ff"
             onClick={() => navigate('/maintenance')}
           />

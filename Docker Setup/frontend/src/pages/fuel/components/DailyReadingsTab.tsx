@@ -51,6 +51,11 @@ function buildColumns(
           {v < 100 && '⚠ '}{v.toLocaleString()} L
         </Text>
       )},
+    // Diesel used since the previous reading (previous level + added − removed − current).
+    { title: 'Consumption', dataIndex: 'fuelConsumedLitres', key: 'consumed', width: 110,
+      render: (v?: number) => v != null
+        ? <Text style={{ fontSize: 13 }}>{v.toLocaleString()} L</Text>
+        : <Text type="secondary" style={{ fontSize: 12 }}>—</Text> },
     { title: 'Next Service', key: 'service', width: 135,
       render: (_: unknown, r) => (
         <div>

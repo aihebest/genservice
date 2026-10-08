@@ -145,7 +145,12 @@ public record VehicleMaintenanceStatsDto(
     int AwaitingFunds,
     int CompletedThisMonth,
     int Rejected,
-    int LongStanding
+    int LongStanding,
+    /// <summary>Requests still in progress — anything not completed or rejected.
+    /// All time, or raised in the selected month when a month is given.</summary>
+    int Open   = 0,
+    /// <summary>Requests whose work is completed. All time, or raised in the selected month.</summary>
+    int Closed = 0
 );
 
 public record VehicleMaintenanceListResponse(

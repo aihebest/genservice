@@ -13,8 +13,10 @@ export const vehicleMaintenanceApi = {
   list: (q?: VMQuery) =>
     apiClient.get<VehicleMaintenanceListResponse>('/vehicle-maintenance', { params: q }).then(r => r.data),
 
-  stats: () =>
-    apiClient.get<VehicleMaintenanceStats>('/vehicle-maintenance/stats').then(r => r.data),
+  /** `month` as "YYYY-MM" narrows Open/Closed to requests raised that month; omit for all time. */
+  stats: (month?: string) =>
+    apiClient.get<VehicleMaintenanceStats>('/vehicle-maintenance/stats', { params: month ? { month } : {} })
+      .then(r => r.data),
 
   getById: (id: string) =>
     apiClient.get<VehicleMaintenance>(`/vehicle-maintenance/${id}`).then(r => r.data),

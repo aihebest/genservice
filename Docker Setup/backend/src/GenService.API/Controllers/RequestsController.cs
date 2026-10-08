@@ -424,6 +424,34 @@ public class RequestsController(
         return Ok(ToDto(r));
     }
 
+    // ── DELETE /api/v1/requests/{id}/permanent ──────────────────────────────
+    /// <summary>
+    /// Remove a request entirely — for entries raised in error or as tests, which
+    /// otherwise sit in the totals forever. "Cancel" above only changes status.
+    ///
+    /// Department Manager / System Admin only. The request's progress logs and
+    /// notifications go with it, so nothing is left pointing at a missing record.
+    /// </summary>
+    [HttpDelete("{id:guid}/permanent")]
+    public async Task<IActionResult> DeletePermanently(Guid id)
+    {
+        if (CallerRole is not ("DepartmentManager" or "SystemAdmin"))
+            return StatusCode(403, new { message = "Only a Department Manager or System Admin can delete requests." });
+
+        var r = await db.ServiceRequests.FindAsync(id);
+        if (r is null) return NotFound(new { message = $"Request {id} not found." });
+
+        var key = id.ToString();
+        db.TaskProgressLogs.RemoveRange(db.TaskProgressLogs.Where(l => l.EntityId == key));
+        db.AppNotifications.RemoveRange(db.AppNotifications.Where(n => n.EntityId == key));
+        db.ServiceRequests.Remove(r);
+        await db.SaveChangesAsync();
+
+        logger.LogWarning("Request {Ticket} ('{Title}') permanently deleted by {User}",
+            r.TicketNumber, r.Title, User.FindFirstValue(ClaimTypes.Email));
+        return NoContent();
+    }
+
     // ── GET /api/v1/requests/{id}/email-approve?token=xxx ───────────────────
     // One-click link sent to line manager. No login required.
     [HttpGet("{id:guid}/email-approve")]

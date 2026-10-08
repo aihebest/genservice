@@ -29,6 +29,14 @@ public class ElectricityPurchase
     public string?  TokenNumber      { get; set; }                       // recharge token
     public double?  MeterReadingKwh  { get; set; }                       // current meter reading (remaining units), if available
 
+    // ── PHED (postpaid) meter log ─────────────────────────────────────────────
+    // A postpaid meter counts up. Recording both readings gives a consumption log
+    // (current − previous) and, with the amount paid, the effective unit rate —
+    // which PHED changes from time to time. Separate from MeterReadingKwh above,
+    // which on prepaid meters means units *remaining*.
+    public double?  PreviousMeterReading { get; set; }
+    public double?  CurrentMeterReading  { get; set; }
+
     // ── Attachments ───────────────────────────────────────────────────────────
     public string?  ReceiptAttachment { get; set; }                      // invoice/receipt filename or URL
 

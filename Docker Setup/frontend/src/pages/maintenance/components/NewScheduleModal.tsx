@@ -7,6 +7,7 @@ import { maintenanceApi } from '../../../api/maintenance.api';
 import { MAINTENANCE_CATEGORY_META } from '../../../types';
 import type { MaintenanceCategory } from '../../../types';
 
+import StaffPicker, { useGsStaff, emailForName } from '../../../components/shared/StaffPicker';
 const { TextArea } = Input;
 
 const FREQUENCY_PRESETS = [
@@ -17,11 +18,6 @@ const FREQUENCY_PRESETS = [
   { label: 'Custom',    days: 0   },
 ];
 
-const STAFF_LIST = [
-  { email: 'technician@demo.local', name: 'Chukwudi Nwosu' },
-  { email: 'tech2@demo.local',      name: 'Grace Obi'       },
-  { email: 'supervisor@demo.local', name: 'Emeka Okonkwo'   },
-];
 
 interface Props {
   open:      boolean;
@@ -42,6 +38,7 @@ interface FormValues {
 
 export default function NewScheduleModal({ open, onClose, onCreated }: Props) {
   const [form]              = Form.useForm<FormValues>();
+  const gsStaff = useGsStaff();
   const [loading, setLoading]         = useState(false);
   const [error,   setError]           = useState<string | null>(null);
   const [isCustom, setIsCustom]       = useState(false);
@@ -60,7 +57,8 @@ export default function NewScheduleModal({ open, onClose, onCreated }: Props) {
 
       const preset     = FREQUENCY_PRESETS.find(p => p.label === vals.frequencyPreset);
       const freqDays   = isCustom ? (vals.frequencyDays ?? 30) : (preset?.days ?? 30);
-      const assignedTo = STAFF_LIST.find(s => s.email === vals.assignedTo);
+      // Name as picked or typed; email only when it's a known GS user.
+      const assignedName = (vals.assignedTo ?? '').trim() || undefined;
 
       await maintenanceApi.create({
         taskName:        vals.taskName,
@@ -70,8 +68,8 @@ export default function NewScheduleModal({ open, onClose, onCreated }: Props) {
         frequencyLabel:  vals.frequencyPreset,
         frequencyDays:   freqDays,
         nextDueAt:       vals.nextDueAt.toISOString(),
-        assignedToEmail: assignedTo?.email,
-        assignedToName:  assignedTo?.name,
+        assignedToEmail: emailForName(gsStaff, assignedName),
+        assignedToName:  assignedName,
       });
 
       onCreated();
@@ -178,12 +176,9 @@ export default function NewScheduleModal({ open, onClose, onCreated }: Props) {
           </Form.Item>
         </Space>
 
-        <Form.Item name="assignedTo" label="Assign To">
-          <Select placeholder="Assign to staff member (optional)" allowClear>
-            {STAFF_LIST.map(s => (
-              <Select.Option key={s.email} value={s.email}>{s.name}</Select.Option>
-            ))}
-          </Select>
+        <Form.Item name="assignedTo" label="Assign To"
+          tooltip="Pick a General Service staff member, or type a name.">
+          <StaffPicker placeholder="Assign to (optional)" />
         </Form.Item>
       </Form>
     </Modal>

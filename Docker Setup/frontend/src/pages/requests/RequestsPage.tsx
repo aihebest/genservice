@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
-import { Button, Card, Input, Select, Space, Tag, Badge, Typography, Tooltip, Tabs, Row, Col } from 'antd';
+import { Button, Card, Input, Popconfirm, Select, Space, Tag, Badge, Typography, Tooltip, Tabs, Row, Col, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { PlusOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons';
+import { PlusOutlined, SearchOutlined, ReloadOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -37,7 +37,8 @@ const STATUS_TABS = [
 
 // ── Table columns ──────────────────────────────────────────────────────────
 function buildColumns(
-  onView: (r: ServiceRequest) => void
+  onView: (r: ServiceRequest) => void,
+  onDelete?: (r: ServiceRequest) => void,
 ): ColumnsType<ServiceRequest> {
   return [
     {
@@ -121,9 +122,21 @@ function buildColumns(
     {
       title: '',
       key: 'actions',
-      width: 70,
+      width: onDelete ? 110 : 70,
       render: (_: unknown, r: ServiceRequest) => (
-        <Button size="small" onClick={() => onView(r)}>View</Button>
+        <Space size={4} onClick={e => e.stopPropagation()}>
+          <Button size="small" onClick={() => onView(r)}>View</Button>
+          {/* Manager-only: removes entries raised in error, e.g. test requests. */}
+          {onDelete && (
+            <Popconfirm
+              title={`Delete ${r.ticketNumber}?`}
+              description="This permanently removes the request and its logs. It cannot be undone."
+              okText="Delete" okButtonProps={{ danger: true }}
+              onConfirm={() => onDelete(r)}>
+              <Button size="small" danger icon={<DeleteOutlined />} />
+            </Popconfirm>
+          )}
+        </Space>
       ),
     },
   ];
@@ -183,7 +196,19 @@ export default function RequestsPage() {
     setPage(1);
   };
 
-  const columns = buildColumns(openDetail);
+  const canDelete = role === 'DepartmentManager' || role === 'SystemAdmin';
+  const handleDelete = async (r: ServiceRequest) => {
+    try {
+      await requestsApi.deletePermanently(r.id);
+      message.success(`${r.ticketNumber} deleted`);
+      qc.invalidateQueries({ queryKey: ['requests'] });
+    } catch (e: unknown) {
+      message.error((e as { response?: { data?: { message?: string } } })?.response?.data?.message
+        ?? 'Could not delete the request.');
+    }
+  };
+
+  const columns = buildColumns(openDetail, canDelete ? handleDelete : undefined);
 
   return (
     <div>

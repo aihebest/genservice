@@ -388,9 +388,14 @@ export default function FleetPage() {
     queryFn: () => vehicleMaintenanceApi.list({ status: activeStatus || undefined, search: search || undefined, page, pageSize: 15 }),
   });
 
+  // "YYYY-MM" or undefined (all time) for the Open / Closed cards.
+  const [statsMonth, setStatsMonth] = useState<string | undefined>();
+
   const { data: stats } = useQuery({
-    queryKey: ['vm', 'stats'],
-    queryFn:  vehicleMaintenanceApi.stats,
+    queryKey: ['vm', 'stats', statsMonth],
+    // Wrapped, not passed directly: React Query would otherwise hand its own
+    // context object to stats() as the month argument.
+    queryFn:  () => vehicleMaintenanceApi.stats(statsMonth),
     refetchInterval: 30_000,
   });
 
@@ -513,6 +518,33 @@ export default function FleetPage() {
           action={<Button size="small" onClick={() => setActiveStatus('InWorkshop')}>View</Button>}
         />
       )}
+
+      {/* Open / Closed — the manager's headline view. All time by default; pick a
+          month to see only requests raised in it. Closed = work completed. */}
+      <Row gutter={16} align="middle" style={{ marginBottom: 12 }}>
+        <Col style={{ flex: '1 1 200px', minWidth: 180, marginBottom: 8 }}>
+          <Card size="small" styles={{ body: { padding: '14px 18px' } }}>
+            <Statistic
+              title={<Text style={{ fontSize: 12 }}>Open {statsMonth ? `· raised ${dayjs(statsMonth + '-01').format('MMM YYYY')}` : '· all time'}</Text>}
+              value={stats?.open ?? 0} valueStyle={{ color: '#fa8c16', fontSize: 28, fontWeight: 700 }} />
+          </Card>
+        </Col>
+        <Col style={{ flex: '1 1 200px', minWidth: 180, marginBottom: 8 }}>
+          <Card size="small" styles={{ body: { padding: '14px 18px' } }}>
+            <Statistic
+              title={<Text style={{ fontSize: 12 }}>Closed {statsMonth ? `· raised ${dayjs(statsMonth + '-01').format('MMM YYYY')}` : '· all time'}</Text>}
+              value={stats?.closed ?? 0} valueStyle={{ color: '#52c41a', fontSize: 28, fontWeight: 700 }} />
+          </Card>
+        </Col>
+        <Col style={{ marginBottom: 8 }}>
+          <Space direction="vertical" size={2}>
+            <Text type="secondary" style={{ fontSize: 12 }}>Filter Open / Closed by month</Text>
+            <DatePicker picker="month" allowClear placeholder="All time" format="MMM YYYY"
+              value={statsMonth ? dayjs(statsMonth + '-01') : null}
+              onChange={d => setStatsMonth(d ? d.format('YYYY-MM') : undefined)} />
+          </Space>
+        </Col>
+      </Row>
 
       <Row gutter={16} style={{ marginBottom: 20 }}>
         {[

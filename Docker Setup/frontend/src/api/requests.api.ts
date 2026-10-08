@@ -51,4 +51,8 @@ export const requestsApi = {
 
   cancel: (id: string) =>
     apiClient.delete<ServiceRequest>(`/requests/${id}`).then(r => r.data),
+
+  /** Remove a request entirely (Department Manager / System Admin only). */
+  deletePermanently: (id: string) =>
+    apiClient.delete(`/requests/${id}/permanent`).then(() => undefined),
 };

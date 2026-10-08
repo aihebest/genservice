@@ -14,7 +14,11 @@ public record CreateElectricityPurchaseRequest(
     double?  MeterReadingKwh        = null,
     string?  ReceiptAttachment      = null,
     double   LowBalanceThresholdKwh = 50,
-    string?  Notes                  = null
+    string?  Notes                  = null,
+    /// <summary>PHED only — meter reading at the previous bill. Defaults to the last one recorded.</summary>
+    double?  PreviousMeterReading   = null,
+    /// <summary>PHED only — meter reading now.</summary>
+    double?  CurrentMeterReading    = null
 );
 
 public record ElectricityPurchaseDto(
@@ -37,7 +41,11 @@ public record ElectricityPurchaseDto(
     string   LoggedByName,
     DateTime CreatedAt,
     string?   LastEditedByName = null,
-    DateTime? LastEditedAt     = null
+    DateTime? LastEditedAt     = null,
+    double?   PreviousMeterReading = null,
+    double?   CurrentMeterReading  = null,
+    /// <summary>Naira per kWh for this purchase (amount ÷ units) — tracks tariff changes.</summary>
+    decimal?  UnitRateNaira        = null
 );
 
 public record ElectricityQuery(

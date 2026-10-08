@@ -1190,6 +1190,27 @@ static async Task ApplySchemaUpdatesAsync(
             // MRSF register column that Equipment and Facility already had.
             AddColIfMissing ("VehicleMaintenanceRequests", "JustificationEvaluation",    "nvarchar(2000)"),
             AddColIfMissing ("VehicleMaintenanceRequests", "NextServiceMileage",         "float"),
+            // PHED postpaid meter log (previous / current reading).
+            AddColIfMissing ("ElectricityPurchases", "PreviousMeterReading", "float"),
+            AddColIfMissing ("ElectricityPurchases", "CurrentMeterReading",  "float"),
+            // Completed vehicle requests are Closed on the register. Existing ones
+            // were completed before that rule was applied. Idempotent.
+            """
+            UPDATE VehicleMaintenanceRequests SET NotificationStatus = 'Closed'
+             WHERE Status = 'Completed' AND (NotificationStatus IS NULL OR NotificationStatus <> 'Closed');
+            """,
+            // One-off clean-up of the generator "service due soon" flood: before
+            // the fix, one alert was raised per reading. Keep the newest per
+            // generator. Bounded by date so it can never touch alerts raised by
+            // the fixed code, and harmless on re-run.
+            """
+            WITH d AS (
+                SELECT Id, ROW_NUMBER() OVER (PARTITION BY RefNumber ORDER BY CreatedAt DESC) AS rn
+                FROM AppNotifications
+                WHERE Module = 'Generator' AND Type = 'MaintenanceDueSoon'
+                  AND CreatedAt < '2026-10-09')
+            DELETE FROM d WHERE rn > 1;
+            """,
             // Requests pushed in from Logistics before that integration sent a
             // location landed with the field empty, which the coordinators
             // reported as missing data. Label them so they are visible and
@@ -1284,6 +1305,36 @@ static async Task ApplySchemaUpdatesAsync(
             AddColIfMissing     ("GeneratorDailyReadings", "CurrentGeneratorKw",  "float"),
             AddColIfMissing     ("GeneratorDailyReadings", "GeneratorKwConsumed", "float"),
 
+            // ── Maintenance scheduler completion history ───────────────────
+            // History of scheduled tasks actually carried out (fumigation, AC
+            // service, tank cleaning…). The schedule only kept its latest one.
+            """
+            IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = N'MaintenanceScheduleCompletions')
+            CREATE TABLE MaintenanceScheduleCompletions (
+                Id             uniqueidentifier NOT NULL PRIMARY KEY DEFAULT NEWID(),
+                ScheduleId     uniqueidentifier NOT NULL,
+                TaskName       nvarchar(200)    NOT NULL,
+                Category       nvarchar(100)    NOT NULL,
+                Location       nvarchar(200)    NULL,
+                CompletedOn    date             NOT NULL,
+                DoneBy         nvarchar(200)    NULL,
+                Notes          nvarchar(2000)   NULL,
+                LoggedByEmail  nvarchar(150)    NOT NULL,
+                LoggedByName   nvarchar(100)    NOT NULL,
+                CreatedAt      datetime2        NOT NULL DEFAULT SYSUTCDATETIME()
+            );
+            """,
+            // Seed the history with each schedule's last recorded completion, so
+            // the log doesn't start empty. Runs once: skips schedules already logged.
+            """
+            INSERT INTO MaintenanceScheduleCompletions
+                   (ScheduleId, TaskName, Category, Location, CompletedOn, Notes, LoggedByEmail, LoggedByName, CreatedAt)
+            SELECT s.Id, s.TaskName, s.Category, s.Location, CAST(s.LastCompletedAt AS date), s.LastCompletionNotes,
+                   ISNULL(s.LastCompletedByEmail, ''), ISNULL(s.LastCompletedByName, ''), s.LastCompletedAt
+              FROM MaintenanceSchedules s
+             WHERE s.LastCompletedAt IS NOT NULL
+               AND NOT EXISTS (SELECT 1 FROM MaintenanceScheduleCompletions c WHERE c.ScheduleId = s.Id);
+            """,
             // ── Guest-house feeding log (replaces the JAYVIK spreadsheet) ────
             """
             IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = N'FeedingLogEntries')
@@ -1773,10 +1824,20 @@ static async Task ApplySchemaUpdatesAsync(
         };
 
         int applied = 0;
+        // Each statement stands alone: one failure is logged and skipped rather
+        // than aborting every column added after it.
         foreach (var sql in statements)
         {
-            await db.Database.ExecuteSqlRawAsync(sql);
-            applied++;
+            try
+            {
+                await db.Database.ExecuteSqlRawAsync(sql);
+                applied++;
+            }
+            catch (Exception stmtEx)
+            {
+                log.LogError(stmtEx, "⚠️ Schema statement failed and was skipped: {Sql}",
+                    sql.Length > 300 ? sql[..300] : sql);
+            }
         }
 
         log.LogInformation("✅ Schema upgrade: checked/applied {Count} column statements.", applied);

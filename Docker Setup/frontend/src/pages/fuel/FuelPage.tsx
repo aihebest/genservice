@@ -206,6 +206,20 @@ function dieselColumns(): ColumnsType<DieselRecord> {
 }
 
 // ── Main page ──────────────────────────────────────────────────────────────────
+/** One-line explanation shown under each Fuel & Power tab. */
+const FUEL_TAB_HELP: Record<string, string> = {
+  generator: 'Generator Log — one entry per generator run (start/stop): why it ran (outage, test, '
+           + 'maintenance), how long, fuel used and the outage cause. Use it for outage history.',
+  daily:     'Daily Readings — the routine daily check of each generator: hour meter, fuel level, '
+           + 'consumption, kW meter and utility hours. Drives the 250-hour service alerts.',
+  power:     'Power Meter (NPA) — daily reading of each grid (PHED/NPA) meter: previous and current '
+           + 'reading, units consumed, rate per kWh, cost, and hours of grid supply.',
+  diesel:    'Diesel Records — diesel coming in and going out: purchases, deliveries and requisitions '
+           + 'with quantities and costs.',
+  tanklog:   'Tank Level Log — periodic dip readings of each bulk diesel tank, giving the stock '
+           + 'level and consumption between readings.',
+};
+
 export default function FuelPage() {
   const user      = useAuthStore(s => s.user);
   const role      = user?.role;
@@ -394,6 +408,10 @@ export default function FuelPage() {
             ]}
             size="small"
           />
+          {/* What each tab is for — asked for by the Department Manager. */}
+          <div style={{ padding: '6px 0 10px', fontSize: 12, color: '#8c8c8c' }}>
+            {FUEL_TAB_HELP[activeTab]}
+          </div>
         </div>
 
         {/* ── Generator Log tab ──────────────────────────────────── */}

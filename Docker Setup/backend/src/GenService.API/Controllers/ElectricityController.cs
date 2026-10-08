@@ -35,7 +35,19 @@ public class ElectricityController(
         p.MeterReadingKwh, p.ReceiptAttachment,
         p.LowBalanceThresholdKwh, p.BalanceAfterKwh, p.Status,
         p.Notes, p.LoggedByEmail, p.LoggedByName, p.CreatedAt,
-        p.LastEditedByName, p.LastEditedAt);
+        p.LastEditedByName, p.LastEditedAt,
+        p.PreviousMeterReading, p.CurrentMeterReading,
+        p.UnitsKwh > 0 ? (decimal?)Math.Round(p.AmountNaira / (decimal)p.UnitsKwh, 2) : null);
+
+    /// <summary>
+    /// PHED units consumed = current − previous reading, when both are known and
+    /// the user didn't enter units directly. Never negative (a meter replacement
+    /// resets the count; the user should enter units by hand in that case).
+    /// </summary>
+    private static double ResolveUnits(double entered, double? previous, double? current)
+        => entered > 0 ? entered
+         : previous is double pr && current is double cu && cu >= pr ? cu - pr
+         : entered;
 
     private static string StatusFor(double balance, double threshold) =>
         balance <= 0        ? ElectricityStatus.Depleted
@@ -110,10 +122,27 @@ public class ElectricityController(
             .ThenByDescending(p => p.CreatedAt)
             .FirstOrDefaultAsync();
 
+        // PHED meter log: previous reading defaults to the last PHED reading here.
+        var isPhed = string.Equals(req.PurchaseType.Trim(), ElectricityType.PHED, StringComparison.OrdinalIgnoreCase);
+        double? prevReading = null, currReading = null;
+        if (isPhed)
+        {
+            currReading = req.CurrentMeterReading;
+            prevReading = req.PreviousMeterReading ?? await db.ElectricityPurchases.AsNoTracking()
+                .Where(p => p.Location == location && p.PurchaseType == ElectricityType.PHED
+                         && p.CurrentMeterReading != null)
+                .OrderByDescending(p => p.PurchaseDate).ThenByDescending(p => p.CreatedAt)
+                .Select(p => p.CurrentMeterReading)
+                .FirstOrDefaultAsync();
+            if (currReading is double c && prevReading is double pv && c < pv)
+                return BadRequest(new { message = $"Current reading ({c:N0}) is lower than the previous reading ({pv:N0})." });
+        }
+        var units = ResolveUnits(req.UnitsKwh, prevReading, currReading);
+
         // A prepaid meter reading reflects the true remaining units, so it overrides
         // the running total. Otherwise the purchase tops up the previous balance.
         double balance = req.MeterReadingKwh
-            ?? ((last?.BalanceAfterKwh ?? 0) + req.UnitsKwh);
+            ?? ((last?.BalanceAfterKwh ?? 0) + units);
 
         var status = StatusFor(balance, threshold);
 
@@ -124,7 +153,9 @@ public class ElectricityController(
             PurchaseDate           = req.PurchaseDate?.Date ?? DateTime.UtcNow.Date,
             Vendor                 = req.Vendor?.Trim(),
             AmountNaira            = req.AmountNaira,
-            UnitsKwh               = req.UnitsKwh,
+            UnitsKwh               = units,
+            PreviousMeterReading   = prevReading,
+            CurrentMeterReading    = currReading,
             PaymentReference       = req.PaymentReference?.Trim(),
             TokenNumber            = req.TokenNumber?.Trim(),
             MeterReadingKwh        = req.MeterReadingKwh,
@@ -156,7 +187,7 @@ public class ElectricityController(
         }
 
         logger.LogInformation("Electricity {Type} purchase logged: {Location} — {Units} kWh, balance {Bal} kWh",
-            purchase.PurchaseType, location, req.UnitsKwh, balance);
+            purchase.PurchaseType, location, units, balance);
 
         return CreatedAtAction(nameof(List), ToDto(purchase));
     }
@@ -164,6 +195,20 @@ public class ElectricityController(
     // ── DELETE /api/v1/electricity/{id} ──────────────────────────────────────
     // ── PUT /api/v1/electricity/{id} ────────────────────────────────────────
     /// <summary>Manager-only correction of an electricity purchase, with edit audit stamp.</summary>
+    // ── GET /api/v1/electricity/last-phed-reading?location= ─────────────────
+    /// <summary>Latest PHED meter reading at a location — pre-fills "Previous reading".</summary>
+    [HttpGet("last-phed-reading")]
+    public async Task<ActionResult<object>> LastPhedReading([FromQuery] string location)
+    {
+        var loc = (location ?? "").Trim();
+        var last = await db.ElectricityPurchases.AsNoTracking()
+            .Where(p => p.Location == loc && p.PurchaseType == ElectricityType.PHED && p.CurrentMeterReading != null)
+            .OrderByDescending(p => p.PurchaseDate).ThenByDescending(p => p.CreatedAt)
+            .Select(p => new { p.CurrentMeterReading, p.PurchaseDate })
+            .FirstOrDefaultAsync();
+        return Ok(new { reading = last?.CurrentMeterReading, date = last?.PurchaseDate });
+    }
+
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<ElectricityPurchaseDto>> Update(
         Guid id, [FromBody] CreateElectricityPurchaseRequest req)
@@ -178,7 +223,9 @@ public class ElectricityController(
         p.Location               = req.Location.Trim();
         p.Vendor                 = req.Vendor?.Trim();
         p.AmountNaira            = req.AmountNaira;
-        p.UnitsKwh               = req.UnitsKwh;
+        p.PreviousMeterReading   = req.PreviousMeterReading;
+        p.CurrentMeterReading    = req.CurrentMeterReading;
+        p.UnitsKwh               = ResolveUnits(req.UnitsKwh, req.PreviousMeterReading, req.CurrentMeterReading);
         p.PaymentReference       = req.PaymentReference?.Trim();
         p.TokenNumber            = req.TokenNumber?.Trim();
         p.MeterReadingKwh        = req.MeterReadingKwh;

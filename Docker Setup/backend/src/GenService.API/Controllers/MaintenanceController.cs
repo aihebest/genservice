@@ -159,12 +159,36 @@ public class MaintenanceController(GenServiceDbContext db) : ControllerBase
         var m = await db.MaintenanceSchedules.FirstOrDefaultAsync(x => x.Id == id);
         if (m is null) return NotFound();
 
-        m.LastCompletedAt      = DateTime.UtcNow;
+        // The actual date the work happened — fumigation done on Monday but logged
+        // on Wednesday must record Monday. Defaults to today; can't be in the future.
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var doneOn = DateOnly.TryParseExact(req.CompletedOn, "yyyy-MM-dd",
+                         System.Globalization.CultureInfo.InvariantCulture,
+                         System.Globalization.DateTimeStyles.None, out var d) ? d : today;
+        if (doneOn > today)
+            return BadRequest(new { message = "The completion date can't be in the future." });
+        var doneAt = doneOn.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+
+        m.LastCompletedAt      = doneAt;
         m.LastCompletedByEmail = req.CompletedByEmail;
         m.LastCompletedByName  = req.CompletedByName;
         m.LastCompletionNotes  = req.Notes;
-        // Advance NextDueAt by the frequency
-        m.NextDueAt  = DateTime.UtcNow.AddDays(m.FrequencyDays);
+        // Next due counts from when the work was actually done, not when logged.
+        m.NextDueAt  = doneAt.AddDays(m.FrequencyDays);
+
+        // Permanent history — the schedule above only ever holds the latest.
+        db.MaintenanceScheduleCompletions.Add(new MaintenanceScheduleCompletion
+        {
+            ScheduleId    = m.Id,
+            TaskName      = m.TaskName,
+            Category      = m.Category,
+            Location      = m.Location,
+            CompletedOn   = doneOn,
+            DoneBy        = string.IsNullOrWhiteSpace(req.DoneBy) ? null : req.DoneBy.Trim(),
+            Notes         = req.Notes?.Trim(),
+            LoggedByEmail = req.CompletedByEmail,
+            LoggedByName  = req.CompletedByName,
+        });
         // Reset escalation state for the new cycle
         m.EscalationLevel      = 0;
         m.LastReminderSentAt   = null;
@@ -173,6 +197,34 @@ public class MaintenanceController(GenServiceDbContext db) : ControllerBase
 
         await db.SaveChangesAsync();
         return Ok(ToDto(m));
+    }
+
+    // ── GET /api/v1/maintenance/completions ─────────────────────────────────
+    /// <summary>
+    /// The completion log: every time a scheduled task was actually carried out,
+    /// newest first. Filter by one schedule, a category, or a date range.
+    /// </summary>
+    [HttpGet("completions")]
+    public async Task<ActionResult<IEnumerable<ScheduleCompletionDto>>> Completions(
+        [FromQuery] Guid?   scheduleId = null,
+        [FromQuery] string? category   = null,
+        [FromQuery] string? from       = null,   // YYYY-MM-DD
+        [FromQuery] string? to         = null)
+    {
+        var q = db.MaintenanceScheduleCompletions.AsNoTracking().AsQueryable();
+        if (scheduleId is not null)            q = q.Where(c => c.ScheduleId == scheduleId);
+        if (!string.IsNullOrWhiteSpace(category)) q = q.Where(c => c.Category == category);
+        if (DateOnly.TryParse(from, out var f)) q = q.Where(c => c.CompletedOn >= f);
+        if (DateOnly.TryParse(to,   out var t)) q = q.Where(c => c.CompletedOn <= t);
+
+        var rows = await q.OrderByDescending(c => c.CompletedOn)
+                          .ThenByDescending(c => c.CreatedAt)
+                          .Take(1000)
+                          .ToListAsync();
+
+        return Ok(rows.Select(c => new ScheduleCompletionDto(
+            c.Id, c.ScheduleId, c.TaskName, c.Category, c.Location,
+            c.CompletedOn.ToString("yyyy-MM-dd"), c.DoneBy, c.Notes, c.LoggedByName, c.CreatedAt)));
     }
 
     // ── GET /api/v1/maintenance/upcoming ────────────────────────────────────

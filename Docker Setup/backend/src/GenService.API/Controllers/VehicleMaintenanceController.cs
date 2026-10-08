@@ -123,11 +123,26 @@ public class VehicleMaintenanceController(
 
     // ── GET /api/v1/vehicle-maintenance/stats ────────────────────────────────
     [HttpGet("stats")]
-    public async Task<ActionResult<VehicleMaintenanceStatsDto>> Stats()
+    public async Task<ActionResult<VehicleMaintenanceStatsDto>> Stats([FromQuery] string? month = null)
     {
         var now        = DateTime.UtcNow;
         var monthStart = new DateTime(now.Year, now.Month, 1);
         var all        = await db.VehicleMaintenanceRequests.ToListAsync();
+
+        // Open / Closed: all time by default; "yyyy-MM" narrows to requests raised
+        // in that month — the manager's monthly view.
+        var scope = all.AsEnumerable();
+        if (DateTime.TryParseExact(month, "yyyy-MM", System.Globalization.CultureInfo.InvariantCulture,
+                                   System.Globalization.DateTimeStyles.None, out var m))
+            scope = scope.Where(r =>
+            {
+                var d = r.DateOfRequest ?? r.CreatedAt;
+                return d.Year == m.Year && d.Month == m.Month;
+            });
+        var scoped = scope.ToList();
+        var closed = scoped.Count(r => r.Status == VehicleMaintenanceStatus.Completed);
+        var open   = scoped.Count(r => r.Status is not (VehicleMaintenanceStatus.Completed
+                                                       or VehicleMaintenanceStatus.Rejected));
 
         return Ok(new VehicleMaintenanceStatsDto(
             Pending:            all.Count(r => r.Status == VehicleMaintenanceStatus.Pending),
@@ -140,7 +155,9 @@ public class VehicleMaintenanceController(
             Rejected:           all.Count(r => r.Status == VehicleMaintenanceStatus.Rejected),
             LongStanding:       all.Count(r => r.Status == VehicleMaintenanceStatus.InWorkshop
                                             && r.SentToWorkshopAt.HasValue
-                                            && (now - r.SentToWorkshopAt.Value).TotalDays > 7)
+                                            && (now - r.SentToWorkshopAt.Value).TotalDays > 7),
+            Open:               open,
+            Closed:             closed
         ));
     }
 
@@ -400,6 +417,9 @@ public class VehicleMaintenanceController(
             return BadRequest(new { message = "Request must be InWorkshop, AwaitingParts, or AwaitingFunds to complete." });
 
         r.Status          = VehicleMaintenanceStatus.Completed;
+        // Work completed closes the request on the register — the manager's rule:
+        // a request is Open until the work is done, then Closed.
+        r.NotificationStatus = "Closed";
         r.WorkDone        = req.WorkDone?.Trim();
         r.ActionedBy      = req.ActionedBy?.Trim() ?? CallerName;
         r.SparesCostNaira = req.SparesCostNaira ?? r.SparesCostNaira;
