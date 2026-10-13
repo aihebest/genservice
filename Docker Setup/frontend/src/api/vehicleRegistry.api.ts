@@ -13,9 +13,12 @@ export interface VehicleSummary {
 
 export const vehicleRegistryApi = {
   // ── Vehicles ──────────────────────────────────────────────────────────────
-  listVehicles: (params?: { location?: string; status?: string; search?: string; page?: number }) =>
+  // pageSize is always sent: it must match the table's page size, or the table
+  // slices the server's page a second time and rows become unreachable.
+  listVehicles: (params?: { location?: string; status?: string; search?: string; page?: number; pageSize?: number }) =>
     apiClient
-      .get<{ items: VehicleRegistryRecord[]; totalCount: number }>('/vehicle-registry/vehicles', { params })
+      .get<{ items: VehicleRegistryRecord[]; totalCount: number }>('/vehicle-registry/vehicles',
+        { params: { pageSize: 20, ...params } })
       .then(r => r.data),
 
   getVehicle: (id: string) =>
@@ -32,9 +35,13 @@ export const vehicleRegistryApi = {
   deleteVehicle: (id: string) => apiClient.delete(`/vehicle-registry/vehicles/${id}`),
 
   // ── Documents ─────────────────────────────────────────────────────────────
-  listDocuments: (params?: { vehicleId?: string; documentType?: string; status?: string; page?: number }) =>
+  // pageSize is always sent. It was omitted, so the server returned 50 per page
+  // while the table showed 20 — documents 21–50 of each page were unreachable,
+  // which made older documents look "replaced" when a new one was added.
+  listDocuments: (params?: { vehicleId?: string; documentType?: string; status?: string; page?: number; pageSize?: number }) =>
     apiClient
-      .get<{ items: VehicleDocument[]; totalCount: number }>('/vehicle-registry/documents', { params })
+      .get<{ items: VehicleDocument[]; totalCount: number }>('/vehicle-registry/documents',
+        { params: { pageSize: 20, ...params } })
       .then(r => r.data),
 
   expiringDocuments: (days = 30) =>

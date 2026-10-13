@@ -117,8 +117,32 @@ function enhance<T>(col: AnyCol<T>, rows: readonly T[]): AnyCol<T> {
   return out as AnyCol<T>;
 }
 
+/** Height of the app's top bar (AppShell <Header>), which is pinned to the top of the window. */
+const TOP_BAR_HEIGHT = 56;
+
 export default function FilterableTable<T extends object>(props: TableProps<T>) {
   const rows = (props.dataSource ?? []) as readonly T[];
   const columns = props.columns?.map(col => enhance(col as AnyCol<T>, rows));
-  return <Table<T> {...props} columns={columns} />;
+
+  // Guard against the bug that hid Vehicle Registry documents: on a server-paged
+  // table (pagination has `total`), the server must return exactly one page.
+  // If it returns more rows than the table's pageSize, the table slices them a
+  // second time and some rows can never be reached. Fix: send pageSize to the API.
+  const pg = props.pagination;
+  if (import.meta.env.DEV && pg && typeof pg === 'object' && pg.total != null && pg.pageSize
+      && rows.length > pg.pageSize) {
+    console.warn(`FilterableTable: received ${rows.length} rows for a page size of ${pg.pageSize}. `
+      + 'The API call is probably missing pageSize — some rows will be unreachable.');
+  }
+
+  return (
+    <Table<T>
+      // Frozen header: column titles (with their sort and filter controls) stay
+      // visible below the top bar as the page scrolls. A table can still pass
+      // its own `sticky` to override.
+      sticky={{ offsetHeader: TOP_BAR_HEIGHT }}
+      {...props}
+      columns={columns}
+    />
+  );
 }
