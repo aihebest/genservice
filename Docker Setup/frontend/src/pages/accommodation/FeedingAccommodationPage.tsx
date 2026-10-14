@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Card, Button, Form, Input, InputNumber, Select, DatePicker, Drawer, Modal,
   Descriptions, Tag, Space, Row, Col, Statistic, message, Tooltip, Popconfirm, Tabs, Typography,
@@ -92,6 +92,23 @@ export default function FeedingAccommodationPage() {
     onError: () => message.error('Failed to delete'),
   });
 
+  // ── Feeding cost from the Feeding Log ────────────────────────────────────
+  // The team logs meals daily, so at check-out the feeding cost is already known.
+  // Fetch the guest's Feeding Log total from check-in to the chosen check-out
+  // date and pre-fill it, recalculating if the date is changed.
+  const coDateStr = wCheckOutDate ? wCheckOutDate.format('YYYY-MM-DD') : undefined;
+  const { data: logFeeding, isFetching: logFeedingLoading } = useQuery({
+    queryKey: ['accommodation', 'feeding-total', checkOutTarget?.id, coDateStr],
+    queryFn: () => accommodationApi.feedingTotal(checkOutTarget!.id, coDateStr),
+    enabled: !!checkOutTarget && !!coDateStr,
+  });
+  // Only auto-fill when no cost was recorded by hand and the user hasn't typed one.
+  const autoFillFeeding = !!checkOutTarget && checkOutTarget.feedingCostNaira == null;
+  useEffect(() => {
+    if (!autoFillFeeding || !logFeeding || checkOutForm.isFieldTouched('feedingCostNaira')) return;
+    checkOutForm.setFieldsValue({ feedingCostNaira: logFeeding.count > 0 ? logFeeding.cost : undefined });
+  }, [autoFillFeeding, logFeeding, checkOutForm]);
+
   const checkOutMutation = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: {
       checkOutDate?: string; feedingCostNaira?: number; accommodationCostNaira?: number; notes?: string;
@@ -121,7 +138,14 @@ export default function FeedingAccommodationPage() {
         id: checkOutTarget.id,
         payload: {
           checkOutDate: (v.checkOutDate as dayjs.Dayjs).format('YYYY-MM-DD'),
-          feedingCostNaira:       v.feedingCostNaira as number | undefined,
+          // If the figure is simply the Feeding Log total, don't store it as a
+          // typed override: leaving it unset keeps the stay linked to the log, so
+          // a later correction to a feeding entry still flows through. A figure
+          // the user changed is saved as entered.
+          feedingCostNaira: autoFillFeeding && logFeeding && logFeeding.count > 0
+                              && v.feedingCostNaira === logFeeding.cost
+                              ? undefined
+                              : v.feedingCostNaira as number | undefined,
           accommodationCostNaira: v.accommodationCostNaira as number | undefined,
           notes:                  (v.notes as string | undefined)?.trim() || undefined,
         },
@@ -448,7 +472,13 @@ export default function FeedingAccommodationPage() {
                   <Form.Item name="feedingCostNaira" label="Feeding Cost (₦)"
                     tooltip={checkOutTarget.feedingCostNaira != null && !canEdit
                       ? 'Already recorded — only a manager can change it.'
-                      : 'Enter if known at departure.'}>
+                      : 'Filled in from the Feeding Log for this stay. Change it only if needed.'}
+                    extra={autoFillFeeding && (logFeedingLoading
+                      ? 'Checking the Feeding Log…'
+                      : logFeeding && logFeeding.count > 0
+                        ? `From ${logFeeding.count} Feeding Log entr${logFeeding.count === 1 ? 'y' : 'ies'}, `
+                          + `${dayjs(checkOutTarget.checkInDate).format('D MMM')} – ${wCheckOutDate?.format('D MMM') ?? 'today'}.`
+                        : 'No Feeding Log entries for this guest during the stay.')}>
                     <InputNumber style={{ width: '100%' }} min={0}
                       disabled={checkOutTarget.feedingCostNaira != null && !canEdit}
                       formatter={v => `₦ ${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}

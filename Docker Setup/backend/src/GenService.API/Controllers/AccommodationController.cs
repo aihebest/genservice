@@ -36,10 +36,10 @@ public class AccommodationController(
     /// check-in and check-out — or today, while the guest is still resident.
     /// </summary>
     private static (decimal Cost, int Count) DeriveFeeding(
-        AccommodationLog r, IReadOnlyCollection<FeedingLogEntry> feeding)
+        AccommodationLog r, IReadOnlyCollection<FeedingLogEntry> feeding, DateOnly? upToOverride = null)
     {
         var name = r.GuestName.Trim();
-        var upTo = r.CheckOutDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
+        var upTo = upToOverride ?? r.CheckOutDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
         var hits = feeding.Where(f =>
                         string.Equals(f.StaffName.Trim(), name, StringComparison.OrdinalIgnoreCase)
                         && f.EntryDate >= r.CheckInDate
@@ -175,6 +175,26 @@ public class AccommodationController(
         if (r is null) return NotFound();
         var feeding = await db.FeedingLogEntries.AsNoTracking().ToListAsync();
         return Ok(ToDto(r, feeding));
+    }
+
+    // ── GET /api/v1/accommodation/{id}/feeding-total?to=YYYY-MM-DD ───────────
+    /// <summary>
+    /// Feeding cost for this guest from the Feeding Log, between check-in and the
+    /// given check-out date (default: today). Pre-fills Feeding Cost on the
+    /// Check Out form so the team doesn't re-type what they've already logged.
+    /// </summary>
+    [HttpGet("{id:guid}/feeding-total")]
+    public async Task<ActionResult<object>> FeedingTotal(Guid id, [FromQuery] string? to = null)
+    {
+        var r = await db.AccommodationLogs.FindAsync(id);
+        if (r is null) return NotFound();
+
+        DateOnly? upTo = DateOnly.TryParse(to, out var d) ? d : null;
+        var feeding = await db.FeedingLogEntries.AsNoTracking()
+            .Where(f => f.EntryDate >= r.CheckInDate)
+            .ToListAsync();
+        var (cost, count) = DeriveFeeding(r, feeding, upTo);
+        return Ok(new { cost, count });
     }
 
     // ── POST /api/v1/accommodation ───────────────────────────────────────────

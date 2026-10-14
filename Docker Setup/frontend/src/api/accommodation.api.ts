@@ -53,6 +53,13 @@ const accommodationApi = {
     return res.data;
   },
 
+  /** Feeding Log total for a guest from check-in up to `to` (YYYY-MM-DD, default today). */
+  feedingTotal: async (id: string, to?: string): Promise<{ cost: number; count: number }> => {
+    const res = await apiClient.get<{ cost: number; count: number }>(`${BASE}/${id}/feeding-total`,
+      { params: to ? { to } : {} });
+    return res.data;
+  },
+
   update: async (id: string, payload: Partial<CreateAccommodationPayload>): Promise<AccommodationLog> => {
     const res = await apiClient.put<AccommodationLog>(`${BASE}/${id}`, payload);
     return res.data;
