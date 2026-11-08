@@ -12,13 +12,19 @@ import { generatorMonitoringApi } from '../../../api/generatorMonitoring.api';
 import type { PowerMeterReading } from '../../../types';
 
 import FilterableTable from '../../../components/shared/FilterableTable';
+import { OFFICE_LOCATIONS } from '../../../types';
 dayjs.extend(relativeTime);
 const { Text } = Typography;
 const { TextArea } = Input;
 
-// Fixed NPA tariff and the two locations tracked for utility power.
+// Fixed NPA tariff.
 const RATE_NAIRA = 209;
-const NPA_LOCATIONS = ['DR', 'Office'];
+// Every office and site the company runs (the shared location list). "Office"
+// is kept at the end because earlier readings were logged under it.
+const NPA_LOCATIONS: string[] = [
+  ...OFFICE_LOCATIONS.filter(l => l !== 'Other'),
+  'Office',
+];
 
 const columns: ColumnsType<PowerMeterReading> = [
   { title: 'Date', dataIndex: 'readingDate', key: 'date', width: 105,
@@ -124,7 +130,7 @@ export default function PowerMeterTab() {
         <Select allowClear placeholder="Filter by location…" style={{ width: 200 }}
           value={locationFilter}
           onChange={v => { setLocationFilter(v); setPage(1); }}
-          options={NPA_LOCATIONS.map(l => ({ value: l, label: l }))} />
+          showSearch options={NPA_LOCATIONS.map(l => ({ value: l, label: l }))} />
         <div style={{ marginLeft: 'auto' }}>
           <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
             Log Meter Reading
@@ -149,7 +155,7 @@ export default function PowerMeterTab() {
           <Row gutter={12}>
             <Col span={8}>
               <Form.Item name="location" label="Location" rules={[{ required: true }]}>
-                <Select placeholder="Select…" options={NPA_LOCATIONS.map(l => ({ value: l, label: l }))} />
+                <Select placeholder="Select…" showSearch options={NPA_LOCATIONS.map(l => ({ value: l, label: l }))} />
               </Form.Item>
             </Col>
             <Col span={8}>

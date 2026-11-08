@@ -24,6 +24,37 @@ public record CreateVehicleMaintenanceRequest(
     double?  NextServiceMileage = null
 );
 
+/// <summary>
+/// Manager correction of a register entry. Every field optional — only supplied
+/// values change. Workflow status and the Logistics link are deliberately not
+/// editable here; those move only through the normal actions.
+/// </summary>
+public record UpdateVehicleMaintenanceRequest(
+    string?   VehicleRegNo            = null,
+    string?   VehicleType             = null,
+    string?   AssetNo                 = null,
+    string?   MaintenanceType         = null,
+    string?   Description             = null,
+    string?   Priority                = null,
+    string?   CurrentLocation         = null,
+    string?   OdometerReading         = null,
+    double?   NextServiceMileage      = null,
+    string?   NotificationStatus      = null,
+    DateTime? DateOfRequest           = null,
+    string?   RequestedByName         = null,
+    string?   WorkshopName            = null,
+    DateTime? DateDeliveredToWorkshop = null,
+    string?   PartsSuppliedBy         = null,
+    string?   WorkDone                = null,
+    string?   ActionedBy              = null,
+    decimal?  AmountNaira             = null,
+    decimal?  SparesCostNaira         = null,
+    decimal?  FinalAmountNaira        = null,
+    DateTime? CompletedAt             = null,
+    string?   JustificationEvaluation = null,
+    string?   Notes                   = null
+);
+
 public record ApproveVehicleMaintenanceRequest(string? Notes);
 public record RejectVehicleMaintenanceRequest(string Reason);
 
@@ -134,7 +165,9 @@ public record VehicleMaintenanceDto(
     /// <summary>"JUSTIFICATION / EVALUATION" on the MRSF register.</summary>
     string?   JustificationEvaluation = null,
     /// <summary>"NEXT SERVICE MILEAGE" — odometer reading the next service is due at.</summary>
-    double?   NextServiceMileage = null
+    double?   NextServiceMileage = null,
+    string?   LastEditedByName   = null,
+    DateTime? LastEditedAt       = null
 );
 
 public record VehicleMaintenanceStatsDto(
@@ -150,7 +183,9 @@ public record VehicleMaintenanceStatsDto(
     /// All time, or raised in the selected month when a month is given.</summary>
     int Open   = 0,
     /// <summary>Requests whose work is completed. All time, or raised in the selected month.</summary>
-    int Closed = 0
+    int Closed = 0,
+    /// <summary>Approved, but logged as not yet taken to the workshop.</summary>
+    int NotSentToWorkshop = 0
 );
 
 public record VehicleMaintenanceListResponse(

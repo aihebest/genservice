@@ -79,7 +79,8 @@ public class TaskProgressLogController(
             EntityId         = req.EntityId,
             RefNumber        = req.RefNumber,
             TaskTitle        = req.TaskTitle,
-            LogDate          = DateTime.UtcNow.Date,
+            // The day the work happened — entries are often written up a day later.
+            LogDate          = ParseLogDate(req.LogDate),
             ActivityPerformed= req.ActivityPerformed.Trim(),
             ProgressStatus   = req.ProgressStatus,
             MaterialsRequired= req.MaterialsRequired?.Trim(),
@@ -92,6 +93,21 @@ public class TaskProgressLogController(
         };
 
         db.TaskProgressLogs.Add(log);
+
+        // "Not Yet Sent to Workshop" on an approved vehicle request moves it to that
+        // stage of the register, so the dashboard shows vehicles waiting to go in.
+        // Only from Approved: it never pulls a vehicle back out of the workshop.
+        if (req.Module == "Vehicle" && req.ProgressStatus == ProgressStatus.NotYetSentToWorkshop
+            && Guid.TryParse(req.EntityId, out var vehId))
+        {
+            var vr = await db.VehicleMaintenanceRequests.FindAsync(vehId);
+            if (vr is not null && vr.Status == VehicleMaintenanceStatus.Approved)
+            {
+                vr.Status    = VehicleMaintenanceStatus.NotSentToWorkshop;
+                vr.UpdatedAt = DateTime.UtcNow;
+            }
+        }
+
         await db.SaveChangesAsync();
 
         logger.LogInformation("Progress log for {Ref} ({Module}) by {User}",
@@ -161,5 +177,14 @@ public class TaskProgressLogController(
         }).OrderByDescending(s => s.TotalAssigned).ToList();
 
         return Ok(summaries);
+    }
+
+    /// <summary>Log date as given (not in the future), else today.</summary>
+    private static DateTime ParseLogDate(string? s)
+    {
+        var today = DateTime.UtcNow.Date;
+        return DateTime.TryParseExact(s, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+                   System.Globalization.DateTimeStyles.None, out var d) && d.Date <= today
+            ? d.Date : today;
     }
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  Alert, Badge, Button, Divider, Form, Input,
+  Alert, Badge, Button, DatePicker, Divider, Form, Input,
   Modal, Select, Space, Tag, Timeline, Tooltip, Typography,
 } from 'antd';
 import { PlusOutlined, UserOutlined } from '@ant-design/icons';
@@ -11,6 +11,7 @@ import { taskProgressLogApi } from '../../api/taskProgressLog.api';
 import { PROGRESS_STATUS_META } from '../../types';
 import type { ProgressStatus } from '../../types';
 import { useAuthStore } from '../../store/authStore';
+import { useGsStaff } from './StaffPicker';
 
 dayjs.extend(relativeTime);
 
@@ -18,9 +19,6 @@ dayjs.extend(relativeTime);
 const { Text } = Typography;
 const { TextArea } = Input;
 
-const STAFF_OPTIONS = [
-  'Chukwudi Nwosu', 'Grace Obi', 'Bola Adeyemi', 'Kwame Asante',
-];
 
 interface Props {
   module:    string;   // "Requests" | "Equipment" | "Facility" | "Vehicle"
@@ -38,6 +36,8 @@ export default function ProgressLogSection({ module, entityId, refNumber, taskTi
   const [error,      setError]      = useState<string | null>(null);
   const [isProxy,    setIsProxy]    = useState(false);
   const [form]       = Form.useForm();
+  // Real GS staff for proxy logging (replaces the prototype's demo names).
+  const gsStaff = useGsStaff();
 
   const isApprover = ['DepartmentManager', 'Supervisor', 'SystemAdmin'].includes(role ?? '');
   const queryKey   = ['task-logs', module, entityId];
@@ -59,9 +59,13 @@ export default function ProgressLogSection({ module, entityId, refNumber, taskTi
         nextAction:        values.nextAction        || undefined,
         isProxy,
         proxyForName:      isProxy ? values.proxyForName : undefined,
+        logDate:           values.logDate
+          ? (values.logDate as unknown as dayjs.Dayjs).format('YYYY-MM-DD') : undefined,
       });
       form.resetFields(); setIsProxy(false); setOpen(false);
       qc.invalidateQueries({ queryKey });
+      // A vehicle log can move the request's stage — refresh the tracker too.
+      if (module === 'Vehicle') qc.invalidateQueries({ queryKey: ['vm'] });
     } catch (e: unknown) {
       setError((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Failed to save.');
     } finally { setLoading(false); }
@@ -173,16 +177,28 @@ export default function ProgressLogSection({ module, entityId, refNumber, taskTi
           {isProxy && (
             <Form.Item name="proxyForName" label="Logging on behalf of" rules={[{ required: true }]}>
               <Select placeholder="Select technician…"
-                options={STAFF_OPTIONS.map(n => ({ value: n, label: n }))} />
+                showSearch
+                options={gsStaff.map(s => ({ value: s.name, label: s.name }))} />
             </Form.Item>
           )}
 
-          <Form.Item name="progressStatus" label="Current Status" rules={[{ required: true }]} initialValue="WorkInProgress">
+          <Form.Item name="logDate" label="Date" initialValue={dayjs()}
+            tooltip="The day the work happened — can be back-dated if the entry is written up later.">
+            <DatePicker style={{ width: '100%' }} format="D MMM YYYY" allowClear={false}
+              disabledDate={d => d.isAfter(dayjs(), 'day')} />
+          </Form.Item>
+
+          <Form.Item name="progressStatus" label="Current Status" rules={[{ required: true }]} initialValue="WorkInProgress"
+            extra={module === 'Vehicle'
+              ? '“Not Yet Sent to Workshop” moves an approved vehicle to that stage on the register.' : undefined}>
             <Select
-              options={Object.entries(PROGRESS_STATUS_META).map(([k, m]) => ({
-                value: k,
-                label: <Tag color={m.color}>{m.label}</Tag>,
-              }))}
+              options={Object.entries(PROGRESS_STATUS_META)
+                // The workshop stage applies to vehicle requests only.
+                .filter(([k]) => k !== 'NotYetSentToWorkshop' || module === 'Vehicle')
+                .map(([k, m]) => ({
+                  value: k,
+                  label: <Tag color={m.color}>{m.label}</Tag>,
+                }))}
             />
           </Form.Item>
 

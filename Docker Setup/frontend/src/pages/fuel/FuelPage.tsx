@@ -226,7 +226,9 @@ export default function FuelPage() {
   const qc        = useQueryClient();
   const canManage = role === 'DepartmentManager' || role === 'Supervisor' || role === 'SystemAdmin';
 
-  const [activeTab,     setActiveTab]     = useState('generator');
+  // Generator Log tab removed at the GS team's request (Nov 2026) — Daily Readings
+  // is the generator record they use. Its data is kept; the tab is just hidden.
+  const [activeTab,     setActiveTab]     = useState('daily');
   const [genPage,       setGenPage]       = useState(1);
   const [dieselPage,    setDieselPage]    = useState(1);
   const [dieselType,    setDieselType]    = useState<string | undefined>();
@@ -400,7 +402,6 @@ export default function FuelPage() {
             activeKey={activeTab}
             onChange={k => setActiveTab(k)}
             items={[
-              { key: 'generator', label: <Space><ThunderboltOutlined />Generator Log</Space>           },
               { key: 'daily',     label: <Space><FireOutlined />Daily Readings</Space>                 },
               { key: 'power',     label: <Space><PlayCircleOutlined />Power Meter (NPA)</Space>        },
               { key: 'diesel',    label: <Space><DropboxOutlined />Diesel Records</Space>              },

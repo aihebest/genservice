@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import {
   Alert, Button, Card, Col, Form, Input, InputNumber, Modal, Row,
-  Select, Space, Tag, Tooltip, Typography, DatePicker, message,
+  Select, Space, Tag, Tooltip, Typography, DatePicker, message, Popconfirm,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { PlusOutlined, ReloadOutlined, PlayCircleOutlined, EditOutlined } from '@ant-design/icons';
+import { PlusOutlined, ReloadOutlined, PlayCircleOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { useAuthStore } from '../../store/authStore';
@@ -51,6 +51,23 @@ export default function DstvPage() {
   });
 
   const refresh = () => qc.invalidateQueries({ queryKey: ['dstv'] });
+
+  // Manager-only clean-up of old / expired entries.
+  const handleDelete = async (r: DstvSubscription) => {
+    try { await dstvApi.remove(r.id); message.success('Subscription deleted'); refresh(); }
+    catch (e: unknown) {
+      message.error((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Failed to delete');
+    }
+  };
+  const handleDeleteExpired = async () => {
+    try {
+      const { deleted } = await dstvApi.removeExpired();
+      message.success(deleted ? `${deleted} expired subscription(s) deleted` : 'No expired subscriptions to delete');
+      refresh();
+    } catch (e: unknown) {
+      message.error((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Failed to delete');
+    }
+  };
 
   const openEdit = (r: DstvSubscription) => {
     setEditing(r);
@@ -134,7 +151,7 @@ export default function DstvPage() {
           )}
         </span>
       ) },
-    { title: '', key: 'act', width: 140,
+    { title: '', key: 'act', width: 180,
       render: (_: unknown, r: DstvSubscription) => (
         <Space size={4}>
           <Button size="small" icon={<PlayCircleOutlined />} onClick={() => { setRenew(r); renewForm.setFieldsValue({ durationMonths: r.durationMonths, amountNaira: r.amountNaira }); }}>Renew</Button>
@@ -142,6 +159,13 @@ export default function DstvPage() {
             <Tooltip title="Edit record">
               <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(r)} />
             </Tooltip>
+          )}
+          {canEdit && (
+            <Popconfirm title="Delete this subscription?"
+              description="This removes the decoder's record permanently."
+              okText="Delete" okButtonProps={{ danger: true }} onConfirm={() => handleDelete(r)}>
+              <Button size="small" danger icon={<DeleteOutlined />} />
+            </Popconfirm>
           )}
         </Space>
       ) },
@@ -159,6 +183,13 @@ export default function DstvPage() {
         <Col>
           <Space>
             <Button icon={<ReloadOutlined />} onClick={refresh} loading={isFetching} />
+            {canEdit && (
+              <Popconfirm title="Delete all expired subscriptions?"
+                description="Each decoder is one record, renewed in place — an expired one hasn't been renewed. This removes them permanently."
+                okText="Delete expired" okButtonProps={{ danger: true }} onConfirm={handleDeleteExpired}>
+                <Button danger icon={<DeleteOutlined />}>Delete Expired</Button>
+              </Popconfirm>
+            )}
             <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>Add Subscription</Button>
           </Space>
         </Col>

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   Alert, AutoComplete, Button, Card, Col, Form, Input, InputNumber, Modal, Row,
-  Select, Space, Tag, Tabs, Typography, DatePicker, message,
+  Select, Space, Tag, Tabs, Tooltip, Typography, DatePicker, message,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { PlusOutlined, ReloadOutlined, CarOutlined, FileProtectOutlined, EditOutlined } from '@ant-design/icons';
@@ -201,11 +201,18 @@ export default function VehicleRegistryPage() {
           { label: 'Documents', value: summary?.totalDocuments, color: '#722ed1' },
           { label: 'Expiring (≤14d)', value: summary?.expiringDocuments, color: '#fa8c16' },
           { label: 'Expired', value: summary?.expiredDocuments, color: '#ff4d4f' },
+          // Renewal spend on documents issued this year (all-time total on hover).
+          { label: `Renewal Cost (${new Date().getFullYear()})`,
+            value: summary ? `₦${(summary.renewalCostThisYear ?? 0).toLocaleString()}` : undefined,
+            color: '#389e0d',
+            hint: summary ? `All time: ₦${(summary.renewalCostTotal ?? 0).toLocaleString()}` : undefined },
         ].map(s => (
           <Col xs={12} sm={8} lg={4} key={s.label}>
             <Card styles={{ body: { padding: '12px 16px' } }}>
               <div style={{ fontSize: 11, color: '#8c8c8c' }}>{s.label}</div>
-              <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value ?? '—'}</div>
+              <Tooltip title={'hint' in s ? s.hint : undefined}>
+                <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value ?? '—'}</div>
+              </Tooltip>
             </Card>
           </Col>
         ))}

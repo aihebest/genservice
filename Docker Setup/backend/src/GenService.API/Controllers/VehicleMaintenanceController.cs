@@ -53,7 +53,8 @@ public class VehicleMaintenanceController(
             r.FinalAmountNaira, r.DateOfRequest,
             r.SourceSystem, r.LogisticsVehicleId, r.LogisticsRecordId,
             r.LogisticsSyncStatus, r.LogisticsSyncedAt, r.LogisticsSyncError,
-            r.JustificationEvaluation, r.NextServiceMileage
+            r.JustificationEvaluation, r.NextServiceMileage,
+            r.LastEditedByName, r.LastEditedAt
         );
     }
 
@@ -157,7 +158,8 @@ public class VehicleMaintenanceController(
                                             && r.SentToWorkshopAt.HasValue
                                             && (now - r.SentToWorkshopAt.Value).TotalDays > 7),
             Open:               open,
-            Closed:             closed
+            Closed:             closed,
+            NotSentToWorkshop:  all.Count(r => r.Status == VehicleMaintenanceStatus.NotSentToWorkshop)
         ));
     }
 
@@ -252,6 +254,56 @@ public class VehicleMaintenanceController(
         return CreatedAtAction(nameof(GetById), new { id = r.Id }, ToDto(r));
     }
 
+    // ── PUT /api/v1/vehicle-maintenance/{id} ─────────────────────────────────
+    /// <summary>
+    /// Department Manager correction of a register entry. Only fields supplied
+    /// change. Does not move the workflow status and does not push to Logistics —
+    /// it corrects the record, it isn't a step in the process.
+    /// </summary>
+    [HttpPut("{id:guid}")]
+    public async Task<ActionResult<VehicleMaintenanceDto>> Update(
+        Guid id, [FromBody] UpdateVehicleMaintenanceRequest req)
+    {
+        if (CallerRole is not ("DepartmentManager" or "SystemAdmin"))
+            return StatusCode(403, new { message = "Only a Department Manager or System Admin can edit register entries." });
+
+        var r = await db.VehicleMaintenanceRequests.FindAsync(id);
+        if (r is null) return NotFound(new { message = $"Request {id} not found." });
+
+        static string? T(string? s) => s?.Trim();
+        if (!string.IsNullOrWhiteSpace(req.VehicleRegNo))    r.VehicleRegNo    = Truncate(req.VehicleRegNo.Trim().ToUpper(), 60);
+        if (!string.IsNullOrWhiteSpace(req.VehicleType))     r.VehicleType     = Truncate(req.VehicleType.Trim(), 200);
+        if (req.AssetNo            is not null) r.AssetNo            = Truncate(T(req.AssetNo)!, 50);
+        if (!string.IsNullOrWhiteSpace(req.MaintenanceType)) r.MaintenanceType = req.MaintenanceType.Trim();
+        if (!string.IsNullOrWhiteSpace(req.Description))     r.Description     = Truncate(req.Description.Trim(), 2000);
+        if (!string.IsNullOrWhiteSpace(req.Priority))        r.Priority        = req.Priority.Trim();
+        if (req.CurrentLocation    is not null) r.CurrentLocation    = Truncate(T(req.CurrentLocation)!, 200);
+        if (req.OdometerReading    is not null) r.OdometerReading    = Truncate(T(req.OdometerReading)!, 100);
+        if (req.NextServiceMileage is not null) r.NextServiceMileage = req.NextServiceMileage;
+        if (req.NotificationStatus is not null) r.NotificationStatus = T(req.NotificationStatus);
+        if (req.DateOfRequest      is not null) r.DateOfRequest      = req.DateOfRequest.Value.Date;
+        if (!string.IsNullOrWhiteSpace(req.RequestedByName)) r.RequestedByName = Truncate(req.RequestedByName.Trim(), 100);
+        if (req.WorkshopName       is not null) r.WorkshopName       = Truncate(T(req.WorkshopName)!, 200);
+        if (req.DateDeliveredToWorkshop is not null) r.DateDeliveredToWorkshop = req.DateDeliveredToWorkshop;
+        if (req.PartsSuppliedBy    is not null) r.PartsSuppliedBy    = T(req.PartsSuppliedBy);
+        if (req.WorkDone           is not null) r.WorkDone           = T(req.WorkDone);
+        if (req.ActionedBy         is not null) r.ActionedBy         = T(req.ActionedBy);
+        if (req.AmountNaira        is not null) r.AmountNaira        = req.AmountNaira;
+        if (req.SparesCostNaira    is not null) r.SparesCostNaira    = req.SparesCostNaira;
+        if (req.FinalAmountNaira   is not null) r.FinalAmountNaira   = req.FinalAmountNaira;
+        if (req.CompletedAt        is not null) r.CompletedAt        = req.CompletedAt;
+        if (req.JustificationEvaluation is not null) r.JustificationEvaluation = T(req.JustificationEvaluation);
+        if (req.Notes              is not null) r.Notes              = T(req.Notes);
+
+        r.UpdatedAt        = DateTime.UtcNow;
+        r.LastEditedByName = CallerName;
+        r.LastEditedAt     = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+
+        logger.LogInformation("{Num} edited by {User}", r.RequestNumber, CallerEmail);
+        return Ok(ToDto(r));
+    }
+
     // ── POST /api/v1/vehicle-maintenance/{id}/approve ────────────────────────
     [HttpPost("{id:guid}/approve")]
     public async Task<ActionResult<VehicleMaintenanceDto>> Approve(
@@ -336,7 +388,7 @@ public class VehicleMaintenanceController(
 
         var r = await db.VehicleMaintenanceRequests.FindAsync(id);
         if (r is null) return NotFound(new { message = $"Request {id} not found." });
-        if (r.Status != VehicleMaintenanceStatus.Approved)
+        if (r.Status is not (VehicleMaintenanceStatus.Approved or VehicleMaintenanceStatus.NotSentToWorkshop))
             return BadRequest(new { message = "Only Approved requests can be dispatched to workshop." });
 
         r.Status                   = VehicleMaintenanceStatus.InWorkshop;

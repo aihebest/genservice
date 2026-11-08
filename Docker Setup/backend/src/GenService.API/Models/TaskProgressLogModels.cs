@@ -13,7 +13,9 @@ public record CreateTaskProgressLogRequest(
     string? NextAction,
     // Proxy support
     bool    IsProxy       = false,
-    string? ProxyForName  = null
+    string? ProxyForName  = null,
+    /// <summary>YYYY-MM-DD — the day the work happened. Defaults to today; can be back-dated.</summary>
+    string? LogDate       = null
 );
 
 // ── Outbound ──────────────────────────────────────────────────────────────────

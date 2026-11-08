@@ -22,6 +22,9 @@ public class StaffActivity
 
     // ── Timestamps ────────────────────────────────────────────────────────
     public DateTime  StartedAt   { get; set; } = DateTime.UtcNow;
+    /// <summary>The day the activity was done, as entered when it was logged
+    /// (can be back-dated). StartedAt is the system timestamp of the entry.</summary>
+    public DateTime? ActivityDate { get; set; }
     public DateTime  UpdatedAt   { get; set; } = DateTime.UtcNow;
     public DateTime? CompletedAt { get; set; }
 }

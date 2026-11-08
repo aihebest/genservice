@@ -8,7 +8,9 @@ public record LogActivityRequest(
     string ActivityDescription,
     string Category,
     string? Location,
-    string? Notes
+    string? Notes,
+    /// <summary>YYYY-MM-DD — the day the activity was done. Defaults to today.</summary>
+    string? ActivityDate = null
 );
 
 public record ProxyLogRequest(
@@ -17,7 +19,9 @@ public record ProxyLogRequest(
     string ActivityDescription,
     string Category,
     string? Location,
-    string? Notes
+    string? Notes,
+    /// <summary>YYYY-MM-DD — the day the activity was done. Defaults to today.</summary>
+    string? ActivityDate = null
 );
 
 public record UpdateActivityStatusRequest(
@@ -41,7 +45,9 @@ public record ActivityDto(
     string?  Notes,
     DateTime StartedAt,
     DateTime UpdatedAt,
-    DateTime? CompletedAt
+    DateTime? CompletedAt,
+    /// <summary>The day the activity was done (falls back to the entry date for older records).</summary>
+    DateTime? ActivityDate = null
 );
 
 public record ActivityListResponse(

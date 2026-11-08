@@ -16,6 +16,8 @@ public class DieselTankReading
     // ── Reading ───────────────────────────────────────────────────────────────
     public DateTime ReadingDate       { get; set; } = DateTime.UtcNow.Date;
     public double   TankLevelLitres   { get; set; }     // current diesel level in tank
+    /// <summary>Dip-stick reading (mm) — set when litres came from the tank's calibration chart.</summary>
+    public double?  DipMm              { get; set; }
 
     // ── Auto-calculated fields ────────────────────────────────────────────────
     public double?  PreviousLevelLitres    { get; set; }  // previous day's reading (fetched server-side)

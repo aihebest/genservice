@@ -11,6 +11,7 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { dieselTankApi } from '../../../api/dieselTank.api';
 import { OFFICE_LOCATIONS } from '../../../types';
+import { TANK_CHARTS, chartFor, litresFromDip } from '../../../utils/tankCalibration';
 import type { DieselTankReading } from '../../../types';
 
 import FilterableTable from '../../../components/shared/FilterableTable';
@@ -21,6 +22,8 @@ const { TextArea } = Input;
 
 // Common tank identifiers used at Desicon
 const TANK_OPTIONS = [
+  // Calibrated tanks first — litres are calculated from the dip reading.
+  ...TANK_CHARTS.map(c => c.tankName),
   'Main Generator Tank',
   'Overhead Tank',
   'DGS Residence Tank',
@@ -52,6 +55,10 @@ function buildColumns(onView: (r: DieselTankReading) => void): ColumnsType<Diese
           {v.toLocaleString()} L
         </Tag>
       ),
+    },
+    {
+      title: 'Dip (mm)', dataIndex: 'dipMm', key: 'dip', width: 95,
+      render: (v?: number) => v != null ? v.toLocaleString() : '—',
     },
     {
       title: 'Previous Level (L)', dataIndex: 'previousLevelLitres', key: 'prev', width: 145,
@@ -123,6 +130,10 @@ export default function DieselTankTab() {
   const [form]           = Form.useForm();
   const [locationSel,    setLocationSel]    = useState<string | null>(null);
   const [tankSel,        setTankSel]        = useState<string | null>(null);
+  // Calibrated tank selected → dip reading drives the litres.
+  const chart  = chartFor(tankSel);
+  const dipVal = Form.useWatch('dipMm', form) as number | undefined;
+  const dipLitres = chart && dipVal != null ? litresFromDip(chart, dipVal) : undefined;
 
   const refresh = useCallback(() => qc.invalidateQueries({ queryKey: ['diesel-tank'] }), [qc]);
 
@@ -152,7 +163,10 @@ export default function DieselTankTab() {
       await dieselTankApi.create({
         location,
         tankIdentifier:   tank,
-        tankLevelLitres:  values.tankLevelLitres as number,
+        // For a calibrated tank the server recalculates from the dip; send the
+        // preview so the payload is complete.
+        tankLevelLitres:  chart ? (dipLitres ?? 0) : values.tankLevelLitres as number,
+        dipMm:            chart ? values.dipMm as number : undefined,
         costPerLitreNaira:values.costPerLitreNaira as number | undefined,
         notes:            values.notes as string | undefined,
       });
@@ -285,7 +299,12 @@ export default function DieselTankTab() {
             <Col span={12}>
               <Form.Item name="tankSelect" label="Tank Identifier" rules={[{ required: true }]}>
                 <Select placeholder="Select tank…"
-                  onChange={(v: string) => setTankSel(v)}
+                  onChange={(v: string) => {
+                    setTankSel(v);
+                    // A calibrated tank belongs to one site — set it for them.
+                    const c = chartFor(v);
+                    if (c) { form.setFieldsValue({ locationSelect: c.location }); setLocationSel(c.location); }
+                  }}
                   options={TANK_OPTIONS.map(t => ({ value: t, label: t }))} />
               </Form.Item>
             </Col>
@@ -302,10 +321,21 @@ export default function DieselTankTab() {
           )}
           <Row gutter={12}>
             <Col span={12}>
-              <Form.Item name="tankLevelLitres" label="Current Diesel Level (Litres)"
-                rules={[{ required: true, message: 'Enter current tank level' }]}>
-                <InputNumber style={{ width: '100%' }} placeholder="e.g. 4,700" min={0} />
-              </Form.Item>
+              {chart ? (
+                <Form.Item name="dipMm" label="Dip Reading (mm)"
+                  tooltip={`Measured with the dip stick. Litres are taken from the tank's calibration chart (ref. height ${chart.referenceHeightMm} mm).`}
+                  rules={[{ required: true, message: 'Enter the dip reading' }]}
+                  extra={dipLitres != null
+                    ? <span>= <strong>{dipLitres.toLocaleString()} L</strong> of {chart.maxVolume.toLocaleString()} L capacity</span>
+                    : `Full tank: ${chart.maxVolume.toLocaleString()} L at ${chart.maxDipMm} mm`}>
+                  <InputNumber style={{ width: '100%' }} placeholder="e.g. 1,250" min={0} max={chart.referenceHeightMm} />
+                </Form.Item>
+              ) : (
+                <Form.Item name="tankLevelLitres" label="Current Diesel Level (Litres)"
+                  rules={[{ required: true, message: 'Enter current tank level' }]}>
+                  <InputNumber style={{ width: '100%' }} placeholder="e.g. 4,700" min={0} />
+                </Form.Item>
+              )}
             </Col>
             <Col span={12}>
               <Form.Item name="costPerLitreNaira" label="Cost per Litre (₦) — optional"

@@ -201,6 +201,24 @@ public class DstvController(
         return Ok(ToDto(s));
     }
 
+    // ── DELETE /api/v1/dstv/expired ──────────────────────────────────────────
+    /// <summary>
+    /// Clear out expired subscriptions in one go (manager only). Each decoder is a
+    /// single record renewed in place, so an expired row is one nobody renewed —
+    /// typically a decoder no longer in use.
+    /// </summary>
+    [HttpDelete("expired")]
+    public async Task<ActionResult<object>> DeleteExpired()
+    {
+        if (!CanEditRecords)
+            return StatusCode(403, new { message = "Only a Department Manager or System Admin can delete records." });
+        var today = DateTime.UtcNow.Date;
+        var expired = await db.DstvSubscriptions.Where(s => s.ExpiryDate < today).ToListAsync();
+        db.DstvSubscriptions.RemoveRange(expired);
+        await db.SaveChangesAsync();
+        return Ok(new { deleted = expired.Count });
+    }
+
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id)
     {

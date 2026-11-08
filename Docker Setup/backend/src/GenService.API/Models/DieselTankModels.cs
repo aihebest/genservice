@@ -5,7 +5,10 @@ public record CreateDieselTankReadingRequest(
     string   TankIdentifier,
     double   TankLevelLitres,
     decimal? CostPerLitreNaira,
-    string?  Notes
+    string?  Notes,
+    /// <summary>Dip-stick reading in mm. For a calibrated tank the server converts
+    /// it to litres from the tank's chart and ignores TankLevelLitres.</summary>
+    double?  DipMm = null
 );
 
 public record DieselTankReadingDto(
@@ -21,7 +24,9 @@ public record DieselTankReadingDto(
     string?   Notes,
     string    LoggedByEmail,
     string    LoggedByName,
-    DateTime  CreatedAt
+    DateTime  CreatedAt,
+    /// <summary>Dip reading the litres were calculated from, when calibrated.</summary>
+    double?   DipMm = null
 );
 
 public record DieselTankQuery(

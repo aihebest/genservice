@@ -84,6 +84,10 @@ public class VehicleMaintenanceRequest
     /// </summary>
     public string? JustificationEvaluation { get; set; }
 
+    /// <summary>Manager correction audit — who last edited the register entry, and when.</summary>
+    public string?   LastEditedByName { get; set; }
+    public DateTime? LastEditedAt     { get; set; }
+
     // ── Logistics Platform link ───────────────────────────────────────────────
     // The Logistics team owns the fleet; when they report a fault it is raised
     // here automatically and every status change is pushed back to them. These
@@ -133,6 +137,7 @@ public static class VehicleMaintenanceStatus
 {
     public const string Pending         = "Pending";          // submitted, awaiting GS approval
     public const string Approved        = "Approved";         // approved, pending workshop dispatch
+    public const string NotSentToWorkshop = "NotSentToWorkshop"; // approved; logged as not yet taken to the workshop
     public const string InWorkshop      = "InWorkshop";       // vehicle is with mechanic
     public const string AwaitingParts   = "AwaitingParts";    // waiting for spare parts
     public const string AwaitingFunds   = "AwaitingFunds";    // waiting for budget/funds

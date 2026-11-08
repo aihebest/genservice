@@ -1193,6 +1193,13 @@ static async Task ApplySchemaUpdatesAsync(
             // PHED postpaid meter log (previous / current reading).
             AddColIfMissing ("ElectricityPurchases", "PreviousMeterReading", "float"),
             AddColIfMissing ("ElectricityPurchases", "CurrentMeterReading",  "float"),
+            // Dip-stick reading behind a calibrated tank level.
+            AddColIfMissing ("DieselTankReadings", "DipMm", "float"),
+            // Manager edits of vehicle register entries.
+            AddColIfMissing ("VehicleMaintenanceRequests", "LastEditedByName", "nvarchar(100)"),
+            AddColIfMissing ("VehicleMaintenanceRequests", "LastEditedAt",     "datetime2"),
+            // Team Activities: the day the activity was done (entered by the user).
+            AddColIfMissing ("StaffActivities", "ActivityDate", "datetime2"),
             // Completed vehicle requests are Closed on the register. Existing ones
             // were completed before that rule was applied. Idempotent.
             """

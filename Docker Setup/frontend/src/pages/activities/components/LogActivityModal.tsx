@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import {
-  Modal, Form, Input, Select, Switch, Space, Alert, Typography, AutoComplete,
+  Modal, Form, Input, Select, Switch, Space, Alert, Typography, AutoComplete, DatePicker,
 } from 'antd';
+import dayjs from 'dayjs';
 import { activitiesApi } from '../../../api/activities.api';
 import { ACTIVITY_CATEGORY_META } from '../../../types';
 import type { ActivityCategory } from '../../../types';
@@ -24,6 +25,7 @@ interface FormValues {
   category:            ActivityCategory;
   location:            string;
   notes?:              string;
+  activityDate?:       dayjs.Dayjs;
 }
 
 export default function LogActivityModal({ open, onClose, onCreated }: Props) {
@@ -63,6 +65,7 @@ export default function LogActivityModal({ open, onClose, onCreated }: Props) {
         category:            vals.category,
         location:            vals.location,
         notes:               vals.notes,
+        activityDate:        vals.activityDate ? vals.activityDate.format('YYYY-MM-DD') : undefined,
       };
 
       if (isProxy) {
@@ -122,6 +125,13 @@ export default function LogActivityModal({ open, onClose, onCreated }: Props) {
             />
           </Form.Item>
         )}
+
+        <Form.Item name="activityDate" label="Date" initialValue={dayjs()}
+          tooltip="The day the activity was done — can be back-dated if logged later."
+          rules={[{ required: true, message: 'Select the date' }]}>
+          <DatePicker style={{ width: '100%' }} format="D MMM YYYY" allowClear={false}
+            disabledDate={d => d.isAfter(dayjs(), 'day')} />
+        </Form.Item>
 
         <Form.Item
           name="activityDescription"

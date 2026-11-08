@@ -9,6 +9,9 @@ export interface VehicleSummary {
   validDocuments:    number;
   expiringDocuments: number;
   expiredDocuments:  number;
+  /** Renewal spend — all time, and on documents issued this year. */
+  renewalCostTotal?:    number;
+  renewalCostThisYear?: number;
 }
 
 export const vehicleRegistryApi = {

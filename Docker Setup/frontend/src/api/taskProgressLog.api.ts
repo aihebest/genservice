@@ -16,6 +16,8 @@ export const taskProgressLogApi = {
     nextAction?:       string;
     isProxy?:          boolean;
     proxyForName?:     string;
+    /** YYYY-MM-DD — the day the work happened (defaults to today). */
+    logDate?:          string;
   }) => apiClient.post<TaskProgressLog>('/task-logs', data).then(r => r.data),
 
   performance: () =>

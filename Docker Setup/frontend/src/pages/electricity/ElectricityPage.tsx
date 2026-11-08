@@ -202,8 +202,15 @@ export default function ElectricityPage() {
               <Card styles={{ body: { padding: '12px 16px' } }}
                 style={{ borderColor: status !== 'Active' ? meta.color : undefined }}>
                 <div style={{ fontSize: 11, color: '#8c8c8c' }}>{loc}</div>
-                <div style={{ fontSize: 20, fontWeight: 700 }}>{(b?.balanceKwh ?? 0).toLocaleString()} <span style={{ fontSize: 12 }}>kWh</span></div>
-                <Tag color={meta.color} style={{ marginTop: 4 }}>{meta.label}</Tag>
+                {b ? (
+                  <>
+                    <div style={{ fontSize: 20, fontWeight: 700 }}>{b.balanceKwh.toLocaleString()} <span style={{ fontSize: 12 }}>kWh</span></div>
+                    <Tag color={meta.color} style={{ marginTop: 4 }}>{meta.label}</Tag>
+                  </>
+                ) : (
+                  // A location with nothing recorded yet — don't imply a real 0 kWh balance.
+                  <div style={{ fontSize: 13, color: '#bfbfbf', padding: '6px 0 4px' }}>No purchases yet</div>
+                )}
               </Card>
             </Col>
           );

@@ -5,7 +5,7 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import {
   PlusOutlined, ReloadOutlined, CheckOutlined, CloseOutlined,
-  CarOutlined, ToolOutlined, WarningOutlined, SyncOutlined, SettingOutlined,
+  CarOutlined, ToolOutlined, WarningOutlined, SyncOutlined, SettingOutlined, EditOutlined,
 } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
@@ -28,6 +28,7 @@ const STATUS_TABS = [
   { key: '',           label: 'All'         },
   { key: 'Pending',    label: 'Pending'     },
   { key: 'Approved',   label: 'Approved'    },
+  { key: 'NotSentToWorkshop', label: 'Not Yet Sent to Workshop' },
   { key: 'InWorkshop', label: 'In Workshop' },
   { key: 'Completed',  label: 'Completed'   },
   { key: 'Rejected',   label: 'Rejected'    },
@@ -122,8 +123,8 @@ const day = (v?: string | null) =>
 /** Register columns that stay hidden until switched on. */
 const DEFAULT_HIDDEN = new Set([
   'month', 'notificationStatus', 'odometerReading', 'nextServiceMileage',
-  'description', 'workDone', 'partsSuppliedBy', 'dateDeliveredToWorkshop',
-  'completedAt', 'daysTaken', 'sparesCostNaira', 'justificationEvaluation',
+  'description', 'workDone', 'partsSuppliedBy',
+  'daysTaken', 'sparesCostNaira', 'justificationEvaluation',
 ]);
 
 function buildColumns(
@@ -131,30 +132,32 @@ function buildColumns(
   rows: VehicleMaintenance[],
 ): VmColumn[] {
   return [
+    // Only these three are frozen (Date, Ref, Requestor) — everything after them
+    // scrolls left and right. Requested by the GS team.
     {
-      title: 'Ref #', dataIndex: 'requestNumber', key: 'requestNumber', width: 120, fixed: 'left',
-      sorter: (a, b) => a.requestNumber.localeCompare(b.requestNumber),
-      render: (v: string) => <Text code style={{ fontSize: 12 }}>{v}</Text>,
-    },
-    {
-      title: 'Month', key: 'month', width: 80,
-      render: (_: unknown, r) => txt(dayjs(r.dateOfRequest ?? r.createdAt).format('MMM')),
-      filters: valueFilters(rows, r => dayjs(r.dateOfRequest ?? r.createdAt).format('MMM')),
-      onFilter: (v, r) => dayjs(r.dateOfRequest ?? r.createdAt).format('MMM') === v,
-    },
-    {
-      title: 'Date of Request', dataIndex: 'dateOfRequest', key: 'dateOfRequest', width: 130,
+      title: 'Date of Request', dataIndex: 'dateOfRequest', key: 'dateOfRequest', width: 120, fixed: 'left',
       defaultSortOrder: 'descend',
       sorter: (a, b) =>
         dayjs(a.dateOfRequest ?? a.createdAt).valueOf() - dayjs(b.dateOfRequest ?? b.createdAt).valueOf(),
       render: (_: unknown, r) => day(r.dateOfRequest ?? r.createdAt),
     },
     {
-      title: 'Raised By', dataIndex: 'requestedByName', key: 'requestedByName', width: 140, ellipsis: true,
+      title: 'Ref #', dataIndex: 'requestNumber', key: 'requestNumber', width: 115, fixed: 'left',
+      sorter: (a, b) => a.requestNumber.localeCompare(b.requestNumber),
+      render: (v: string) => <Text code style={{ fontSize: 12 }}>{v}</Text>,
+    },
+    {
+      title: 'Raised By', dataIndex: 'requestedByName', key: 'requestedByName', width: 140, ellipsis: true, fixed: 'left',
       filters: valueFilters(rows, r => r.requestedByName),
       onFilter: (v, r) => r.requestedByName === v,
       sorter: (a, b) => (a.requestedByName ?? '').localeCompare(b.requestedByName ?? ''),
       render: (v: string) => txt(v),
+    },
+    {
+      title: 'Month', key: 'month', width: 80,
+      render: (_: unknown, r) => txt(dayjs(r.dateOfRequest ?? r.createdAt).format('MMM')),
+      filters: valueFilters(rows, r => dayjs(r.dateOfRequest ?? r.createdAt).format('MMM')),
+      onFilter: (v, r) => dayjs(r.dateOfRequest ?? r.createdAt).format('MMM') === v,
     },
     {
       title: 'Notification', dataIndex: 'notificationStatus', key: 'notificationStatus', width: 110,
@@ -246,8 +249,18 @@ function buildColumns(
       },
     },
     {
+      title: 'Approved On', dataIndex: 'approvedAt', key: 'approvedAt', width: 130,
+      sorter: (a, b) => dayjs(a.approvedAt ?? 0).valueOf() - dayjs(b.approvedAt ?? 0).valueOf(),
+      render: (v?: string) => day(v),
+    },
+    {
       title: 'Date Completed', dataIndex: 'completedAt', key: 'completedAt', width: 145,
       sorter: (a, b) => dayjs(a.completedAt ?? 0).valueOf() - dayjs(b.completedAt ?? 0).valueOf(),
+      render: (v?: string) => day(v),
+    },
+    {
+      title: 'Handed Over', dataIndex: 'dateHandedOver', key: 'dateHandedOver', width: 130,
+      sorter: (a, b) => dayjs(a.dateHandedOver ?? 0).valueOf() - dayjs(b.dateHandedOver ?? 0).valueOf(),
       render: (v?: string) => day(v),
     },
     {
@@ -313,7 +326,7 @@ function buildColumns(
       render: (_: unknown, r: VehicleMaintenance) => <LogisticsSyncTag record={r} />,
     },
     {
-      title: '', key: 'action', width: 70, fixed: 'right',
+      title: '', key: 'action', width: 70,
       render: (_: unknown, r: VehicleMaintenance) => (
         <Button size="small" onClick={() => onView(r)}>View</Button>
       ),
@@ -353,6 +366,37 @@ export default function FleetPage() {
   const [logisticsVehicleId, setLogisticsVehicleId] = useState<string | null>(null);
 
   const isApprover = role === 'DepartmentManager' || role === 'Supervisor' || role === 'SystemAdmin';
+  // Correcting a register entry is the Department Manager's call (enforced server-side too).
+  const canEditRegister = role === 'DepartmentManager' || role === 'SystemAdmin';
+  const [editOpen, setEditOpen] = useState(false);
+  const [editForm] = Form.useForm();
+  const openEdit = (r: VehicleMaintenance) => {
+    editForm.setFieldsValue({
+      vehicleRegNo: r.vehicleRegNo, vehicleType: r.vehicleType, assetNo: r.assetNo,
+      currentLocation: r.currentLocation, odometerReading: r.odometerReading,
+      nextServiceMileage: r.nextServiceMileage, notificationStatus: r.notificationStatus,
+      dateOfRequest: r.dateOfRequest ? dayjs(r.dateOfRequest) : undefined,
+      requestedByName: r.requestedByName, description: r.description, priority: r.priority,
+      workshopName: r.workshopName,
+      dateDeliveredToWorkshop: r.dateDeliveredToWorkshop ? dayjs(r.dateDeliveredToWorkshop) : undefined,
+      partsSuppliedBy: r.partsSuppliedBy, workDone: r.workDone,
+      amountNaira: r.amountNaira, sparesCostNaira: r.sparesCostNaira, finalAmountNaira: r.finalAmountNaira,
+      completedAt: r.completedAt ? dayjs(r.completedAt) : undefined,
+      justificationEvaluation: r.justificationEvaluation, notes: r.notes,
+    });
+    setEditOpen(true);
+  };
+  const saveEdit = async () => {
+    if (!selected) return;
+    const v = await editForm.validateFields();
+    const d = (x?: dayjs.Dayjs) => (x ? x.format('YYYY-MM-DD') : undefined);
+    await act(() => vehicleMaintenanceApi.update(selected.id, {
+      ...v,
+      dateOfRequest: d(v.dateOfRequest), dateDeliveredToWorkshop: d(v.dateDeliveredToWorkshop),
+      completedAt: d(v.completedAt),
+    }));
+    setEditOpen(false);
+  };
 
   // One-shot back-population of everything raised before the Logistics link existed.
   const [resyncing, setResyncing] = useState(false);
@@ -550,6 +594,7 @@ export default function FleetPage() {
         {[
           { label: 'Pending',         value: stats?.pending,            color: '#fa8c16', key: 'Pending'    },
           { label: 'Approved',        value: stats?.approved,           color: '#1677ff', key: 'Approved'   },
+          { label: 'Not Yet Sent to Workshop', value: stats?.notSentToWorkshop, color: '#13c2c2', key: 'NotSentToWorkshop' },
           { label: 'In Workshop',     value: stats?.inWorkshop,         color: '#722ed1', key: 'InWorkshop' },
           { label: 'Long-Standing',   value: stats?.longStanding,       color: '#f5222d', key: 'InWorkshop' },
           { label: 'Done This Month', value: stats?.completedThisMonth, color: '#52c41a', key: 'Completed'  },
@@ -766,6 +811,9 @@ export default function FleetPage() {
           open={drawerOpen} onClose={() => setDrawerOpen(false)} width={540}
           extra={
             <Space wrap>
+              {canEditRegister && (
+                <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(selected)}>Edit</Button>
+              )}
               {isApprover && selected.status === 'Pending' && (
                 <>
                   <Button type="primary" size="small" icon={<CheckOutlined />} loading={actionLoading}
@@ -773,7 +821,7 @@ export default function FleetPage() {
                   <Button danger size="small" icon={<CloseOutlined />} onClick={() => setRejectOpen(true)}>Reject</Button>
                 </>
               )}
-              {isApprover && selected.status === 'Approved' && (
+              {isApprover && (selected.status === 'Approved' || selected.status === 'NotSentToWorkshop') && (
                 <Button type="primary" size="small" icon={<ToolOutlined />}
                   onClick={() => setDispatchOpen(true)}>Send to Workshop</Button>
               )}
@@ -902,6 +950,49 @@ export default function FleetPage() {
         okText="Confirm Rejection" okButtonProps={{ danger: true, disabled: !rejectReason.trim() }} confirmLoading={actionLoading}>
         <p>Provide a reason for rejecting <strong>{selected?.requestNumber}</strong>:</p>
         <TextArea rows={3} value={rejectReason} onChange={e => setRejectReason(e.target.value)} placeholder="Reason for rejection…" maxLength={1000} showCount />
+      </Modal>
+
+      {/* Manager edit of a register entry */}
+      <Modal title={<><EditOutlined /> Edit {selected?.requestNumber}</>} open={editOpen} width={720}
+        onOk={saveEdit} onCancel={() => setEditOpen(false)} okText="Save Changes" confirmLoading={actionLoading}
+        destroyOnClose>
+        <Alert type="info" showIcon style={{ marginBottom: 12 }}
+          message="Corrects the register entry. The workflow stage (Approved, In Workshop…) is not changed here." />
+        <Form form={editForm} layout="vertical">
+          <Row gutter={12}>
+            <Col span={8}><Form.Item name="dateOfRequest" label="Date of Request"><DatePicker style={{ width: '100%' }} format="D MMM YYYY" /></Form.Item></Col>
+            <Col span={8}><Form.Item name="vehicleRegNo" label="Vehicle Reg" rules={[{ required: true }]}><Input /></Form.Item></Col>
+            <Col span={8}><Form.Item name="requestedByName" label="Requestor"><Input /></Form.Item></Col>
+          </Row>
+          <Row gutter={12}>
+            <Col span={8}><Form.Item name="vehicleType" label="Vehicle Type"><Input /></Form.Item></Col>
+            <Col span={8}><Form.Item name="assetNo" label="Asset No."><Input /></Form.Item></Col>
+            <Col span={8}><Form.Item name="currentLocation" label="Location"><Input /></Form.Item></Col>
+          </Row>
+          <Row gutter={12}>
+            <Col span={8}><Form.Item name="odometerReading" label="Odometer"><Input /></Form.Item></Col>
+            <Col span={8}><Form.Item name="nextServiceMileage" label="Next Service Mileage"><InputNumber style={{ width: '100%' }} min={0} /></Form.Item></Col>
+            <Col span={8}><Form.Item name="notificationStatus" label="Notification">
+              <Select options={['Open', 'Notified', 'Closed'].map(x => ({ value: x, label: x }))} /></Form.Item></Col>
+          </Row>
+          <Form.Item name="description" label="Description of Request"><Input.TextArea rows={2} /></Form.Item>
+          <Row gutter={12}>
+            <Col span={8}><Form.Item name="workshopName" label="Work Done At"><Input /></Form.Item></Col>
+            <Col span={8}><Form.Item name="dateDeliveredToWorkshop" label="Date to Workshop"><DatePicker style={{ width: '100%' }} format="D MMM YYYY" /></Form.Item></Col>
+            <Col span={8}><Form.Item name="completedAt" label="Date Completed"><DatePicker style={{ width: '100%' }} format="D MMM YYYY" /></Form.Item></Col>
+          </Row>
+          <Row gutter={12}>
+            <Col span={12}><Form.Item name="partsSuppliedBy" label="Parts Supplied By"><Input /></Form.Item></Col>
+            <Col span={12}><Form.Item name="workDone" label="Work Done"><Input /></Form.Item></Col>
+          </Row>
+          <Row gutter={12}>
+            <Col span={8}><Form.Item name="amountNaira" label="Amount (₦)"><InputNumber style={{ width: '100%' }} min={0} /></Form.Item></Col>
+            <Col span={8}><Form.Item name="sparesCostNaira" label="Spares Cost (₦)"><InputNumber style={{ width: '100%' }} min={0} /></Form.Item></Col>
+            <Col span={8}><Form.Item name="finalAmountNaira" label="Final Amount (₦)"><InputNumber style={{ width: '100%' }} min={0} /></Form.Item></Col>
+          </Row>
+          <Form.Item name="justificationEvaluation" label="Justification / Evaluation"><Input /></Form.Item>
+          <Form.Item name="notes" label="Notes"><Input.TextArea rows={2} /></Form.Item>
+        </Form>
       </Modal>
 
       {/* Dispatch modal */}

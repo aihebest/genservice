@@ -14,6 +14,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { dashboardApi } from '../../api/dashboard.api';
+import { maintenanceApi } from '../../api/maintenance.api';
+import type { MaintenanceSchedule } from '../../types';
 import type {
   DashboardRequestItem, DashboardActivityItem,
   DashboardMaintenanceItem, DashboardStoreItem,
@@ -170,6 +172,34 @@ export default function DashboardPage() {
     || user?.role === 'Supervisor'
     || user?.role === 'SystemAdmin';
 
+  // The actual overdue / escalated tasks behind the alert banners, so each one
+  // can be opened directly instead of scrolling the whole scheduler for it.
+  const { data: overdueTasks } = useQuery({
+    queryKey: ['maintenance', 'list', 'dashboard-overdue'],
+    queryFn:  () => maintenanceApi.list({ overdueOnly: true, page: 1, pageSize: 20 }),
+    refetchInterval: 60_000,
+  });
+  const { data: escalatedTasks } = useQuery({
+    queryKey: ['maintenance', 'escalations'],
+    queryFn:  maintenanceApi.escalations,
+    enabled:  isApprover,
+    refetchInterval: 60_000,
+  });
+  const openTask = (id: string) => navigate(`/maintenance?tab=scheduler&focus=${id}`);
+  const taskLinks = (items?: MaintenanceSchedule[]) => items && items.length > 0 && (
+    <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+      {items.slice(0, 8).map(t => (
+        <Button key={t.id} size="small" type="link" style={{ padding: '0 4px', height: 'auto' }}
+          onClick={() => openTask(t.id)}>
+          {t.taskName}{t.location ? ` — ${t.location}` : ''}
+          {t.isOverdue ? ` (due ${dayjs(t.nextDueAt).format('D MMM')})` : ''}
+        </Button>
+      ))}
+      {items.length > 8 && <Text type="secondary" style={{ fontSize: 12 }}>+{items.length - 8} more</Text>}
+    </div>
+  );
+
+
   const { data, isFetching, isLoading } = useQuery({
     queryKey: ['dashboard-summary'],
     queryFn:  dashboardApi.summary,
@@ -214,8 +244,9 @@ export default function DashboardPage() {
               {' '}been escalated and require urgent management attention.
             </span>
           }
+          description={taskLinks(escalatedTasks)}
           action={
-            <Button size="small" danger onClick={() => navigate('/maintenance')} icon={<ArrowRightOutlined />}>
+            <Button size="small" danger onClick={() => navigate('/maintenance?tab=scheduler')} icon={<ArrowRightOutlined />}>
               View escalations
             </Button>
           }
@@ -250,8 +281,9 @@ export default function DashboardPage() {
               {' '}overdue and require immediate attention.
             </span>
           }
+          description={taskLinks(overdueTasks?.items)}
           action={
-            <Button size="small" danger onClick={() => navigate('/maintenance')} icon={<ArrowRightOutlined />}>
+            <Button size="small" danger onClick={() => navigate('/maintenance?tab=scheduler')} icon={<ArrowRightOutlined />}>
               View
             </Button>
           }

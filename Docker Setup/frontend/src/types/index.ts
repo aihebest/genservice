@@ -164,6 +164,8 @@ export interface DieselTankReading {
   loggedByEmail:             string;
   loggedByName:              string;
   createdAt:                 string;
+  /** Dip reading (mm) the level was calculated from, for calibrated tanks. */
+  dipMm?:                    number;
 }
 
 // ── Generator Monitoring ──────────────────────────────────────────────────────
@@ -246,6 +248,7 @@ export interface PowerMeterReading {
 // ── Task Progress Logs ────────────────────────────────────────────────────────
 
 export type ProgressStatus =
+  | 'NotYetSentToWorkshop'
   | 'WorkCompleted'
   | 'WorkInProgress'
   | 'AwaitingMaterials'
@@ -260,6 +263,8 @@ export const PROGRESS_STATUS_META: Record<ProgressStatus, { label: string; color
   AwaitingVendor:     { label: 'Awaiting Vendor',      color: 'orange'   },
   AwaitingApproval:   { label: 'Awaiting Approval',    color: 'purple'   },
   PendingProcurement: { label: 'Pending Procurement',  color: 'volcano'  },
+  // Vehicle requests only — moves an Approved request to "Not Yet Sent to Workshop".
+  NotYetSentToWorkshop: { label: 'Not Yet Sent to Workshop', color: 'cyan' },
 };
 
 export interface TaskProgressLog {
@@ -416,6 +421,8 @@ export interface StaffActivity {
   startedAt:           string;
   updatedAt:           string;
   completedAt?:        string;
+  /** The day the activity was done, as entered when logged. */
+  activityDate?:       string;
 }
 
 export interface ActivityListResponse {
@@ -432,6 +439,8 @@ export interface LogActivityRequest {
   category:            ActivityCategory;
   location?:           string;
   notes?:              string;
+  /** YYYY-MM-DD — the day the activity was done (defaults to today). */
+  activityDate?:       string;
 }
 
 export const ACTIVITY_STATUS_META: Record<ActivityStatus, { label: string; color: string; badge: string }> = {
@@ -783,7 +792,7 @@ export const GENERATOR_LIST: Array<{ assetNo: string; description: string; locat
 ];
 
 export type VehicleMaintenanceStatus =
-  | 'Pending' | 'Approved' | 'InWorkshop'
+  | 'Pending' | 'Approved' | 'NotSentToWorkshop' | 'InWorkshop'
   | 'AwaitingParts' | 'AwaitingFunds'
   | 'Completed' | 'Rejected';
 
@@ -856,6 +865,9 @@ export interface VehicleMaintenance {
   justificationEvaluation?: string;
   /** "NEXT SERVICE MILEAGE" — odometer reading the next service falls due at. */
   nextServiceMileage?:      number;
+  /** Manager correction audit. */
+  lastEditedByName?:        string;
+  lastEditedAt?:            string;
 }
 
 export interface VehicleMaintenanceStats {
@@ -871,6 +883,8 @@ export interface VehicleMaintenanceStats {
   open?:              number;
   /** Work completed. All time, or raised in the chosen month. */
   closed?:            number;
+  /** Approved, but logged as not yet taken to the workshop. */
+  notSentToWorkshop?: number;
 }
 
 export interface VehicleMaintenanceListResponse {
@@ -883,6 +897,7 @@ export interface VehicleMaintenanceListResponse {
 export const VM_STATUS_META: Record<VehicleMaintenanceStatus, { label: string; color: string; badge: string }> = {
   Pending:       { label: 'Pending',        color: 'orange',  badge: 'warning'    },
   Approved:      { label: 'Approved',       color: 'blue',    badge: 'processing' },
+  NotSentToWorkshop: { label: 'Not Yet Sent to Workshop', color: 'cyan', badge: 'default' },
   InWorkshop:    { label: 'In Workshop',    color: 'purple',  badge: 'processing' },
   AwaitingParts: { label: 'Awaiting Parts', color: 'gold',    badge: 'warning'    },
   AwaitingFunds: { label: 'Awaiting Funds', color: 'volcano', badge: 'warning'    },
@@ -1587,6 +1602,9 @@ export interface DispenseDieselPayload {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export const ELECTRICITY_LOCATIONS = [
+  // Offices — requested by the GS team (Nov 2026).
+  'Port Harcourt (PH) Office', 'Lagos Office', 'Abuja Office',
+  // Sites and residences already in use.
   'WOJI', 'DGS', 'OFFICE', 'DR', 'UYO – Chairman', 'UYO – MD',
 ] as const;
 

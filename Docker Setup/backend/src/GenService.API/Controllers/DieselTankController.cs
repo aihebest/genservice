@@ -1,6 +1,7 @@
 using GenService.API.Data;
 using GenService.API.Domain;
 using GenService.API.Models;
+using GenService.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -22,7 +23,7 @@ public class DieselTankController(
         r.Id, r.Location, r.TankIdentifier, r.ReadingDate,
         r.TankLevelLitres, r.PreviousLevelLitres, r.ConsumptionLitres,
         r.CostPerLitreNaira, r.TotalConsumptionCostNaira,
-        r.Notes, r.LoggedByEmail, r.LoggedByName, r.CreatedAt
+        r.Notes, r.LoggedByEmail, r.LoggedByName, r.CreatedAt, r.DipMm
     );
 
     // ── GET /api/v1/diesel-tank ──────────────────────────────────────────────
@@ -93,6 +94,19 @@ public class DieselTankController(
     public async Task<ActionResult<DieselTankReadingDto>> Create(
         [FromBody] CreateDieselTankReadingRequest req)
     {
+        // Calibrated tank: litres come from the dip reading and the tank's chart,
+        // not from a figure typed by hand.
+        var level = req.TankLevelLitres;
+        var chart = TankCalibration.For(req.TankIdentifier);
+        if (chart is not null)
+        {
+            if (req.DipMm is not double dip)
+                return BadRequest(new { message = $"Enter the dip reading (mm) for {chart.TankName}." });
+            if (dip < 0 || dip > chart.ReferenceHeightMm)
+                return BadRequest(new { message = $"Dip must be between 0 and {chart.ReferenceHeightMm} mm for this tank." });
+            level = TankCalibration.Litres(chart, dip);
+        }
+
         // Auto-fetch previous reading for this tank
         var prev = await db.DieselTankReadings
             .AsNoTracking()
@@ -102,7 +116,7 @@ public class DieselTankController(
             .FirstOrDefaultAsync();
 
         double? consumed = prev != null
-            ? Math.Max(0, prev.TankLevelLitres - req.TankLevelLitres)
+            ? Math.Max(0, prev.TankLevelLitres - level)
             : null;
 
         decimal? totalCost = null;
@@ -114,7 +128,8 @@ public class DieselTankController(
             Location                 = req.Location.Trim(),
             TankIdentifier           = req.TankIdentifier.Trim(),
             ReadingDate              = DateTime.UtcNow.Date,
-            TankLevelLitres          = req.TankLevelLitres,
+            TankLevelLitres          = level,
+            DipMm                    = chart is not null ? req.DipMm : null,
             PreviousLevelLitres      = prev?.TankLevelLitres,
             ConsumptionLitres        = consumed,
             CostPerLitreNaira        = req.CostPerLitreNaira,
@@ -129,7 +144,7 @@ public class DieselTankController(
         await db.SaveChangesAsync();
 
         logger.LogInformation("Diesel tank reading: {Location} {Tank} — {Level}L (consumed: {Consumed}L)",
-            req.Location, req.TankIdentifier, req.TankLevelLitres, consumed?.ToString("0.0") ?? "N/A");
+            req.Location, req.TankIdentifier, level, consumed?.ToString("0.0") ?? "N/A");
 
         return Ok(ToDto(reading));
     }

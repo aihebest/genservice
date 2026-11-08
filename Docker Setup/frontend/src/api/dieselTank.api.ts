@@ -14,5 +14,7 @@ export const dieselTankApi = {
     tankLevelLitres:  number;
     costPerLitreNaira?:number;
     notes?:           string;
+    /** Dip reading (mm) — required for calibrated tanks; the server converts it to litres. */
+    dipMm?:           number;
   }) => apiClient.post<DieselTankReading>('/diesel-tank', data).then(r => r.data),
 };

@@ -27,8 +27,17 @@ public class ActivitiesController(GenServiceDbContext db) : ControllerBase
         a.Id, a.StaffEmail, a.StaffName, a.ActivityDescription,
         a.Location, a.Category, a.Status, a.IsProxy,
         a.LoggedByEmail, a.LoggedByName, a.Notes,
-        a.StartedAt, a.UpdatedAt, a.CompletedAt
+        a.StartedAt, a.UpdatedAt, a.CompletedAt,
+        a.ActivityDate ?? a.StartedAt.Date
     );
+
+    /// <summary>Activity date as entered (not in the future), else today.</summary>
+    private static DateTime ParseActivityDate(string? s)
+    {
+        var today = DateTime.UtcNow.Date;
+        return DateTime.TryParseExact(s, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+                   System.Globalization.DateTimeStyles.None, out var d) && d.Date <= today ? d.Date : today;
+    }
 
     // ── GET /api/v1/activities ─────────────────────────────────────────────
     [HttpGet]
@@ -110,6 +119,7 @@ public class ActivitiesController(GenServiceDbContext db) : ControllerBase
             Category            = req.Category,
             Location            = req.Location ?? "",
             Notes               = req.Notes,
+            ActivityDate        = ParseActivityDate(req.ActivityDate),
             IsProxy             = false,
             LoggedByEmail       = CallerEmail,
             LoggedByName        = CallerName,
@@ -141,6 +151,7 @@ public class ActivitiesController(GenServiceDbContext db) : ControllerBase
             Category            = req.Category,
             Location            = req.Location ?? "",
             Notes               = req.Notes,
+            ActivityDate        = ParseActivityDate(req.ActivityDate),
             IsProxy             = true,
             LoggedByEmail       = CallerEmail,
             LoggedByName        = CallerName,

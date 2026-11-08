@@ -50,4 +50,7 @@ export const dstvApi = {
   }) => apiClient.post<DstvSubscription>(`/dstv/${id}/renew`, data).then(r => r.data),
 
   remove: (id: string) => apiClient.delete(`/dstv/${id}`),
+
+  /** Delete every expired subscription (manager only). Returns how many were removed. */
+  removeExpired: () => apiClient.delete<{ deleted: number }>('/dstv/expired').then(r => r.data),
 };

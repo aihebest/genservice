@@ -36,6 +36,15 @@ const STATUS_TABS = [
 function buildColumns(canManage: boolean, onComplete: (id: string) => void): ColumnsType<StaffActivity> {
   return [
     {
+      // The day the activity was done, as entered when it was logged.
+      title: 'Date',
+      dataIndex: 'activityDate',
+      key: 'activityDate',
+      width: 110,
+      render: (_: unknown, r: StaffActivity) =>
+        <Text style={{ fontSize: 12 }}>{dayjs(r.activityDate ?? r.startedAt).format('D MMM YYYY')}</Text>,
+    },
+    {
       title: 'Staff Member',
       dataIndex: 'staffName',
       key: 'staffName',

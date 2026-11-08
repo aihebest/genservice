@@ -50,11 +50,12 @@ const MANUAL_GEN = '__manual__';
 
 function buildColumns(onView: (r: EquipmentMaintenance) => void): ColumnsType<EquipmentMaintenance> {
   return [
-    { title: 'Ref #', dataIndex: 'requestNumber', key: 'ref', width: 110,
-      render: (v: string) => <Text code style={{ fontSize: 12 }}>{v}</Text> },
-    { title: 'Date of Request', dataIndex: 'dateOfRequest', key: 'dor', width: 120,
+    // Frozen: Date, Ref, Requestor. Everything else scrolls horizontally.
+    { title: 'Date of Request', dataIndex: 'dateOfRequest', key: 'dor', fixed: 'left', width: 120,
       render: (v?: string) => <Text style={{ fontSize: 12 }}>{v ? dayjs(v).format('D MMM YY') : '—'}</Text> },
-    { title: 'Requestor', dataIndex: 'requestor', key: 'requestor', width: 130, ellipsis: true,
+    { title: 'Ref #', dataIndex: 'requestNumber', key: 'ref', fixed: 'left', width: 110,
+      render: (v: string) => <Text code style={{ fontSize: 12 }}>{v}</Text> },
+    { title: 'Requestor', dataIndex: 'requestor', key: 'requestor', fixed: 'left', width: 130, ellipsis: true,
       render: (v?: string) => <Text style={{ fontSize: 12 }}>{v ?? '—'}</Text> },
     { title: 'Notification', dataIndex: 'notificationStatus', key: 'notif', width: 105,
       render: (v?: string) => v ? <Tag>{v}</Tag> : <Text type="secondary" style={{ fontSize: 12 }}>—</Text> },

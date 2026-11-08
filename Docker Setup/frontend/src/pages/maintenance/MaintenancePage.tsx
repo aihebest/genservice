@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Tabs, Typography, Row, Col } from 'antd';
 import { ToolOutlined, HomeOutlined, CalendarOutlined } from '@ant-design/icons';
 import EquipmentTab from './components/EquipmentTab';
@@ -7,7 +8,11 @@ import FacilityTab  from './components/FacilityTab';
 const { Title, Text } = Typography;
 
 export default function MaintenancePage() {
-  const [activeTab, setActiveTab] = useState('equipment');
+  // Deep link from the dashboard: /maintenance?tab=scheduler&focus=<scheduleId>
+  const [params, setParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(params.get('tab') ?? 'equipment');
+  const focusId = params.get('focus') ?? undefined;
+  const clearFocus = () => { params.delete('focus'); setParams(params, { replace: true }); };
 
   return (
     <div>
@@ -40,7 +45,7 @@ export default function MaintenancePage() {
           {
             key:      'scheduler',
             label:    <span><CalendarOutlined style={{ marginRight: 6 }} />Maintenance Scheduler</span>,
-            children: <SchedulerContent />,
+            children: <SchedulerContent focusId={focusId} onClearFocus={clearFocus} />,
           },
         ]}
       />
@@ -210,7 +215,7 @@ function buildColumns(
 }
 
 // ── SchedulerContent ──────────────────────────────────────────────────────────
-function SchedulerContent() {
+function SchedulerContent({ focusId, onClearFocus }: { focusId?: string; onClearFocus?: () => void }) {
   const user      = useAuthStore(s => s.user);
   const role      = user?.role;
   const qc        = useQueryClient();
@@ -252,6 +257,13 @@ function SchedulerContent() {
     queryKey: ['maintenance', 'list', category, overdueOnly, page],
     queryFn:  () => maintenanceApi.list({ category, overdueOnly: overdueOnly || undefined, page, pageSize: 15 }),
     refetchInterval: 60_000,
+  });
+
+  // The single task opened from a dashboard alert.
+  const { data: focused } = useQuery({
+    queryKey: ['maintenance', 'one', focusId],
+    queryFn:  () => maintenanceApi.getById(focusId!),
+    enabled:  !!focusId,
   });
 
   const { data: stats } = useQuery({
@@ -474,12 +486,18 @@ function SchedulerContent() {
           </Dropdown>
         </div>
 
+        {/* Opened from a dashboard alert: show just that task, with a way back. */}
+        {focusId && (
+          <Alert type="info" showIcon style={{ margin: '12px 16px 0' }}
+            message={focused ? <>Showing <strong>{focused.taskName}</strong> from the dashboard alert.</> : 'Loading the task…'}
+            action={<Button size="small" onClick={onClearFocus}>Show all tasks</Button>} />
+        )}
         <FilterableTable<MaintenanceSchedule>
           columns={columns}
-          dataSource={data?.items ?? []}
+          dataSource={focusId ? (focused ? [focused] : []) : (data?.items ?? [])}
           rowKey="id"
-          loading={isFetching}
-          pagination={{
+          loading={focusId ? !focused : isFetching}
+          pagination={focusId ? false : {
             current:   page,
             pageSize:  15,
             total:     data?.totalCount ?? 0,

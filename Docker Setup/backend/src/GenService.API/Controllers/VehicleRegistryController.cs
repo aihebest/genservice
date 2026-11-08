@@ -308,6 +308,10 @@ public class VehicleRegistryController(
             validDocuments   = docs.Count(d => DocStatusFor(d.ExpiryDate) == VehicleDocumentStatus.Valid),
             expiringDocuments= docs.Count(d => DocStatusFor(d.ExpiryDate) == VehicleDocumentStatus.Expiring),
             expiredDocuments = docs.Count(d => DocStatusFor(d.ExpiryDate) == VehicleDocumentStatus.Expired),
+            // Renewal spend, all time and for documents issued this year.
+            renewalCostTotal    = docs.Sum(d => d.RenewalCostNaira ?? 0),
+            renewalCostThisYear = docs.Where(d => d.IssueDate.Year == DateTime.UtcNow.Year)
+                                      .Sum(d => d.RenewalCostNaira ?? 0),
         });
     }
 }

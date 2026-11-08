@@ -39,4 +39,7 @@ public static class ProgressStatus
     public const string AwaitingVendor     = "AwaitingVendor";
     public const string AwaitingApproval   = "AwaitingApproval";
     public const string PendingProcurement = "PendingProcurement";
+    /// <summary>Vehicle approved but not yet taken to the workshop. On a vehicle
+    /// request this moves it to the matching register stage.</summary>
+    public const string NotYetSentToWorkshop = "NotYetSentToWorkshop";
 }

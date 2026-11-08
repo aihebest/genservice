@@ -43,6 +43,17 @@ export const vehicleMaintenanceApi = {
     justificationEvaluation?: string;
   }) => apiClient.post<VehicleMaintenance>('/vehicle-maintenance', data).then(r => r.data),
 
+  /** Department Manager correction of a register entry (doesn't change the workflow stage). */
+  update: (id: string, data: Partial<{
+    vehicleRegNo: string; vehicleType: string; assetNo: string; maintenanceType: string;
+    description: string; priority: string; currentLocation: string; odometerReading: string;
+    nextServiceMileage: number; notificationStatus: string; dateOfRequest: string;
+    requestedByName: string; workshopName: string; dateDeliveredToWorkshop: string;
+    partsSuppliedBy: string; workDone: string; actionedBy: string; amountNaira: number;
+    sparesCostNaira: number; finalAmountNaira: number; completedAt: string;
+    justificationEvaluation: string; notes: string;
+  }>) => apiClient.put<VehicleMaintenance>(`/vehicle-maintenance/${id}`, data).then(r => r.data),
+
   approve: (id: string, notes?: string) =>
     apiClient.post<VehicleMaintenance>(`/vehicle-maintenance/${id}/approve`, { notes }).then(r => r.data),
 
