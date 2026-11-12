@@ -36,6 +36,7 @@ import {
 import type { RequestCategory, RequestStatus, MaintenanceCategory, GeneratorRunReason } from '../../types';
 
 import FilterableTable from '../../components/shared/FilterableTable';
+import ManagementDashboards from './ManagementDashboards';
 const { Title, Text } = Typography;
 
 // ── Colour palettes ────────────────────────────────────────────────────────────
@@ -766,6 +767,12 @@ export default function ReportsPage() {
             key:      'explorer',
             label:    <Space><FilterOutlined />Report Explorer</Space>,
             children: <ReportExplorerTab />,
+          },
+          {
+            // Live versions of the department's Excel dashboards.
+            key:      'dashboards',
+            label:    <Space><BarChartOutlined />Management Dashboards</Space>,
+            children: <ManagementDashboards />,
           },
           {
             key:      'requests',
