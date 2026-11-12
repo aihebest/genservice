@@ -130,6 +130,7 @@ const DEFAULT_HIDDEN = new Set([
 function buildColumns(
   onView: (r: VehicleMaintenance) => void,
   rows: VehicleMaintenance[],
+  onEdit?: (r: VehicleMaintenance) => void,
 ): VmColumn[] {
   return [
     // Only these three are frozen (Date, Ref, Requestor) — everything after them
@@ -326,9 +327,17 @@ function buildColumns(
       render: (_: unknown, r: VehicleMaintenance) => <LogisticsSyncTag record={r} />,
     },
     {
-      title: '', key: 'action', width: 70,
+      title: '', key: 'action', width: onEdit ? 110 : 70,
       render: (_: unknown, r: VehicleMaintenance) => (
-        <Button size="small" onClick={() => onView(r)}>View</Button>
+        <Space size={4} onClick={e => e.stopPropagation()}>
+          <Button size="small" onClick={() => onView(r)}>View</Button>
+          {/* Manager: correct the entry straight from the list. */}
+          {onEdit && (
+            <Tooltip title="Edit entry">
+              <Button size="small" icon={<EditOutlined />} onClick={() => onEdit(r)} />
+            </Tooltip>
+          )}
+        </Space>
       ),
     },
   ];
@@ -473,7 +482,8 @@ export default function FleetPage() {
   // All 21 register columns are available; the detail-heavy ones start hidden so
   // the default view stays readable, and the Columns menu switches them on.
   const rows = data?.items ?? [];
-  const allColumns = buildColumns(openDetail, rows);
+  const allColumns = buildColumns(openDetail, rows,
+    canEditRegister ? (r => { setSelected(r); openEdit(r); }) : undefined);
   const [hiddenCols, setHiddenCols] = useState<Set<string>>(new Set(DEFAULT_HIDDEN));
   const visibleColumns = allColumns.filter(c => !hiddenCols.has(c.key));
 

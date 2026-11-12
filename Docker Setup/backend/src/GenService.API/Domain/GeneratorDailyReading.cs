@@ -80,6 +80,14 @@ public class GeneratorDailyReading
     // ── Edit audit (manager corrections) ──────────────────────────────────────
     public string?   LastEditedByName { get; set; }
     public DateTime? LastEditedAt     { get; set; }
+
+    // ── Site tank, by dip (calibrated) ────────────────────────────────────────
+    // Kept apart from the generator's own fuel figures above: this is the bulk
+    // tank serving the whole site, measured with the dip stick and converted by
+    // the tank's calibration chart. Consumption is dip-to-dip at the location.
+    public double?  TankDipMm             { get; set; }
+    public double?  TankLevelLitres       { get; set; }
+    public double?  TankConsumptionLitres { get; set; }
 }
 
 public static class GeneratorDailyStatus

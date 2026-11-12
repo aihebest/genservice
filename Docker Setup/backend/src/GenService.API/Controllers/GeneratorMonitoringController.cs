@@ -39,7 +39,8 @@ public class GeneratorMonitoringController(
         r.ServiceCompleted, r.LastServicedAtHours,
         r.ServiceAlertActive, r.HoursUntilNextService,
         r.Notes, r.LoggedByEmail, r.LoggedByName, r.CreatedAt,
-        r.LastEditedByName, r.LastEditedAt
+        r.LastEditedByName, r.LastEditedAt,
+        r.TankDipMm, r.TankLevelLitres, r.TankConsumptionLitres
     );
 
     // ── GET /api/v1/generator-monitoring/readings ────────────────────────────
@@ -213,6 +214,26 @@ public class GeneratorMonitoringController(
             CreatedAt               = DateTime.UtcNow,
             UpdatedAt               = DateTime.UtcNow,
         };
+
+        // Site tank by dip: litres from the calibration chart; consumption is the
+        // drop since the previous dip at this location (whichever generator it
+        // was logged against — they share the tank). A rise means it was
+        // refilled, so no consumption is shown for that reading.
+        if (req.TankDipMm is double dip && TankCalibration.ForLocation(reading.Location) is { } chart)
+        {
+            if (dip < 0 || dip > chart.ReferenceHeightMm)
+                return BadRequest(new { message = $"Tank dip must be between 0 and {chart.ReferenceHeightMm} mm at {reading.Location}." });
+            var level = TankCalibration.Litres(chart, dip);
+            var prevDip = await db.GeneratorDailyReadings.AsNoTracking()
+                .Where(r => r.Location == reading.Location && r.TankLevelLitres != null
+                         && r.ReadingDate <= reading.ReadingDate)
+                .OrderByDescending(r => r.ReadingDate).ThenByDescending(r => r.CreatedAt)
+                .Select(r => r.TankLevelLitres)
+                .FirstOrDefaultAsync();
+            reading.TankDipMm             = dip;
+            reading.TankLevelLitres       = level;
+            reading.TankConsumptionLitres = prevDip is double p && p >= level ? p - level : null;
+        }
 
         db.GeneratorDailyReadings.Add(reading);
         await db.SaveChangesAsync();

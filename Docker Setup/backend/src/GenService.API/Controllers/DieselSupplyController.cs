@@ -52,7 +52,8 @@ public class DieselSupplyController(
         s.QuantityLitres, s.UnitPriceNaira, s.TotalCostNaira, s.StorageLocation,
         s.DeliveryDocuments, s.ReceivingOfficer, s.QuantityRemainingLitres,
         s.QuantityLitres - s.QuantityRemainingLitres,
-        s.Notes, s.LoggedByEmail, s.LoggedByName, s.CreatedAt);
+        s.Notes, s.LoggedByEmail, s.LoggedByName, s.CreatedAt,
+        s.LastEditedByName, s.LastEditedAt);
 
     private static DieselDistributionDto ToDto(DieselDistribution d) => new(
         d.Id, d.DistributionReference, d.DistributionType, d.SupplyType, d.BulkSupplyId, d.BulkSupplyReference,
@@ -126,6 +127,53 @@ public class DieselSupplyController(
         return CreatedAtAction(nameof(ListSupplies), ToDto(supply));
     }
 
+    // ── PUT /api/v1/diesel-supply/supplies/{id} ─────────────────────────────
+    /// <summary>
+    /// Department Manager correction of a bulk supply batch.
+    ///
+    /// Litres already distributed from the batch are kept intact: the remaining
+    /// balance becomes new quantity − already distributed, so the running stock
+    /// stays correct. The quantity can't be reduced below what has gone out.
+    /// </summary>
+    [HttpPut("supplies/{id:guid}")]
+    public async Task<ActionResult<DieselSupplyDto>> UpdateSupply(Guid id, [FromBody] UpdateDieselSupplyRequest req)
+    {
+        if (!CanEditRecords)
+            return StatusCode(403, new { message = "Only a Department Manager or System Admin can edit bulk supplies." });
+
+        var s = await db.DieselBulkSupplies.FindAsync(id);
+        if (s is null) return NotFound();
+
+        if (req.QuantityLitres is double qty)
+        {
+            var distributed = s.QuantityLitres - s.QuantityRemainingLitres;
+            if (qty <= 0)
+                return BadRequest(new { message = "Quantity supplied must be greater than zero." });
+            if (qty < distributed)
+                return BadRequest(new { message =
+                    $"{distributed:0.#} L has already been distributed from {s.SupplyReference}; the quantity can't be less than that." });
+            s.QuantityLitres          = qty;
+            s.QuantityRemainingLitres = qty - distributed;
+        }
+        if (!string.IsNullOrWhiteSpace(req.Vendor)) s.Vendor = req.Vendor.Trim();
+        if (req.UnitPriceNaira is decimal price)   s.UnitPriceNaira = price;
+        if (req.SupplyDate     is DateTime date)   s.SupplyDate     = date.Date;
+        if (req.InvoiceNumber     is not null) s.InvoiceNumber     = req.InvoiceNumber.Trim();
+        if (req.StorageLocation   is not null) s.StorageLocation   = req.StorageLocation.Trim();
+        if (req.DeliveryDocuments is not null) s.DeliveryDocuments = req.DeliveryDocuments.Trim();
+        if (req.ReceivingOfficer  is not null) s.ReceivingOfficer  = req.ReceivingOfficer.Trim();
+        if (req.Notes             is not null) s.Notes             = req.Notes.Trim();
+
+        s.TotalCostNaira   = s.UnitPriceNaira * (decimal)s.QuantityLitres;
+        s.UpdatedAt        = DateTime.UtcNow;
+        s.LastEditedByName = CallerName;
+        s.LastEditedAt     = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+
+        logger.LogInformation("Bulk supply {Ref} edited by {User}", s.SupplyReference, CallerEmail);
+        return Ok(ToDto(s));
+    }
+
     // ═════════════════════════════ DISTRIBUTIONS ════════════════════════════════
 
     // ── GET /api/v1/diesel-supply/distributions ──────────────────────────────
@@ -150,7 +198,107 @@ public class DieselSupplyController(
             .Take(q.PageSize)
             .ToListAsync();
 
-        return Ok(new { items = items.Select(ToDto), totalCount = total, page = q.Page, pageSize = q.PageSize });
+        // Previous issue / distance / km-per-litre for each vehicle row. Uses the
+        // vehicle's full history, not just this page, so the first row on a page
+        // still finds its previous issue.
+        var regs = items.Where(d => d.DistributionType == DieselDistributionType.Vehicle && !string.IsNullOrWhiteSpace(d.VehicleRegNo))
+                        .Select(d => RegKey(d.VehicleRegNo)).ToHashSet();
+        var consumption = regs.Count == 0
+            ? new Dictionary<Guid, Consumption>()
+            : ComputeConsumption(await db.DieselDistributions.AsNoTracking()
+                  .Where(d => d.DistributionType == DieselDistributionType.Vehicle && d.VehicleRegNo != null)
+                  .ToListAsync(), regs);
+
+        var dtos = items.Select(d => consumption.TryGetValue(d.Id, out var c)
+            ? ToDto(d) with
+              {
+                  PreviousDistributionDate = c.PrevDate, PreviousQuantityLitres = c.PrevLitres,
+                  PreviousOdometer = c.PrevOdo, DistanceKm = c.Distance, KmPerLitre = c.KmPerLitre,
+              }
+            : ToDto(d));
+
+        return Ok(new { items = dtos, totalCount = total, page = q.Page, pageSize = q.PageSize });
+    }
+
+    // ── GET /api/v1/diesel-supply/distributions/vehicle-summary ─────────────
+    /// <summary>
+    /// Per-vehicle diesel use: issues, litres, distance covered and average km per
+    /// litre — for spotting vehicles drawing more fuel than they should.
+    /// </summary>
+    [HttpGet("distributions/vehicle-summary")]
+    public async Task<ActionResult<IEnumerable<VehicleDieselSummaryDto>>> VehicleSummary([FromQuery] int days = 90)
+    {
+        var from = DateTime.UtcNow.AddDays(-Math.Max(1, days)).Date;
+        var all = await db.DieselDistributions.AsNoTracking()
+            .Where(d => d.DistributionType == DieselDistributionType.Vehicle && d.VehicleRegNo != null)
+            .ToListAsync();
+        var consumption = ComputeConsumption(all, null);
+
+        var rows = all
+            .Where(d => d.DistributionDate >= from)
+            .GroupBy(d => RegKey(d.VehicleRegNo))
+            .Select(g =>
+            {
+                var list  = g.OrderBy(d => d.DistributionDate).ThenBy(d => d.CreatedAt).ToList();
+                var pairs = list.Select(d => consumption.GetValueOrDefault(d.Id))
+                                .Where(c => c is { Distance: not null, PrevLitres: > 0 }).ToList();
+                double? dist   = pairs.Count > 0 ? pairs.Sum(c => c!.Distance!.Value) : null;
+                double? litres = pairs.Count > 0 ? pairs.Sum(c => c!.PrevLitres!.Value) : null;
+                var last = list[^1];
+                return new VehicleDieselSummaryDto(
+                    last.VehicleRegNo!.Trim(), list.Count, list.Sum(d => d.QuantityLitres),
+                    last.DistributionDate, ParseOdo(last.OdometerReading),
+                    dist, litres,
+                    dist is double km && litres is double l && l > 0 ? Math.Round(km / l, 2) : null);
+            })
+            .OrderByDescending(r => r.TotalLitres)
+            .ToList();
+        return Ok(rows);
+    }
+
+    // ── Vehicle consumption helpers ─────────────────────────────────────────
+    private sealed record Consumption(
+        DateTime? PrevDate, double? PrevLitres, double? PrevOdo, double? Distance, double? KmPerLitre);
+
+    /// <summary>Registration as a comparison key — "PHC 178 AM" and "phc178am" are the same vehicle.</summary>
+    private static string RegKey(string? reg) =>
+        new((reg ?? "").Where(char.IsLetterOrDigit).Select(char.ToUpperInvariant).ToArray());
+
+    private static double? ParseOdo(string? s)
+    {
+        var digits = new string((s ?? "").Where(c => char.IsDigit(c) || c == '.').ToArray());
+        return double.TryParse(digits, System.Globalization.NumberStyles.Any,
+                   System.Globalization.CultureInfo.InvariantCulture, out var v) && v > 0 ? v : null;
+    }
+
+    /// <summary>
+    /// Each vehicle issue compared with the one before it: distance = odometer now −
+    /// odometer then; km/L = distance ÷ litres issued then. A non-increasing
+    /// odometer (typo or reset) yields no distance rather than a nonsense figure.
+    /// </summary>
+    private static Dictionary<Guid, Consumption> ComputeConsumption(
+        List<DieselDistribution> history, HashSet<string>? onlyRegs)
+    {
+        var result = new Dictionary<Guid, Consumption>();
+        foreach (var g in history.GroupBy(d => RegKey(d.VehicleRegNo)))
+        {
+            if (onlyRegs is not null && !onlyRegs.Contains(g.Key)) continue;
+            DieselDistribution? prev = null;
+            foreach (var d in g.OrderBy(d => d.DistributionDate).ThenBy(d => d.CreatedAt))
+            {
+                if (prev is not null)
+                {
+                    var now = ParseOdo(d.OdometerReading);
+                    var then = ParseOdo(prev.OdometerReading);
+                    double? dist = now is double n && then is double t && n > t ? n - t : null;
+                    double? kmpl = dist is double km && prev.QuantityLitres > 0
+                        ? Math.Round(km / prev.QuantityLitres, 2) : null;
+                    result[d.Id] = new Consumption(prev.DistributionDate, prev.QuantityLitres, then, dist, kmpl);
+                }
+                prev = d;
+            }
+        }
+        return result;
     }
 
     // ── POST /api/v1/diesel-supply/distributions ─────────────────────────────

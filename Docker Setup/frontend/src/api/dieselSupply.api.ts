@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import type { DieselSupply, DieselDistribution, DieselStockSummary } from '../types';
+import type { DieselSupply, DieselDistribution, DieselStockSummary, VehicleDieselSummary } from '../types';
 
 export const dieselSupplyApi = {
   // ── Bulk supplies ───────────────────────────────────────────────────────────
@@ -23,7 +23,19 @@ export const dieselSupplyApi = {
     notes?:            string;
   }) => apiClient.post<DieselSupply>('/diesel-supply/supplies', data).then(r => r.data),
 
+  /** Department Manager correction of a bulk supply batch. Distributed litres are preserved. */
+  updateSupply: (id: string, data: Partial<{
+    vendor: string; quantityLitres: number; unitPriceNaira: number; supplyDate: string;
+    invoiceNumber: string; storageLocation: string; deliveryDocuments: string;
+    receivingOfficer: string; notes: string;
+  }>) => apiClient.put<DieselSupply>(`/diesel-supply/supplies/${id}`, data).then(r => r.data),
+
   // ── Distributions ─────────────────────────────────────────────────────────
+  /** Per-vehicle issues, litres, distance and average km per litre over the last `days`. */
+  vehicleSummary: (days = 90) =>
+    apiClient.get<VehicleDieselSummary[]>('/diesel-supply/distributions/vehicle-summary', { params: { days } })
+      .then(r => r.data),
+
   listDistributions: (params?: { distributionType?: string; bulkSupplyId?: string; vehicleRegNo?: string; days?: number; page?: number }) =>
     apiClient
       .get<{ items: DieselDistribution[]; totalCount: number }>('/diesel-supply/distributions', { params })

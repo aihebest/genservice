@@ -32,6 +32,8 @@ export const generatorMonitoringApi = {
     lastServicedAtHours?:    number;
     notes?:                  string;
     readingDate?:            string;
+    /** Dip of the site's calibrated tank (mm). */
+    tankDipMm?:              number;
   }) => apiClient.post<GeneratorDailyReading>('/generator-monitoring/readings', data).then(r => r.data),
 
   // Manager-only correction of an existing reading.

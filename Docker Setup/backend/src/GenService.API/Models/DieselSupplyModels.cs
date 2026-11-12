@@ -31,7 +31,22 @@ public record DieselSupplyDto(
     string?  Notes,
     string   LoggedByEmail,
     string   LoggedByName,
-    DateTime CreatedAt
+    DateTime CreatedAt,
+    string?   LastEditedByName = null,
+    DateTime? LastEditedAt     = null
+);
+
+/// <summary>Manager correction of a bulk supply batch. Only supplied fields change.</summary>
+public record UpdateDieselSupplyRequest(
+    string?   Vendor            = null,
+    double?   QuantityLitres    = null,
+    decimal?  UnitPriceNaira    = null,
+    DateTime? SupplyDate        = null,
+    string?   InvoiceNumber     = null,
+    string?   StorageLocation   = null,
+    string?   DeliveryDocuments = null,
+    string?   ReceivingOfficer  = null,
+    string?   Notes             = null
 );
 
 public record DieselSupplyQuery(
@@ -79,7 +94,29 @@ public record DieselDistributionDto(
     string?  Notes,
     string   LoggedByEmail,
     string   LoggedByName,
-    DateTime CreatedAt
+    DateTime CreatedAt,
+    // ── Vehicle consumption (Option B) — derived from the vehicle's previous issue ──
+    DateTime? PreviousDistributionDate = null,
+    double?   PreviousQuantityLitres   = null,
+    double?   PreviousOdometer         = null,
+    /// <summary>Odometer now − odometer at the previous issue.</summary>
+    double?   DistanceKm               = null,
+    /// <summary>Distance ÷ litres issued last time (the fuel that covered it).</summary>
+    double?   KmPerLitre               = null
+);
+
+/// <summary>Per-vehicle diesel consumption over a period.</summary>
+public record VehicleDieselSummaryDto(
+    string    VehicleRegNo,
+    int       Issues,
+    double    TotalLitres,
+    DateTime  LastIssueDate,
+    double?   LastOdometer,
+    /// <summary>Total km covered between issues that have odometer readings.</summary>
+    double?   DistanceKm,
+    /// <summary>Litres that covered that distance (each issue's litres, up to the next issue).</summary>
+    double?   LitresForDistance,
+    double?   AverageKmPerLitre
 );
 
 public record DieselDistributionQuery(

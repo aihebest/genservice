@@ -185,6 +185,32 @@ public class ActivitiesController(GenServiceDbContext db) : ControllerBase
         return Ok(ToDto(a));
     }
 
+    // ── PUT /api/v1/activities/{id} ───────────────────────────────────────
+    /// <summary>Department Manager correction of an activity entry.</summary>
+    [HttpPut("{id:guid}")]
+    public async Task<ActionResult<ActivityDto>> Update(Guid id, [FromBody] UpdateActivityRequest req)
+    {
+        if (CallerRole is not ("SystemAdmin" or "DepartmentManager"))
+            return StatusCode(403, new { message = "Only a Department Manager or System Admin can edit activities." });
+        var a = await db.StaffActivities.FirstOrDefaultAsync(x => x.Id == id);
+        if (a is null) return NotFound();
+
+        if (!string.IsNullOrWhiteSpace(req.StaffName))           a.StaffName           = req.StaffName.Trim();
+        if (!string.IsNullOrWhiteSpace(req.ActivityDescription)) a.ActivityDescription = req.ActivityDescription.Trim();
+        if (!string.IsNullOrWhiteSpace(req.Category))            a.Category            = req.Category.Trim();
+        if (req.Location is not null)                            a.Location            = req.Location.Trim();
+        if (req.Notes    is not null)                            a.Notes               = req.Notes.Trim();
+        if (!string.IsNullOrWhiteSpace(req.ActivityDate))        a.ActivityDate        = ParseActivityDate(req.ActivityDate);
+        if (!string.IsNullOrWhiteSpace(req.Status) && req.Status != a.Status)
+        {
+            a.Status = req.Status;
+            a.CompletedAt = req.Status == ActivityStatus.Completed ? DateTime.UtcNow : null;
+        }
+        a.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+        return Ok(ToDto(a));
+    }
+
     // ── DELETE /api/v1/activities/{id} ────────────────────────────────────
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id)

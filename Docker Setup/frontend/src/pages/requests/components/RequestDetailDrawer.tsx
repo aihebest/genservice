@@ -13,6 +13,7 @@ import ProgressLogSection   from '../../../components/shared/ProgressLogSection'
 import AuditHistorySection from '../../../components/shared/AuditHistorySection';
 import type { ServiceRequest } from '../../../types';
 import { useAuthStore } from '../../../store/authStore';
+import { useGsStaff } from '../../../components/shared/StaffPicker';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 
@@ -22,13 +23,6 @@ dayjs.extend(relativeTime);
 const { TextArea } = Input;
 const { Text }     = Typography;
 
-// ── Staff list for assignment (demo) ──────────────────────────────────────────
-const STAFF_OPTIONS = [
-  { email: 'technician@demo.local', name: 'Chukwudi Nwosu', role: 'Technician' },
-  { email: 'tech2@demo.local',      name: 'Grace Obi',       role: 'Technician' },
-  { email: 'driver@demo.local',     name: 'Bola Adeyemi',    role: 'Driver'     },
-  { email: 'driver2@demo.local',    name: 'Kwame Asante',    role: 'Driver'     },
-];
 
 interface Props {
   request:  ServiceRequest | null;
@@ -38,7 +32,12 @@ interface Props {
 }
 
 export default function RequestDetailDrawer({ request, open, onClose, onUpdate }: Props) {
-  const role = useAuthStore(s => s.user?.role);
+  const role      = useAuthStore(s => s.user?.role);
+  const userEmail = useAuthStore(s => s.user?.email);
+  // Real General Service staff for assignment. The list used to be hard-coded
+  // demo names, so no actual team member was ever the assignee — which is why
+  // assigned requests stalled: nobody on the team could move them on.
+  const gsStaff = useGsStaff();
 
   const [loading,        setLoading]        = useState(false);
   const [error,          setError]          = useState<string | null>(null);
@@ -61,6 +60,10 @@ export default function RequestDetailDrawer({ request, open, onClose, onUpdate }
 
   const isApprover = role === 'DepartmentManager' || role === 'Supervisor' || role === 'SystemAdmin';
   const isTech     = role === 'Technician';
+  // Whoever the request is assigned to can work it through to closure,
+  // whatever their role.
+  const isAssignee = !!userEmail && !!request.assignedToEmail
+    && request.assignedToEmail.toLowerCase() === userEmail.toLowerCase();
   const catMeta    = CATEGORY_META[request.category];
   const statusMeta = STATUS_META[request.status] ?? { label: request.status, color: 'default' };
   const prioMeta   = PRIORITY_META[request.priority];
@@ -86,7 +89,7 @@ export default function RequestDetailDrawer({ request, open, onClose, onUpdate }
   };
 
   const doAssign = async () => {
-    const staff = STAFF_OPTIONS.find(s => s.email === assignee);
+    const staff = gsStaff.find(s => s.email === assignee);
     if (!staff) return;
     await act(() => requestsApi.assign(request.id, staff.email, staff.name));
     setAssignOpen(false); setAssignee('');
@@ -103,10 +106,10 @@ export default function RequestDetailDrawer({ request, open, onClose, onUpdate }
   const canApprove     = isApprover && request.status === 'PendingApproval';
   const canAssign      = isApprover && (request.status === 'Open' || request.status === 'Approved');
   const canReassign   = isApprover && !['Completed', 'Cancelled', 'Rejected'].includes(request.status);
-  const canStart      = isTech && (request.status === 'Open' || request.status === 'Approved' || request.status === 'InProgress');
-  const canMaterialAwaited = isApprover && request.status === 'InProgress';
+  const canStart      = (isTech || isAssignee) && (request.status === 'Open' || request.status === 'Approved' || request.status === 'InProgress');
+  const canMaterialAwaited = (isApprover || isAssignee) && request.status === 'InProgress';
   const canAwaitingFunds   = isApprover && request.status === 'InProgress';
-  const canComplete   = (isTech || isApprover) && (request.status === 'InProgress' || request.status === 'MaterialAwaited');
+  const canComplete   = (isTech || isApprover || isAssignee) && (request.status === 'InProgress' || request.status === 'MaterialAwaited');
 
   return (
     <>
@@ -322,15 +325,16 @@ export default function RequestDetailDrawer({ request, open, onClose, onUpdate }
         <p style={{ marginBottom: 12 }}>
           Assign <strong>{request.ticketNumber}</strong> to:
         </p>
-        <Space direction="vertical" style={{ width: '100%' }}>
-          {STAFF_OPTIONS.map(s => (
-            <Button key={s.email} block
-              type={assignee === s.email ? 'primary' : 'default'}
-              onClick={() => setAssignee(s.email)}>
-              {s.name} — <Text type="secondary" style={{ fontSize: 12 }}>{s.role}</Text>
-            </Button>
-          ))}
-        </Space>
+        {/* GS team members with a platform login — the assignee can then start,
+            log progress and close the request themselves. */}
+        <Select showSearch style={{ width: '100%' }} placeholder="Select a GS team member…"
+          value={assignee || undefined} onChange={v => setAssignee(v)}
+          optionFilterProp="label"
+          options={gsStaff.map(s => ({ value: s.email, label: `${s.name} — ${s.role}` }))}
+          notFoundContent="No GS staff found — check User Management." />
+        <Text type="secondary" style={{ display: 'block', fontSize: 12, marginTop: 8 }}>
+          They'll be able to start the work, log daily progress and mark it complete from this request.
+        </Text>
       </Modal>
 
       {/* ── Reassign modal ────────────────────────────────────────────────── */}

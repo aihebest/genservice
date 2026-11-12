@@ -4,12 +4,13 @@ import {
   Select, Space, Tag, Tabs, Tooltip, Typography, DatePicker, message, Switch,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { PlusOutlined, ReloadOutlined, DropboxOutlined, SendOutlined } from '@ant-design/icons';
+import { PlusOutlined, ReloadOutlined, DropboxOutlined, SendOutlined, EditOutlined, CarOutlined } from '@ant-design/icons';
+import { useAuthStore } from '../../store/authStore';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { dieselSupplyApi } from '../../api/dieselSupply.api';
 import { DIESEL_DISTRIBUTION_TYPES, OFFICE_LOCATIONS, VEHICLE_LIST } from '../../types';
-import type { DieselSupply, DieselDistribution } from '../../types';
+import type { DieselSupply, DieselDistribution, VehicleDieselSummary } from '../../types';
 
 import FilterableTable from '../../components/shared/FilterableTable';
 const { Title, Text } = Typography;
@@ -25,7 +26,39 @@ export default function DieselSupplyPage() {
   const [dPage, setDPage]       = useState(1);
   const [sForm] = Form.useForm();
   const [dForm] = Form.useForm();
+  // Department Manager correction of a bulk supply batch (enforced server-side too).
+  const role    = useAuthStore(s => s.user?.role);
+  const canEdit = role === 'DepartmentManager' || role === 'SystemAdmin';
+  const [editSupply, setEditSupply] = useState<DieselSupply | null>(null);
+  const [eForm] = Form.useForm();
+  const openEditSupply = (r: DieselSupply) => {
+    setEditSupply(r);
+    eForm.setFieldsValue({
+      supplyDate: dayjs(r.supplyDate), vendor: r.vendor, invoiceNumber: r.invoiceNumber,
+      quantityLitres: r.quantityLitres, unitPriceNaira: r.unitPriceNaira,
+      storageLocation: r.storageLocation, receivingOfficer: r.receivingOfficer, notes: r.notes,
+    });
+  };
+  const saveEditSupply = async () => {
+    if (!editSupply) return;
+    const v = await eForm.validateFields();
+    setSaving(true);
+    try {
+      await dieselSupplyApi.updateSupply(editSupply.id, { ...v, supplyDate: v.supplyDate?.format('YYYY-MM-DD') });
+      message.success(`${editSupply.supplyReference} updated`);
+      setEditSupply(null); qc.invalidateQueries({ queryKey: ['diesel-supply'] });
+    } catch (e: unknown) {
+      message.error((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Could not update the batch');
+    } finally { setSaving(false); }
+  };
   const distType = Form.useWatch('distributionType', dForm) as string | undefined;
+  // Per-vehicle consumption tab.
+  const [vsDays, setVsDays] = useState(90);
+  const { data: vehSummary, isFetching: vsFetch } = useQuery({
+    queryKey: ['diesel-supply', 'vehicle-summary', vsDays],
+    queryFn:  () => dieselSupplyApi.vehicleSummary(vsDays),
+    enabled:  tab === 'vehicles',
+  });
 
   const { data: summary } = useQuery({ queryKey: ['diesel-supply', 'summary'], queryFn: dieselSupplyApi.summary, refetchInterval: 60_000 });
   const { data: supplies, isFetching: sFetch } = useQuery({
@@ -99,6 +132,12 @@ export default function DieselSupplyPage() {
       render: (v?: string) => v
         ? <Tooltip title={v}><Text style={{ fontSize: 12 }}>{v}</Text></Tooltip>
         : <Text type="secondary" style={{ fontSize: 12 }}>—</Text> },
+    ...(canEdit ? [{
+      title: '', key: 'edit', width: 60,
+      render: (_: unknown, r: DieselSupply) => (
+        <Tooltip title="Edit batch"><Button size="small" icon={<EditOutlined />} onClick={() => openEditSupply(r)} /></Tooltip>
+      ),
+    }] : []),
   ];
 
   const distColumns: ColumnsType<DieselDistribution> = [
@@ -114,6 +153,17 @@ export default function DieselSupplyPage() {
     { title: 'Odometer', dataIndex: 'odometerReading', key: 'odometer', width: 100, ellipsis: true,
       render: (v?: string) => v ?? '—' },
     { title: 'Qty', dataIndex: 'quantityLitres', width: 90, render: (v: number) => `${v.toLocaleString()} L` },
+    // Option B — compared with the vehicle's previous issue (no extra input needed).
+    { title: 'Previous Issue', key: 'prevIssue', width: 135,
+      render: (_: unknown, r: DieselDistribution) => r.previousQuantityLitres != null
+        ? <Tooltip title={`Odometer then: ${r.previousOdometer?.toLocaleString() ?? '—'}`}>
+            <Text style={{ fontSize: 12 }}>{r.previousQuantityLitres.toLocaleString()} L · {dayjs(r.previousDistributionDate).format('D MMM')}</Text>
+          </Tooltip>
+        : <Text type="secondary" style={{ fontSize: 12 }}>—</Text> },
+    { title: 'Km Covered', dataIndex: 'distanceKm', key: 'distanceKm', width: 105,
+      render: (v?: number) => v != null ? `${v.toLocaleString()} km` : <Text type="secondary" style={{ fontSize: 12 }}>—</Text> },
+    { title: 'Km / Litre', dataIndex: 'kmPerLitre', key: 'kmPerLitre', width: 100,
+      render: (v?: number) => v != null ? <Text strong>{v.toFixed(1)}</Text> : <Text type="secondary" style={{ fontSize: 12 }}>—</Text> },
     { title: 'From Supply', dataIndex: 'bulkSupplyReference', width: 110 },
     { title: 'Purpose', dataIndex: 'purpose', ellipsis: true, render: (v?: string) => v ?? '—' },
     { title: 'Issued By', dataIndex: 'issuingOfficer', width: 130, ellipsis: true, render: (v?: string) => v ?? '—' },
@@ -167,6 +217,7 @@ export default function DieselSupplyPage() {
             items={[
               { key: 'supplies',      label: <Space><DropboxOutlined />Bulk Supplies</Space> },
               { key: 'distributions', label: <Space><SendOutlined />Distributions</Space> },
+              { key: 'vehicles',      label: <Space><CarOutlined />Per Vehicle</Space> },
             ]} />
         </div>
         {tab === 'supplies' && (
@@ -177,11 +228,61 @@ export default function DieselSupplyPage() {
         {tab === 'distributions' && (
           <FilterableTable<DieselDistribution> columns={distColumns} dataSource={dists?.items ?? []} rowKey="id" loading={dFetch}
             pagination={{ current: dPage, pageSize: 20, total: dists?.totalCount ?? 0, onChange: setDPage, showSizeChanger: false }}
-            size="middle" scroll={{ x: 1300 }} style={{ padding: '0 8px' }} />
+            size="middle" scroll={{ x: 1650 }} style={{ padding: '0 8px' }} />
+        )}
+        {tab === 'vehicles' && (
+          <div style={{ padding: 16 }}>
+            <Space style={{ marginBottom: 12 }} wrap>
+              <Text type="secondary">Period:</Text>
+              <Select value={vsDays} onChange={setVsDays} style={{ width: 140 }}
+                options={[30, 90, 180, 365].map(d => ({ value: d, label: `Last ${d} days` }))} />
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                Km covered = odometer now − odometer at the previous issue. Km/Litre = km covered ÷ litres issued at that previous issue.
+              </Text>
+            </Space>
+            <FilterableTable<VehicleDieselSummary> rowKey="vehicleRegNo" size="middle" loading={vsFetch}
+              dataSource={vehSummary ?? []} pagination={{ pageSize: 20, showSizeChanger: false }}
+              columns={[
+                { title: 'Vehicle', dataIndex: 'vehicleRegNo', key: 'reg', width: 140, render: (v: string) => <Text strong>{v}</Text> },
+                { title: 'Issues', dataIndex: 'issues', key: 'issues', width: 80 },
+                { title: 'Total Issued', dataIndex: 'totalLitres', key: 'total', width: 120, render: (v: number) => `${v.toLocaleString()} L` },
+                { title: 'Last Issue', dataIndex: 'lastIssueDate', key: 'last', width: 115, render: (v: string) => dayjs(v).format('D MMM YY') },
+                { title: 'Last Odometer', dataIndex: 'lastOdometer', key: 'odo', width: 125, render: (v?: number) => v != null ? v.toLocaleString() : '—' },
+                { title: 'Km Covered', dataIndex: 'distanceKm', key: 'km', width: 115, render: (v?: number) => v != null ? `${v.toLocaleString()} km` : '—' },
+                { title: 'Litres Used', dataIndex: 'litresForDistance', key: 'lused', width: 110, render: (v?: number) => v != null ? `${v.toLocaleString()} L` : '—' },
+                { title: 'Avg Km / Litre', dataIndex: 'averageKmPerLitre', key: 'kmpl', width: 125,
+                  render: (v?: number) => v != null ? <Text strong>{v.toFixed(1)}</Text> : '—' },
+              ]} />
+          </div>
         )}
       </Card>
 
       {/* Add supply modal */}
+      {/* Edit bulk supply batch (Department Manager) */}
+      <Modal title={`Edit ${editSupply?.supplyReference ?? ''}`} open={!!editSupply} onOk={saveEditSupply}
+        onCancel={() => setEditSupply(null)} okText="Save Changes" confirmLoading={saving} destroyOnClose>
+        {editSupply && (
+          <Alert type="info" showIcon style={{ marginBottom: 12 }}
+            message={`${(editSupply.quantityLitres - editSupply.quantityRemainingLitres).toLocaleString()} L already distributed from this batch is kept — the remaining balance adjusts to the new quantity.`} />
+        )}
+        <Form form={eForm} layout="vertical">
+          <Row gutter={12}>
+            <Col span={12}><Form.Item name="supplyDate" label="Supply Date"><DatePicker style={{ width: '100%' }} format="D MMM YYYY" /></Form.Item></Col>
+            <Col span={12}><Form.Item name="vendor" label="Vendor" rules={[{ required: true }]}><Input /></Form.Item></Col>
+          </Row>
+          <Row gutter={12}>
+            <Col span={12}><Form.Item name="quantityLitres" label="Quantity (L)" rules={[{ required: true }]}><InputNumber style={{ width: '100%' }} min={1} /></Form.Item></Col>
+            <Col span={12}><Form.Item name="unitPriceNaira" label="Unit Price (₦/L)" rules={[{ required: true }]}><InputNumber style={{ width: '100%' }} min={0} /></Form.Item></Col>
+          </Row>
+          <Row gutter={12}>
+            <Col span={12}><Form.Item name="invoiceNumber" label="Waybill / Invoice"><Input /></Form.Item></Col>
+            <Col span={12}><Form.Item name="storageLocation" label="Storage"><Input /></Form.Item></Col>
+          </Row>
+          <Form.Item name="receivingOfficer" label="Receiving Officer"><Input /></Form.Item>
+          <Form.Item name="notes" label="Notes"><TextArea rows={2} /></Form.Item>
+        </Form>
+      </Modal>
+
       <Modal title="Record Bulk Diesel Supply" open={supplyModal} onOk={() => sForm.submit()}
         onCancel={() => { setSupplyModal(false); sForm.resetFields(); }} confirmLoading={saving} okText="Save" width={560} destroyOnClose>
         <Form form={sForm} layout="vertical" onFinish={saveSupply}>

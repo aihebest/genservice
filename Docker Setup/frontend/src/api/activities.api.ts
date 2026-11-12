@@ -41,4 +41,10 @@ export const activitiesApi = {
 
   delete: (id: string) =>
     apiClient.delete(`/activities/${id}`),
+
+  /** Department Manager correction of an activity entry. */
+  update: (id: string, data: Partial<{
+    staffName: string; activityDescription: string; category: string;
+    location: string; notes: string; activityDate: string; status: string;
+  }>) => apiClient.put<StaffActivity>(`/activities/${id}`, data).then(r => r.data),
 };

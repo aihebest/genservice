@@ -45,6 +45,24 @@ public static class TankCalibration
         ]),
     ];
 
+    /// <summary>
+    /// The calibrated tank serving a site, for Daily Readings — every generator at
+    /// that location draws from it. Accepts the location names used across the
+    /// platform ("Port Harcourt Office", older "Office" entries, etc.).
+    /// </summary>
+    public static Chart? ForLocation(string? location)
+    {
+        var l = (location ?? "").Trim().ToLowerInvariant();
+        return l switch
+        {
+            "port harcourt office" or "phc office" or "office" or "port harcourt (ph) office" => Charts[0],
+            "dgs" or "dgs house" or "dgs residence"                                           => Charts[1],
+            "woji" or "woji spar"                                                             => Charts[2],
+            "dr"                                                                              => Charts[3],
+            _ => null,
+        };
+    }
+
     public static Chart? For(string? tankName) =>
         Charts.FirstOrDefault(c => string.Equals(c.TankName, tankName?.Trim(), StringComparison.OrdinalIgnoreCase));
 

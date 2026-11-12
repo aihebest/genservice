@@ -1200,6 +1200,10 @@ static async Task ApplySchemaUpdatesAsync(
             AddColIfMissing ("VehicleMaintenanceRequests", "LastEditedAt",     "datetime2"),
             // Team Activities: the day the activity was done (entered by the user).
             AddColIfMissing ("StaffActivities", "ActivityDate", "datetime2"),
+            // Daily Readings: site tank by dip (calibrated).
+            AddColIfMissing ("GeneratorDailyReadings", "TankDipMm",             "float"),
+            AddColIfMissing ("GeneratorDailyReadings", "TankLevelLitres",       "float"),
+            AddColIfMissing ("GeneratorDailyReadings", "TankConsumptionLitres", "float"),
             // Completed vehicle requests are Closed on the register. Existing ones
             // were completed before that rule was applied. Idempotent.
             """

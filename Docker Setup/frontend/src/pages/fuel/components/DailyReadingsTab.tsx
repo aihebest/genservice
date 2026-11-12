@@ -15,6 +15,7 @@ import { GENERATOR_DAILY_STATUS_META, OFFICE_LOCATIONS } from '../../../types';
 import type { GeneratorDailyReading, GeneratorDailyStatus } from '../../../types';
 
 import FilterableTable from '../../../components/shared/FilterableTable';
+import { chartForLocation, litresFromDip } from '../../../utils/tankCalibration';
 dayjs.extend(relativeTime);
 
 const { Text } = Typography;
@@ -52,6 +53,17 @@ function buildColumns(
         </Text>
       )},
     // Diesel used since the previous reading (previous level + added − removed − current).
+    // Site tank by dip — its own columns, separate from the generator figures.
+    { title: 'Tank Dip', dataIndex: 'tankDipMm', key: 'tankDip', width: 95,
+      render: (v?: number) => v != null ? <Text style={{ fontSize: 12 }}>{v.toLocaleString()} mm</Text> : <Text type="secondary" style={{ fontSize: 12 }}>—</Text> },
+    { title: 'Tank Level (dip)', dataIndex: 'tankLevelLitres', key: 'tankLevel', width: 125,
+      render: (v?: number) => v != null ? <Text style={{ fontSize: 13 }}>{v.toLocaleString()} L</Text> : <Text type="secondary" style={{ fontSize: 12 }}>—</Text> },
+    { title: 'Tank Consumption (dip)', dataIndex: 'tankConsumptionLitres', key: 'tankUsed', width: 165,
+      render: (v?: number, r?: GeneratorDailyReading) => v != null
+        ? <Text strong style={{ fontSize: 13 }}>{v.toLocaleString()} L</Text>
+        : r?.tankLevelLitres != null
+          ? <Tooltip title="Level rose since the last dip — tank refilled, or first dip at this site."><Text type="secondary" style={{ fontSize: 12 }}>refill / first</Text></Tooltip>
+          : <Text type="secondary" style={{ fontSize: 12 }}>—</Text> },
     { title: 'Consumption', dataIndex: 'fuelConsumedLitres', key: 'consumed', width: 110,
       render: (v?: number) => v != null
         ? <Text style={{ fontSize: 13 }}>{v.toLocaleString()} L</Text>
@@ -111,6 +123,11 @@ export default function DailyReadingsTab() {
   const wCurrUtil   = Form.useWatch('currentUtilityReading',   form) as number | undefined;
   const wPrevKw     = Form.useWatch('previousGeneratorKw',     form) as number | undefined;
   const wCurrKw     = Form.useWatch('currentGeneratorKw',      form) as number | undefined;
+  // Site tank by dip — only where the location has a calibrated tank.
+  const wLocation   = Form.useWatch('locationSelect',          form) as string | undefined;
+  const wTankDip    = Form.useWatch('tankDipMm',               form) as number | undefined;
+  const siteTank    = chartForLocation(wLocation);
+  const tankLitres  = siteTank && wTankDip != null ? litresFromDip(siteTank, wTankDip) : undefined;
   const runHoursPreview =
     wCurrEngine != null && wPrevEngine != null ? Math.max(0, wCurrEngine - wPrevEngine) : null;
   // Fuel Consumed = (Previous + Added − Removed) − Current
@@ -204,6 +221,7 @@ export default function DailyReadingsTab() {
         lastServicedAtHours: values.lastServicedAtHours as number | undefined,
         notes: values.notes as string | undefined,
         readingDate: values.readingDate ? (values.readingDate as dayjs.Dayjs).format('YYYY-MM-DD') : undefined,
+        tankDipMm: values.tankDipMm as number | undefined,
       };
       if (editing) await generatorMonitoringApi.updateReading(editing.id, payload);
       else         await generatorMonitoringApi.createReading(payload);
@@ -380,6 +398,23 @@ export default function DailyReadingsTab() {
             <Text type="secondary" style={{ display: 'block', marginTop: -6, marginBottom: 10, fontSize: 12 }}>
               Run Hours (24 h) = <strong>{runHoursPreview.toFixed(1)} h</strong>
             </Text>
+          )}
+
+          {/* Site tank by dip — separate from the generator's own fuel figures below.
+              Consumption is dip-to-dip at this location, from the calibration chart. */}
+          {siteTank && !editing && (
+            <>
+              <Divider titlePlacement="left" orientationMargin={0} style={{ fontSize: 12 }}>
+                Site Tank — Dip Reading ({siteTank.tankName.replace(' (calibrated)', '')})
+              </Divider>
+              <Form.Item name="tankDipMm" label="Tank Dip (mm) — optional"
+                tooltip={`Dip-stick reading of the site tank. Litres come from its calibration chart; consumption is worked out from the previous dip at ${wLocation}.`}
+                extra={tankLitres != null
+                  ? <span>= <strong>{tankLitres.toLocaleString()} L</strong> of {siteTank.maxVolume.toLocaleString()} L</span>
+                  : `Ref. height ${siteTank.referenceHeightMm} mm · full ${siteTank.maxVolume.toLocaleString()} L at ${siteTank.maxDipMm} mm. One dip per site per day is enough.`}>
+                <InputNumber style={{ width: '100%' }} min={0} max={siteTank.referenceHeightMm} placeholder="e.g. 1,250" />
+              </Form.Item>
+            </>
           )}
 
           <Divider titlePlacement="left" orientationMargin={0} style={{ fontSize: 12 }}>

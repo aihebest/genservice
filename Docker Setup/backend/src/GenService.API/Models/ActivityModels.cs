@@ -24,6 +24,17 @@ public record ProxyLogRequest(
     string? ActivityDate = null
 );
 
+/// <summary>Manager correction of an activity entry. Only supplied fields change.</summary>
+public record UpdateActivityRequest(
+    string? StaffName           = null,
+    string? ActivityDescription = null,
+    string? Category            = null,
+    string? Location            = null,
+    string? Notes               = null,
+    string? ActivityDate        = null,   // YYYY-MM-DD
+    string? Status              = null
+);
+
 public record UpdateActivityStatusRequest(
     string Status,
     string? Notes

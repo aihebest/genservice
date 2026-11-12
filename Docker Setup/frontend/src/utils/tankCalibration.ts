@@ -31,6 +31,16 @@ export const TANK_CHARTS: TankChart[] = [
     segments: [[0, 0, 4.800], [10, 48, 4.833], [100, 483, 4.838], [1000, 4837, 4.837]] },
 ];
 
+/** The calibrated tank serving a site (Daily Readings). Mirrors TankCalibration.ForLocation. */
+export function chartForLocation(location?: string | null): TankChart | undefined {
+  const l = (location ?? '').trim().toLowerCase();
+  if (['port harcourt office', 'phc office', 'office', 'port harcourt (ph) office'].includes(l)) return TANK_CHARTS[0];
+  if (['dgs', 'dgs house', 'dgs residence'].includes(l)) return TANK_CHARTS[1];
+  if (['woji', 'woji spar'].includes(l)) return TANK_CHARTS[2];
+  if (l === 'dr') return TANK_CHARTS[3];
+  return undefined;
+}
+
 export const chartFor = (tankName?: string | null) =>
   TANK_CHARTS.find(c => c.tankName.toLowerCase() === (tankName ?? '').trim().toLowerCase());
 

@@ -211,6 +211,10 @@ export interface GeneratorDailyReading {
   loggedByEmail:          string;
   loggedByName:           string;
   createdAt:              string;
+  /** Site tank by dip (calibrated): reading, litres, and litres used since the last dip at this site. */
+  tankDipMm?:             number;
+  tankLevelLitres?:       number;
+  tankConsumptionLitres?: number;
 }
 
 export interface GeneratorSummary {
@@ -1820,6 +1824,14 @@ export interface DieselDistribution {
   loggedByEmail:         string;
   loggedByName:          string;
   createdAt:             string;
+  // Vehicle consumption (derived from the vehicle's previous issue).
+  previousDistributionDate?: string;
+  previousQuantityLitres?:   number;
+  previousOdometer?:         number;
+  /** Odometer now − odometer at the previous issue. */
+  distanceKm?:               number;
+  /** Distance ÷ litres issued last time. */
+  kmPerLitre?:               number;
 }
 
 export interface DieselStockSummary {
@@ -1828,4 +1840,16 @@ export interface DieselStockSummary {
   availableBalanceLitres:  number;
   totalPurchaseValueNaira: number;
   activeSupplyBatches:     number;
+}
+
+/** Per-vehicle diesel use over a period. */
+export interface VehicleDieselSummary {
+  vehicleRegNo:       string;
+  issues:             number;
+  totalLitres:        number;
+  lastIssueDate:      string;
+  lastOdometer?:      number;
+  distanceKm?:        number;
+  litresForDistance?: number;
+  averageKmPerLitre?: number;
 }

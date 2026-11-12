@@ -1,12 +1,13 @@
 import { useState, useCallback } from 'react';
 import {
   Button, Card, Col, Progress, Row, Select, Space, Statistic, Tag, Badge, Tabs, Tooltip, Typography,
+  Alert, DatePicker, Descriptions, Form, Input, Modal, Popconfirm, message,
 } from 'antd';
 import type { ColumnsType as AntColumnsType } from 'antd/es/table';
 import type { ColumnsType } from 'antd/es/table';
 import {
   PlusOutlined, ReloadOutlined, TeamOutlined, ThunderboltOutlined,
-  TrophyOutlined,
+  TrophyOutlined, EyeOutlined, EditOutlined, DeleteOutlined,
 } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
@@ -33,7 +34,13 @@ const STATUS_TABS = [
   { key: 'Completed', label: 'Completed' },
 ];
 
-function buildColumns(canManage: boolean, onComplete: (id: string) => void): ColumnsType<StaffActivity> {
+function buildColumns(
+  canManage: boolean,
+  onComplete: (id: string) => void,
+  onView: (r: StaffActivity) => void,
+  onEdit?: (r: StaffActivity) => void,
+  onDelete?: (r: StaffActivity) => void,
+): ColumnsType<StaffActivity> {
   return [
     {
       // The day the activity was done, as entered when it was logged.
@@ -106,15 +113,26 @@ function buildColumns(canManage: boolean, onComplete: (id: string) => void): Col
         </Tooltip>
       ),
     },
-    ...(canManage ? [{
+    {
       title: '',
       key: 'action',
-      width: 85,
-      render: (_: unknown, r: StaffActivity) =>
-        r.status === 'Active' ? (
-          <Button size="small" onClick={() => onComplete(r.id)}>Complete</Button>
-        ) : null,
-    }] : []),
+      width: 210,
+      render: (_: unknown, r: StaffActivity) => (
+        <Space size={4}>
+          <Tooltip title="View details"><Button size="small" icon={<EyeOutlined />} onClick={() => onView(r)} /></Tooltip>
+          {onEdit && <Tooltip title="Edit"><Button size="small" icon={<EditOutlined />} onClick={() => onEdit(r)} /></Tooltip>}
+          {onDelete && (
+            <Popconfirm title="Delete this activity?" okText="Delete" okButtonProps={{ danger: true }}
+              onConfirm={() => onDelete(r)}>
+              <Button size="small" danger icon={<DeleteOutlined />} />
+            </Popconfirm>
+          )}
+          {canManage && r.status === 'Active' && (
+            <Button size="small" onClick={() => onComplete(r.id)}>Complete</Button>
+          )}
+        </Space>
+      ),
+    },
   ];
 }
 
@@ -165,7 +183,38 @@ export default function ActivitiesPage() {
     refresh();
   };
 
-  const columns = buildColumns(canManage, id => handleStatusUpdate(id, 'Completed'));
+  // Manager rights: edit is Department Manager / Admin; delete also Supervisor (server rule).
+  const canEditAct   = role === 'DepartmentManager' || role === 'SystemAdmin';
+  const [viewAct, setViewAct] = useState<StaffActivity | null>(null);
+  const [editAct, setEditAct] = useState<StaffActivity | null>(null);
+  const [editForm] = Form.useForm();
+  const openEditAct = (r: StaffActivity) => {
+    setEditAct(r);
+    editForm.setFieldsValue({
+      staffName: r.staffName, activityDescription: r.activityDescription, category: r.category,
+      location: r.location, notes: r.notes, status: r.status,
+      activityDate: dayjs(r.activityDate ?? r.startedAt),
+    });
+  };
+  const saveEditAct = async () => {
+    if (!editAct) return;
+    const v = await editForm.validateFields();
+    try {
+      await activitiesApi.update(editAct.id, { ...v, activityDate: v.activityDate?.format('YYYY-MM-DD') });
+      message.success('Activity updated'); setEditAct(null);
+      qc.invalidateQueries({ queryKey: ['activities'] });
+    } catch { message.error('Could not update the activity'); }
+  };
+  const deleteAct = async (r: StaffActivity) => {
+    try {
+      await activitiesApi.delete(r.id);
+      message.success('Activity deleted');
+      qc.invalidateQueries({ queryKey: ['activities'] });
+    } catch { message.error('Could not delete the activity'); }
+  };
+
+  const columns = buildColumns(canManage, id => handleStatusUpdate(id, 'Completed'),
+    setViewAct, canEditAct ? openEditAct : undefined, canManage ? deleteAct : undefined);
 
   const activeCount = feedData?.filter(a => a.status === 'Active').length ?? 0;
   const pausedCount = feedData?.filter(a => a.status === 'Paused').length ?? 0;
@@ -265,7 +314,7 @@ export default function ActivitiesPage() {
           />
         </div>
 
-        {activeTab === 'feed' ? (
+        {activeTab === 'performance' ? null : activeTab === 'feed' ? (
           <div style={{ padding: 24 }}>
             <ActivityFeed
               activities={feedData ?? []}
@@ -277,12 +326,14 @@ export default function ActivitiesPage() {
           <>
             <div style={{ padding: '16px 24px', borderBottom: '1px solid #f0f0f0' }}>
               <Space wrap>
+                <Tooltip title="Stage of each activity — Active: being worked on now; Paused: started but on hold; Completed: finished.">
                 <Select
                   style={{ width: 140 }}
                   value={activeStatus}
                   onChange={v => { setActiveStatus(v); setPage(1); }}
                   options={STATUS_TABS.map(t => ({ value: t.key, label: t.label }))}
                 />
+                </Tooltip>
                 <Select
                   placeholder="Category"
                   allowClear
@@ -316,8 +367,51 @@ export default function ActivitiesPage() {
           </>
         )}
 
+        {/* View */}
+        <Modal title="Activity Details" open={!!viewAct} onCancel={() => setViewAct(null)} footer={null}>
+          {viewAct && (
+            <Descriptions column={1} size="small" bordered>
+              <Descriptions.Item label="Date">{dayjs(viewAct.activityDate ?? viewAct.startedAt).format('D MMM YYYY')}</Descriptions.Item>
+              <Descriptions.Item label="Staff">{viewAct.staffName}</Descriptions.Item>
+              <Descriptions.Item label="Activity">{viewAct.activityDescription}</Descriptions.Item>
+              <Descriptions.Item label="Category">{ACTIVITY_CATEGORY_META[viewAct.category]?.label ?? viewAct.category}</Descriptions.Item>
+              <Descriptions.Item label="Location">{viewAct.location || '—'}</Descriptions.Item>
+              <Descriptions.Item label="Stage">{ACTIVITY_STATUS_META[viewAct.status]?.label ?? viewAct.status}</Descriptions.Item>
+              <Descriptions.Item label="Logged by">{viewAct.loggedByName}{viewAct.isProxy ? ' (on behalf)' : ''}</Descriptions.Item>
+              <Descriptions.Item label="Entered">{dayjs(viewAct.startedAt).format('D MMM YYYY, HH:mm')}</Descriptions.Item>
+              {viewAct.completedAt && <Descriptions.Item label="Completed">{dayjs(viewAct.completedAt).format('D MMM YYYY, HH:mm')}</Descriptions.Item>}
+              <Descriptions.Item label="Notes">{viewAct.notes || '—'}</Descriptions.Item>
+            </Descriptions>
+          )}
+        </Modal>
+
+        {/* Edit (Department Manager) */}
+        <Modal title="Edit Activity" open={!!editAct} onOk={saveEditAct} onCancel={() => setEditAct(null)}
+          okText="Save Changes" destroyOnClose>
+          <Form form={editForm} layout="vertical">
+            <Form.Item name="activityDate" label="Date"><DatePicker style={{ width: '100%' }} format="D MMM YYYY" /></Form.Item>
+            <Form.Item name="staffName" label="Staff Member" rules={[{ required: true }]}><Input /></Form.Item>
+            <Form.Item name="activityDescription" label="Activity" rules={[{ required: true }]}><Input.TextArea rows={2} /></Form.Item>
+            <Form.Item name="category" label="Category">
+              <Select options={Object.entries(ACTIVITY_CATEGORY_META).map(([k, m]) => ({ value: k, label: m.label }))} /></Form.Item>
+            <Form.Item name="location" label="Location"><Input /></Form.Item>
+            <Form.Item name="status" label="Stage">
+              <Select options={Object.entries(ACTIVITY_STATUS_META).map(([k, m]) => ({ value: k, label: m.label }))} /></Form.Item>
+            <Form.Item name="notes" label="Notes"><Input.TextArea rows={2} /></Form.Item>
+          </Form>
+        </Modal>
+
         {activeTab === 'performance' && (
           <div style={{ padding: 24 }}>
+            {/* What the Performance figures mean — asked by the GS Manager. */}
+            <Alert type="info" showIcon style={{ marginBottom: 16 }}
+              message="How Performance is measured"
+              description={<span>
+                One row per staff member. <b>Assigned / In Progress / Completed / Pending</b> count the
+                service requests assigned to them (Requests page), and <b>Completion Rate</b> is completed ÷ assigned.
+                {' '}<b>Today / This Week / This Month</b> count the progress updates they logged (“Log Daily Progress”).
+                {' '}<b>Blockers</b> are updates marked Awaiting Materials or Awaiting Vendor.
+              </span>} />
             <PerformanceDashboard data={perfData ?? []} loading={perfFetching} />
           </div>
         )}

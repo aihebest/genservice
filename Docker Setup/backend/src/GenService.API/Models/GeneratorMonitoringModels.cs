@@ -21,7 +21,8 @@ public record CreateGeneratorReadingRequest(
     bool    ServiceCompleted       = false, // §2 tick when a service was carried out
     double? LastServicedAtHours    = null,
     string?   Notes                = null,
-    DateTime? ReadingDate          = null   // optional — allows backdating a reading
+    DateTime? ReadingDate          = null,  // optional — allows backdating a reading
+    double?   TankDipMm            = null   // dip of the site's calibrated tank (mm)
 );
 
 public record GeneratorReadingDto(
@@ -57,7 +58,12 @@ public record GeneratorReadingDto(
     string    LoggedByName,
     DateTime  CreatedAt,
     string?   LastEditedByName,
-    DateTime? LastEditedAt
+    DateTime? LastEditedAt,
+    /// <summary>Site tank by dip: reading (mm), litres from the calibration chart,
+    /// and litres used since the previous dip at this location.</summary>
+    double?   TankDipMm             = null,
+    double?   TankLevelLitres       = null,
+    double?   TankConsumptionLitres = null
 );
 
 public record GeneratorReadingQuery(
