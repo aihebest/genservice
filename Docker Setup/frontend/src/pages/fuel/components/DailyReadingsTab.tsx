@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import {
   Alert, Badge, Button, Col, DatePicker, Descriptions, Divider, Drawer, Form,
   Input, InputNumber, Modal, Progress, Row, Select, Space,
-  Statistic, Switch, Tag, Tooltip, Typography,
+  Statistic, Switch, Tag, Tooltip, Typography, Segmented,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { PlusOutlined, WarningOutlined, ThunderboltOutlined, EditOutlined } from '@ant-design/icons';
@@ -115,19 +115,30 @@ export default function DailyReadingsTab() {
   // Live-computed previews for the create modal (mirror the server-side calculations)
   const wPrevEngine = Form.useWatch('previousEngineReading',   form) as number | undefined;
   const wCurrEngine = Form.useWatch('currentEngineReading',    form) as number | undefined;
-  const wPrevFuel   = Form.useWatch('previousFuelLevelLitres', form) as number | undefined;
-  const wCurrFuel   = Form.useWatch('currentFuelLevelLitres',  form) as number | undefined;
-  const wFuelAdded  = Form.useWatch('fuelAddedLitres',        form) as number | undefined;
-  const wFuelRemoved= Form.useWatch('fuelRemovedLitres',      form) as number | undefined;
+  const rPrevFuel   = Form.useWatch('previousFuelLevelLitres', form) as number | undefined;
+  const rCurrFuel   = Form.useWatch('currentFuelLevelLitres',  form) as number | undefined;
+  const rFuelAdded  = Form.useWatch('fuelAddedLitres',        form) as number | undefined;
+  const rFuelRemoved= Form.useWatch('fuelRemovedLitres',      form) as number | undefined;
   const wPrevUtil   = Form.useWatch('previousUtilityReading',  form) as number | undefined;
   const wCurrUtil   = Form.useWatch('currentUtilityReading',   form) as number | undefined;
   const wPrevKw     = Form.useWatch('previousGeneratorKw',     form) as number | undefined;
   const wCurrKw     = Form.useWatch('currentGeneratorKw',      form) as number | undefined;
   // Site tank by dip — only where the location has a calibrated tank.
   const wLocation   = Form.useWatch('locationSelect',          form) as string | undefined;
-  const wTankDip    = Form.useWatch('tankDipMm',               form) as number | undefined;
   const siteTank    = chartForLocation(wLocation);
-  const tankLitres  = siteTank && wTankDip != null ? litresFromDip(siteTank, wTankDip) : undefined;
+  // At a site with a calibrated tank the four fuel fields are entered as dip
+  // readings (mm) and converted to litres from the tank's chart — the team
+  // measures with a dip stick, so this removes the manual look-up. They can
+  // switch back to litres. Editing an old reading always works in litres.
+  const [fuelUnit, setFuelUnit] = useState<'mm' | 'L'>('mm');
+  const dipMode = !!siteTank && !editing && fuelUnit === 'mm';
+  const toLitres = (v?: number) => v == null ? undefined : dipMode && siteTank ? litresFromDip(siteTank, v) : v;
+  const wPrevFuel    = toLitres(rPrevFuel);
+  const wCurrFuel    = toLitres(rCurrFuel);
+  const wFuelAdded   = toLitres(rFuelAdded);
+  const wFuelRemoved = toLitres(rFuelRemoved);
+  const dipHint = (mm?: number, l?: number) =>
+    dipMode && mm != null && l != null ? <span>= <strong>{l.toLocaleString()} L</strong></span> : undefined;
   const runHoursPreview =
     wCurrEngine != null && wPrevEngine != null ? Math.max(0, wCurrEngine - wPrevEngine) : null;
   // Fuel Consumed = (Previous + Added − Removed) − Current
@@ -208,10 +219,11 @@ export default function DailyReadingsTab() {
         previousEngineReading: values.previousEngineReading as number | undefined,
         currentEngineReading: values.currentEngineReading as number,
         generatorStatus: values.generatorStatus as string,
-        previousFuelLevelLitres: values.previousFuelLevelLitres as number | undefined,
-        currentFuelLevelLitres: values.currentFuelLevelLitres as number,
-        fuelAddedLitres: values.fuelAddedLitres as number | undefined,
-        fuelRemovedLitres: values.fuelRemovedLitres as number | undefined,
+        // Entered as dip (mm) at calibrated sites — always stored in litres.
+        previousFuelLevelLitres: toLitres(values.previousFuelLevelLitres as number | undefined),
+        currentFuelLevelLitres: toLitres(values.currentFuelLevelLitres as number) as number,
+        fuelAddedLitres: toLitres(values.fuelAddedLitres as number | undefined),
+        fuelRemovedLitres: toLitres(values.fuelRemovedLitres as number | undefined),
         previousUtilityReading: values.previousUtilityReading as number | undefined,
         currentUtilityReading: values.currentUtilityReading as number | undefined,
         previousGeneratorKw: values.previousGeneratorKw as number | undefined,
@@ -221,7 +233,8 @@ export default function DailyReadingsTab() {
         lastServicedAtHours: values.lastServicedAtHours as number | undefined,
         notes: values.notes as string | undefined,
         readingDate: values.readingDate ? (values.readingDate as dayjs.Dayjs).format('YYYY-MM-DD') : undefined,
-        tankDipMm: values.tankDipMm as number | undefined,
+        // The current dip also fills the Tank Dip / Tank Level columns.
+        tankDipMm: dipMode ? values.currentFuelLevelLitres as number : undefined,
       };
       if (editing) await generatorMonitoringApi.updateReading(editing.id, payload);
       else         await generatorMonitoringApi.createReading(payload);
@@ -400,50 +413,64 @@ export default function DailyReadingsTab() {
             </Text>
           )}
 
-          {/* Site tank by dip — separate from the generator's own fuel figures below.
-              Consumption is dip-to-dip at this location, from the calibration chart. */}
-          {siteTank && !editing && (
-            <>
-              <Divider titlePlacement="left" orientationMargin={0} style={{ fontSize: 12 }}>
-                Site Tank — Dip Reading ({siteTank.tankName.replace(' (calibrated)', '')})
-              </Divider>
-              <Form.Item name="tankDipMm" label="Tank Dip (mm) — optional"
-                tooltip={`Dip-stick reading of the site tank. Litres come from its calibration chart; consumption is worked out from the previous dip at ${wLocation}.`}
-                extra={tankLitres != null
-                  ? <span>= <strong>{tankLitres.toLocaleString()} L</strong> of {siteTank.maxVolume.toLocaleString()} L</span>
-                  : `Ref. height ${siteTank.referenceHeightMm} mm · full ${siteTank.maxVolume.toLocaleString()} L at ${siteTank.maxDipMm} mm. One dip per site per day is enough.`}>
-                <InputNumber style={{ width: '100%' }} min={0} max={siteTank.referenceHeightMm} placeholder="e.g. 1,250" />
-              </Form.Item>
-            </>
-          )}
-
           <Divider titlePlacement="left" orientationMargin={0} style={{ fontSize: 12 }}>
             Fuel Consumption
           </Divider>
+          {siteTank && !editing && (
+            <div style={{ marginBottom: 10 }}>
+              <Space wrap>
+                <Text type="secondary" style={{ fontSize: 12 }}>Enter fuel as:</Text>
+                <Segmented size="small" value={fuelUnit}
+                  onChange={v => {
+                    setFuelUnit(v as 'mm' | 'L');
+                    // Clear so a millimetre figure is never read as litres (or the reverse).
+                    form.setFieldsValue({ previousFuelLevelLitres: undefined, currentFuelLevelLitres: undefined,
+                                          fuelAddedLitres: undefined, fuelRemovedLitres: undefined });
+                  }}
+                  options={[{ value: 'mm', label: 'Dip reading (mm)' }, { value: 'L', label: 'Litres' }]} />
+              </Space>
+              {dipMode && (
+                <Text type="secondary" style={{ display: 'block', fontSize: 11, marginTop: 4 }}>
+                  Converted with the {siteTank.tankName.replace(' (calibrated)', '')} calibration chart
+                  (full: {siteTank.maxVolume.toLocaleString()} L at {siteTank.maxDipMm} mm).
+                </Text>
+              )}
+            </div>
+          )}
           <Row gutter={12}>
             <Col span={12}>
-              <Form.Item name="previousFuelLevelLitres" label="Previous Fuel Level (L)"
-                tooltip="Leave blank to auto-fill from the last recorded reading.">
-                <InputNumber style={{ width: '100%' }} placeholder="e.g. 800" min={0} />
+              <Form.Item name="previousFuelLevelLitres" label={`Previous Fuel Level (${dipMode ? 'Dip, mm' : 'L'})`}
+                tooltip="Leave blank to auto-fill from the last recorded reading."
+                extra={dipHint(rPrevFuel, wPrevFuel)}>
+                <InputNumber style={{ width: '100%' }} placeholder={dipMode ? 'e.g. 1,250' : 'e.g. 800'} min={0}
+                  max={dipMode ? siteTank?.referenceHeightMm : undefined} />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="currentFuelLevelLitres" label="Current Fuel Level (L)" rules={[{ required: true }]}>
-                <InputNumber style={{ width: '100%' }} placeholder="e.g. 650" min={0} />
+              <Form.Item name="currentFuelLevelLitres" label={`Current Fuel Level (${dipMode ? 'Dip, mm' : 'L'})`}
+                rules={[{ required: true }]} extra={dipHint(rCurrFuel, wCurrFuel)}>
+                <InputNumber style={{ width: '100%' }} placeholder={dipMode ? 'e.g. 1,180' : 'e.g. 650'} min={0}
+                  max={dipMode ? siteTank?.referenceHeightMm : undefined} />
               </Form.Item>
             </Col>
           </Row>
           <Row gutter={12}>
             <Col span={12}>
-              <Form.Item name="fuelAddedLitres" label="Fuel Added (L) — optional"
-                tooltip="Diesel supplied INTO this tank between the previous and current reading. Fill only if a top-up was made.">
-                <InputNumber style={{ width: '100%' }} placeholder="e.g. 300" min={0} />
+              <Form.Item name="fuelAddedLitres" label={dipMode ? 'Fuel Added (rise in dip, mm) — optional' : 'Fuel Added (L) — optional'}
+                tooltip={dipMode
+                  ? 'How many mm the dip rose when diesel was added (dip after top-up − dip before). Fill only if a top-up was made.'
+                  : 'Diesel supplied INTO this tank between the previous and current reading. Fill only if a top-up was made.'}
+                extra={dipHint(rFuelAdded, wFuelAdded)}>
+                <InputNumber style={{ width: '100%' }} placeholder={dipMode ? 'e.g. 400' : 'e.g. 300'} min={0} />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="fuelRemovedLitres" label="Fuel Removed (L) — optional"
-                tooltip="Diesel taken OUT of this tank (transfer, testing, emergency, etc.). Fill only if fuel was removed.">
-                <InputNumber style={{ width: '100%' }} placeholder="e.g. 50" min={0} />
+              <Form.Item name="fuelRemovedLitres" label={dipMode ? 'Fuel Removed (drop in dip, mm) — optional' : 'Fuel Removed (L) — optional'}
+                tooltip={dipMode
+                  ? 'How many mm the dip dropped when diesel was taken out (transfer, testing, etc.). Fill only if fuel was removed.'
+                  : 'Diesel taken OUT of this tank (transfer, testing, emergency, etc.). Fill only if fuel was removed.'}
+                extra={dipHint(rFuelRemoved, wFuelRemoved)}>
+                <InputNumber style={{ width: '100%' }} placeholder={dipMode ? 'e.g. 60' : 'e.g. 50'} min={0} />
               </Form.Item>
             </Col>
           </Row>
