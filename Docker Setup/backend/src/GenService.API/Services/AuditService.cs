@@ -43,7 +43,7 @@ public class AuditService(GenServiceDbContext db, ILogger<AuditService> log)
     public Task LogCreatedAsync(string entityType, string entityId, string refNumber,
         string by, string byName, string? details = null) =>
         LogAsync(entityType, entityId, refNumber, AuditAction.Created, by, byName,
-            details: details);
+            oldValue: null, newValue: null, details: details);
 
     public Task LogStatusChangedAsync(string entityType, string entityId, string refNumber,
         string oldStatus, string newStatus, string by, string byName, string? reason = null) =>
@@ -52,5 +52,8 @@ public class AuditService(GenServiceDbContext db, ILogger<AuditService> log)
 
     public Task LogAsync(string entityType, string entityId, string refNumber,
         string action, string by, string byName, string? details) =>
-        LogAsync(entityType, entityId, refNumber, action, by, byName, details: details);
+        // oldValue/newValue must be named here: without them this call resolves
+        // back to this same overload and recurses until the process crashes.
+        LogAsync(entityType, entityId, refNumber, action, by, byName,
+            oldValue: null, newValue: null, details: details);
 }
