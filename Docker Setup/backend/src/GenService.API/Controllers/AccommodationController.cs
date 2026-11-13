@@ -95,9 +95,10 @@ public class AccommodationController(
 
     private async Task<string> NextReferenceAsync()
     {
-        var yr    = DateTime.UtcNow.Year % 100;
-        var count = await db.AccommodationLogs.CountAsync(r => r.CreatedAt.Year == DateTime.UtcNow.Year);
-        return $"FA/{yr}/{(count + 1):D3}";
+        // Highest existing number + 1 — safe when records have been deleted (see RefNumbers).
+        var prefix = $"FA/{DateTime.UtcNow.Year % 100}/";
+        var used   = await db.AccommodationLogs.Where(r => r.Reference.StartsWith(prefix)).Select(r => r.Reference).ToListAsync();
+        return RefNumbers.Next(prefix, used, 3);
     }
 
     // ── GET /api/v1/accommodation ────────────────────────────────────────────

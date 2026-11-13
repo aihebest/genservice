@@ -35,16 +35,18 @@ public class DieselSupplyController(
     // ── Reference number generators ───────────────────────────────────────────
     private async Task<string> NextSupplyRefAsync()
     {
-        var yy    = DateTime.UtcNow.ToString("yy");
-        var count = await db.DieselBulkSupplies.CountAsync() + 1;
-        return $"DSL/{yy}/{count:000}";
+        // Highest existing number + 1 — safe when records have been deleted (see RefNumbers).
+        var prefix = $"DSL/{DateTime.UtcNow.Year % 100}/";
+        var used   = await db.DieselBulkSupplies.Where(r => r.SupplyReference.StartsWith(prefix)).Select(r => r.SupplyReference).ToListAsync();
+        return RefNumbers.Next(prefix, used, 3);
     }
 
     private async Task<string> NextDistributionRefAsync()
     {
-        var yy    = DateTime.UtcNow.ToString("yy");
-        var count = await db.DieselDistributions.CountAsync() + 1;
-        return $"DDT/{yy}/{count:000}";
+        // Highest existing number + 1 — safe when records have been deleted (see RefNumbers).
+        var prefix = $"DDT/{DateTime.UtcNow.Year % 100}/";
+        var used   = await db.DieselDistributions.Where(r => r.DistributionReference.StartsWith(prefix)).Select(r => r.DistributionReference).ToListAsync();
+        return RefNumbers.Next(prefix, used, 3);
     }
 
     private static DieselSupplyDto ToDto(DieselBulkSupply s) => new(

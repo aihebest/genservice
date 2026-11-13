@@ -354,10 +354,10 @@ public class IntegrationController(
 
     private async Task<string> NextRequestNumberAsync()
     {
-        var year  = DateTime.UtcNow.Year % 100;
-        var count = await db.VehicleMaintenanceRequests
-                            .CountAsync(r => r.CreatedAt.Year == DateTime.UtcNow.Year);
-        return $"V/{year}/{(count + 1):D3}";
+        // Highest existing number + 1 — safe when records have been deleted (see RefNumbers).
+        var prefix = $"V/{DateTime.UtcNow.Year % 100}/";
+        var used   = await db.VehicleMaintenanceRequests.Where(r => r.RequestNumber.StartsWith(prefix)).Select(r => r.RequestNumber).ToListAsync();
+        return RefNumbers.Next(prefix, used, 3);
     }
 
     /// <summary>

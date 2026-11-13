@@ -41,10 +41,10 @@ public class RequestsController(
 
     private async Task<string> NextTicketNumberAsync()
     {
-        var year  = DateTime.UtcNow.Year;
-        var count = await db.ServiceRequests
-                            .CountAsync(r => r.CreatedAt.Year == year);
-        return $"REQ-{year}-{(count + 1):D4}";
+        // Highest existing number + 1 — safe when records have been deleted (see RefNumbers).
+        var prefix = $"REQ-{DateTime.UtcNow.Year}-";
+        var used   = await db.ServiceRequests.Where(r => r.TicketNumber.StartsWith(prefix)).Select(r => r.TicketNumber).ToListAsync();
+        return RefNumbers.Next(prefix, used, 4);
     }
 
     // ── GET /api/v1/requests ─────────────────────────────────────────────────

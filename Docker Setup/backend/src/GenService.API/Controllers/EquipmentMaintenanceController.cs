@@ -46,10 +46,10 @@ public class EquipmentMaintenanceController(
 
     private async Task<string> NextRefAsync()
     {
-        var yr    = DateTime.UtcNow.Year % 100;
-        var count = await db.EquipmentMaintenanceRequests
-                            .CountAsync(r => r.CreatedAt.Year == DateTime.UtcNow.Year);
-        return $"E/{yr}/{(count + 1):D3}";
+        // Highest existing number + 1 — safe when records have been deleted (see RefNumbers).
+        var prefix = $"E/{DateTime.UtcNow.Year % 100}/";
+        var used   = await db.EquipmentMaintenanceRequests.Where(r => r.RequestNumber.StartsWith(prefix)).Select(r => r.RequestNumber).ToListAsync();
+        return RefNumbers.Next(prefix, used, 3);
     }
 
     // ── GET /api/v1/equipment-maintenance ────────────────────────────────────
